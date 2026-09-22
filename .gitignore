@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Angular
+.angular/
+dist/
+
+# Build output
+build/
+coverage/
+
+# Logs
+*.log
+logs/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Runtime
+*.pid
+
+# Temporary files
+tmp/
+temp/
+
+# Database files
+*.sqlite
+*.sqlite3
+
+# Secrets
+*.pem
+*.key
+
+# Uploaded files
+uploads/
+
+# Cache
+.cache/
+
+# Test artifacts
+playwright-report/
+test-results/
