@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>HANDYLINK — Trusted Home Services &amp; Artisans in South Africa</title>
+<!-- Google Fonts: Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Play CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary-container": "#fffbff",
+            "secondary-container": "#99efe5",
+            "tertiary": "#a13b00",
+            "outline-variant": "#bfc7d2",
+            "secondary-fixed-dim": "#80d5cb",
+            "secondary-fixed": "#9cf2e8",
+            "error-container": "#ffdad6",
+            "on-primary-fixed-variant": "#004b73",
+            "inverse-primary": "#93ccff",
+            "on-surface-variant": "#3f4850",
+            "on-surface": "#131b2e",
+            "surface-tint": "#0284c7",
+            "on-secondary-fixed-variant": "#00504a",
+            "on-secondary-fixed": "#00201d",
+            "outline": "#707881",
+            "on-tertiary-fixed": "#360f00",
+            "on-secondary-container": "#006f67",
+            "on-primary-fixed": "#001d31",
+            "surface": "#faf8ff",
+            "on-background": "#131b2e",
+            "surface-container-low": "#f2f3ff",
+            "on-secondary": "#ffffff",
+            "on-tertiary-fixed-variant": "#7e2c00",
+            "primary-container": "#e0f2fe",
+            "primary-hover": "#0369a1",
+            "surface-container": "#f1f5f9",
+            "surface-dim": "#d2d9f4",
+            "surface-container-high": "#e2e7ff",
+            "on-primary-container": "#0369a1",
+            "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#93ccff",
+            "on-error-container": "#93000a",
+            "tertiary-container": "#c94c00",
+            "primary-fixed": "#cce5ff",
+            "error": "#ba1a1a",
+            "surface-container-highest": "#dae2fd",
+            "on-error": "#ffffff",
+            "background": "#faf8ff",
+            "surface-container-lowest": "#ffffff",
+            "tertiary-fixed-dim": "#ffb597",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "surface-bright": "#faf8ff",
+            "primary": "#0284c7",
+            "inverse-surface": "#283044",
+            "tertiary-fixed": "#ffdbcd",
+            "secondary": "#006a63",
+            "inverse-on-surface": "#eef0ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "2xl": "1rem",
+            "3xl": "1.5rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.5rem",
+            "gutter": "1.25rem",
+            "space-sm": "0.5rem",
+            "margin": "2rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.5rem",
+            "margin-mobile": "1rem",
+            "gutter-mobile": "0.75rem"
+          },
+          "fontFamily": {
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-xl-mobile": ["Plus Jakarta Sans"],
+            "price-display": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"],
+            "headline-lg-mobile": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-xl-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "price-display": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "800" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+            "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "headline-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-xl": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "label-md": ["14px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "label-lg": ["16px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .material-symbols-outlined.fill-icon {
+      font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+    }
+    /* Ambient shadow levels per style specification */
+    .shadow-tier-1 {
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+    }
+    .shadow-tier-2 {
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+    }
+    .shadow-card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 20px -4px rgba(15, 23, 42, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased selection:bg-primary/20 selection:text-primary">
+<!-- TOP APP BAR / NAVIGATION (Semantic Shell mapping JSON) -->
+<header class="sticky top-0 z-50 bg-surface-container-lowest border-b border-outline-variant/30 shadow-sm transition-all duration-200">
+<div class="flex justify-between items-center w-full px-margin-mobile md:px-margin max-w-7xl mx-auto h-20">
+<!-- Brand Logo -->
+<a class="flex items-center gap-2 group" href="#">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-sm group-hover:bg-[#0369a1] transition-colors">
+<span class="material-symbols-outlined" data-icon="handyman" style="font-variation-settings: 'FILL' 1;">handyman</span>
+</div>
+<div class="flex flex-col">
+<span class="text-headline-md font-headline-md text-primary tracking-tight font-extrabold leading-none">HANDYLINK</span>
+<span class="text-[10px] tracking-widest text-on-surface-variant font-bold uppercase mt-0.5">South Africa</span>
+</div>
+</a>
+<!-- Desktop Navigation Links -->
+<nav class="hidden md:flex items-center gap-8">
+<!-- Active link: Home (Determined autonomously from screen context) -->
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-md text-label-md transition-colors" href="#">Home</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-150 font-label-md text-label-md" href="#featured">Find a Handyman</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-150 font-label-md text-label-md" href="#services">Services</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors duration-150 font-label-md text-label-md" href="#how-it-works">How It Works</a>
+</nav>
+<!-- Trailing Action Cluster -->
+<div class="flex items-center gap-3">
+<a class="text-on-surface-variant hover:text-primary font-label-md text-label-md px-3 py-2 transition-colors" href="#login">Login</a>
+<a class="hidden sm:inline-flex items-center text-secondary hover:text-on-secondary-container font-label-md text-label-md px-3 py-2 transition-colors" href="#artisan-signup">
+          Join as an Artisan
+        </a>
+<a class="inline-flex items-center justify-center gap-2 bg-primary hover:bg-[#0369a1] text-on-primary px-5 py-2.5 rounded-xl font-label-md text-label-md shadow-sm active:scale-95 transition-all duration-150" href="#search-anchor">
+<span class="material-symbols-outlined text-[18px]" data-icon="search">search</span>
+<span>Find a Handyman</span>
+</a>
+</div>
+</div>
+</header>
+<!-- HERO SECTION -->
+<section class="relative pt-8 pb-16 md:pt-14 md:pb-24 overflow-hidden">
+<!-- Subtle warm atmospheric glow -->
+<div class="absolute -top-32 right-0 w-96 h-96 bg-primary-fixed/30 rounded-full blur-3xl pointer-events-none -z-10"></div>
+<div class="absolute top-1/2 left-0 w-80 h-80 bg-secondary-fixed/30 rounded-full blur-3xl pointer-events-none -z-10"></div>
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+<!-- Hero Copy & Dual Input Card (7 cols) -->
+<div class="lg:col-span-7 flex flex-col items-start">
+<!-- Suburb Trust Tag -->
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high border border-outline-variant/40 mb-5">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Vetted Artisans in Sandton, Fourways &amp; Bryanston</span>
+</div>
+<!-- Hero Headline -->
+<h1 class="text-headline-xl-mobile md:text-headline-xl font-headline-xl-mobile md:font-headline-xl text-on-surface tracking-tight mb-4">
+            Find a handyman you can <span class="text-primary underline decoration-primary/40 decoration-wavy decoration-2 underline-offset-4">trust.</span>
+</h1>
+<p class="text-body-md md:text-body-lg font-body-md md:font-body-lg text-on-surface-variant max-w-xl mb-8">
+            Connect with skilled local professionals for repairs, maintenance and home improvement. Vetted background checks, upfront pricing, and real work photos.
+          </p>
+<!-- DUAL INPUT SEARCH CARD (Signature Component) -->
+<div class="w-full bg-surface-container-lowest rounded-2xl border border-outline-variant/40 shadow-tier-2 p-3 md:p-3.5 transition-all" id="search-anchor">
+<form action="#featured" class="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-0" method="GET">
+<!-- Input 1: WHAT DO YOU NEED -->
+<div class="flex-1 flex items-center gap-3 px-3 py-2 md:py-1">
+<span class="material-symbols-outlined text-outline text-[22px]" data-icon="search">search</span>
+<div class="flex flex-col w-full text-left">
+<label class="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant text-[11px]" for="need-input">What do you need?</label>
+<input class="w-full border-0 p-0 text-on-surface placeholder:text-outline/70 focus:ring-0 text-body-md font-body-md bg-transparent" id="need-input" placeholder="Plumbing, painting, electrical, tiling…" type="text"/>
+</div>
+</div>
+<!-- Hairline Divider -->
+<div class="hidden md:block w-px h-10 bg-outline-variant/50 mx-2"></div>
+<div class="block md:hidden h-px w-full bg-outline-variant/30 my-1"></div>
+<!-- Input 2: WHERE -->
+<div class="flex-1 flex items-center gap-3 px-3 py-2 md:py-1">
+<span class="material-symbols-outlined text-outline text-[22px]" data-icon="location_on">location_on</span>
+<div class="flex flex-col w-full text-left">
+<label class="text-label-sm font-label-sm uppercase tracking-wider text-on-surface-variant text-[11px]" for="location-input">Where?</label>
+<input class="w-full border-0 p-0 text-on-surface placeholder:text-outline/70 focus:ring-0 text-body-md font-body-md bg-transparent" id="location-input" placeholder="Fourways, Sandton, Bryanston…" type="text"/>
+</div>
+</div>
+<!-- Search CTA Button -->
+<button class="mt-2 md:mt-0 flex items-center justify-center gap-2 bg-primary hover:bg-[#0369a1] text-on-primary font-label-lg font-bold px-7 py-4 rounded-xl shadow-md transition-all duration-150 active:scale-98 shrink-0" type="submit">
+<span>Find a Handyman</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</form>
+</div>
+<!-- Secondary Link & Suburb Pill Bar -->
+<div class="flex flex-wrap items-center justify-between w-full gap-3 mt-4 px-2">
+<div class="flex items-center gap-2 text-label-sm font-label-sm text-on-surface-variant">
+<span>Popular suburbs:</span>
+<a class="hover:text-primary underline" href="#">Fourways</a> •
+              <a class="hover:text-primary underline" href="#">Sandton</a> •
+              <a class="hover:text-primary underline" href="#">Bryanston</a> •
+              <a class="hover:text-primary underline" href="#">Rosebank</a>
+</div>
+<a class="text-label-sm font-label-sm font-semibold text-secondary hover:text-on-secondary-container transition-colors inline-flex items-center gap-1" href="#artisan-signup">
+<span>Are you a skilled artisan? Join as a Handyman</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span>
+</a>
+</div>
+</div>
+<!-- Hero Visual Showcase (5 cols) -->
+<div class="lg:col-span-5 relative">
+<div class="relative rounded-3xl overflow-hidden border border-outline-variant/30 shadow-tier-2 bg-surface-container-lowest group">
+<img class="w-full h-[440px] md:h-[500px] object-cover object-center group-hover:scale-102 transition-transform duration-500" data-alt="A friendly, professional South African male handyman smiling warmly while carefully assembling a modern wooden shelf in a sunlit Sandton residential living room. The room has high ceilings, crisp white walls, and warm African timber textures. The artisan wears a tidy branded terracotta polo shirt with toolbelt accessories. Natural golden morning light fills the clean, stylish interior." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAwkarJ2-NsYXLyS5603QkjAEjjoyN40S42SQSm-e15GgcHOSgas5cNUgPUn8Rgv6FlZDEXaT7O_cBL6m4_qA4r_lYjnezeHUwqIs7VBx8vVvb2oQnoV-2or4ol-uwwMYywoKMQfdeFJ9sS3rELatabGOmLXyST21i_tOa6URnq_thIfnhxfxoD4xnxMEgablb4gp1t4uyriqvY0Yu45oFgSEjhv5WU2t9coc-LwdqIv5a0lfBak2rDOg"/>
+<!-- In-Image Verified Overlay Card (Bottom-left) -->
+<div class="absolute bottom-4 left-4 right-4 bg-surface-container-lowest/95 backdrop-blur-md rounded-2xl p-4 border border-outline-variant/40 shadow-tier-2 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-secondary-fixed/50 flex items-center justify-center text-secondary font-bold text-headline-sm">
+<span class="material-symbols-outlined text-[28px]" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<span class="text-label-md font-label-md text-on-surface font-bold">100% Identity Verified</span>
+<span class="material-symbols-outlined text-secondary text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<p class="text-label-sm font-label-sm text-on-surface-variant">SAPS Criminal Background Checked</p>
+</div>
+</div>
+<div class="text-right">
+<span class="text-label-sm font-label-sm text-secondary font-bold">4.9 ★</span>
+<p class="text-[11px] text-on-surface-variant">Over 1,200 reviews</p>
+</div>
+</div>
+<!-- Floating Top Badge -->
+<div class="absolute top-4 right-4 bg-primary text-on-primary px-3 py-1.5 rounded-full text-label-sm font-label-sm font-bold flex items-center gap-1 shadow-md">
+<span class="material-symbols-outlined text-[16px]" data-icon="shield">shield</span>
+<span>R1,000,000 Guarantee</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- TRUST STRIP (4 Clear Horizontal Markers) -->
+<section class="border-y border-outline-variant/30 bg-surface-container-lowest py-8">
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+<!-- Trust Marker 1 -->
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-xl bg-secondary-container/40 text-on-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div>
+<h4 class="text-label-md font-label-md text-on-surface font-bold">Verified Professionals</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-0.5">ID &amp; SAPS background checked</p>
+</div>
+</div>
+<!-- Trust Marker 2 -->
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-xl bg-primary-fixed/60 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]" data-icon="photo_library" style="font-variation-settings: 'FILL' 1;">photo_library</span>
+</div>
+<div>
+<h4 class="text-label-md font-label-md text-on-surface font-bold">Real Work Portfolios</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-0.5">Proof of past South African jobs</p>
+</div>
+</div>
+<!-- Trust Marker 3 -->
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-xl bg-secondary-container/40 text-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]" data-icon="near_me" style="font-variation-settings: 'FILL' 1;">near_me</span>
+</div>
+<div>
+<h4 class="text-label-md font-label-md text-on-surface font-bold">Local Professionals</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-0.5">Near Fourways &amp; Sandton</p>
+</div>
+</div>
+<!-- Trust Marker 4 -->
+<div class="flex items-start gap-3.5">
+<div class="w-11 h-11 rounded-xl bg-primary-fixed/60 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[24px]" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<div>
+<h4 class="text-label-md font-label-md text-on-surface font-bold">Customer Reviews</h4>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-0.5">Authentic, unedited feedback</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- POPULAR SERVICES GRID (10 Categories) -->
+<section class="py-16 md:py-24" id="services">
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-10">
+<div>
+<span class="text-label-sm font-label-sm font-bold uppercase tracking-wider text-primary">Browse by Category</span>
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-on-surface mt-1">Popular Services</h2>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1">Find the right verified professional for the job.</p>
+</div>
+<a class="mt-4 md:mt-0 inline-flex items-center gap-1 text-primary hover:text-[#0369a1] font-label-md font-bold transition-colors" href="#featured">
+<span>View all 48 services</span>
+<span class="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+<!-- 10 Responsive Category Cards Grid -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5">
+<!-- Service 1: General Handyman -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-primary-fixed/40 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="handyman">handyman</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">General Handyman</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Fixes, mounting &amp; repairs</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R350</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 2: Plumbing -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/40 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-on-secondary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="plumbing">plumbing</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Plumbing</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Leaks, geysers, pipes</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R450</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 3: Electrical -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-primary-fixed/40 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="bolt">bolt</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Electrical</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Wiring, DB boards, solar</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R450</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 4: Painting -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/40 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-on-secondary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="format_paint">format_paint</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Painting</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Interior &amp; exterior coating</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R380</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 5: Carpentry -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-primary-fixed/40 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="carpenter">carpenter</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Carpentry</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Cabinets, doors &amp; decking</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R420</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 6: Tiling -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/40 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-on-secondary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="grid_view">grid_view</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Tiling</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Floor, wall &amp; patio paving</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R400</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 7: Building -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-primary-fixed/40 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="home_repair_service">home_repair_service</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Building</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Plastering, brickwork, walls</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R500</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 8: Home Maintenance -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/40 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-on-secondary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="roofing">roofing</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Home Maintenance</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Gutters, waterproofing, roofs</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R390</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 9: Gardening -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-primary-fixed/40 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="yard">yard</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Gardening</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Landscaping, cleanups, trees</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R300</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+<!-- Service 10: Appliance Repairs -->
+<a class="group p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between" href="#">
+<div class="w-12 h-12 rounded-xl bg-secondary-container/40 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-on-secondary transition-colors mb-4">
+<span class="material-symbols-outlined text-[26px]" data-icon="kitchen">kitchen</span>
+</div>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface group-hover:text-primary transition-colors text-base font-bold">Appliance Repairs</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1 text-[13px]">Fridges, washers, ovens</p>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/20 flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span>From R420</span>
+<span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</div>
+</a>
+</div>
+</div>
+</section>
+<!-- HOW IT WORKS SECTION (4 Numbered Step Cards) -->
+<section class="py-16 md:py-24 bg-surface-container-low border-y border-outline-variant/30" id="how-it-works">
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="text-center max-w-2xl mx-auto mb-14">
+<span class="text-label-sm font-label-sm font-bold uppercase tracking-wider text-secondary">Frictionless Process</span>
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-on-surface mt-1">Getting help is simple.</h2>
+<p class="text-body-md font-body-md text-on-surface-variant mt-2">Book reliable local handymen in four transparent steps with zero surprises.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
+<!-- Step 1 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 shadow-tier-1 flex flex-col justify-between relative overflow-hidden">
+<div class="text-[52px] font-extrabold text-outline-variant/30 leading-none select-none">01</div>
+<div class="my-4">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed/40 text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]" data-icon="edit_note">edit_note</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold">Tell us what you need</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-2">Describe your job and upload photos so artisans can assess the scope accurately.</p>
+</div>
+<div class="text-label-sm font-label-sm text-secondary font-semibold flex items-center gap-1">
+<span>Instant request</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 shadow-tier-1 flex flex-col justify-between relative overflow-hidden">
+<div class="text-[52px] font-extrabold text-outline-variant/30 leading-none select-none">02</div>
+<div class="my-4">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/40 text-secondary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]" data-icon="badge">badge</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold">Find the right professional</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-2">Compare experience, previous work, certificates and reviews from local clients.</p>
+</div>
+<div class="text-label-sm font-label-sm text-secondary font-semibold flex items-center gap-1">
+<span>Verified portfolios</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 shadow-tier-1 flex flex-col justify-between relative overflow-hidden">
+<div class="text-[52px] font-extrabold text-outline-variant/30 leading-none select-none">03</div>
+<div class="my-4">
+<div class="w-10 h-10 rounded-lg bg-primary-fixed/40 text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]" data-icon="receipt_long">receipt_long</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold">Get a quote</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-2">Review the quote in South African Rand (ZAR) and choose your preferred professional.</p>
+</div>
+<div class="text-label-sm font-label-sm text-secondary font-semibold flex items-center gap-1">
+<span>No hidden fees</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+</div>
+<!-- Step 4 -->
+<div class="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 shadow-tier-1 flex flex-col justify-between relative overflow-hidden">
+<div class="text-[52px] font-extrabold text-outline-variant/30 leading-none select-none">04</div>
+<div class="my-4">
+<div class="w-10 h-10 rounded-lg bg-secondary-container/40 text-secondary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]" data-icon="task_alt">task_alt</span>
+</div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold">Get the job done</h3>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-2">Communicate, complete the job safely and release payment after leaving a verified review.</p>
+</div>
+<div class="text-label-sm font-label-sm text-secondary font-semibold flex items-center gap-1">
+<span>Satisfaction guarantee</span>
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- TRUSTED PROFESSIONALS NEAR YOU (Featured Handymen Cards) -->
+<section class="py-16 md:py-24" id="featured">
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-12">
+<div>
+<span class="text-label-sm font-label-sm font-bold uppercase tracking-wider text-primary">Handpicked Artisans</span>
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-on-surface mt-1">Trusted Professionals Near You</h2>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1">Top-rated handymen currently available in Fourways, Sandton &amp; Bryanston.</p>
+</div>
+<div class="mt-4 md:mt-0 flex items-center gap-2">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Filter:</span>
+<span class="px-3 py-1 bg-primary text-on-primary rounded-full text-label-sm font-label-sm font-semibold">Available Today</span>
+<span class="px-3 py-1 bg-surface-container-lowest border border-outline-variant/30 rounded-full text-label-sm font-label-sm text-on-surface-variant">Top Rated</span>
+</div>
+</div>
+<!-- 3 High-Fidelity Artisan Cards -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Artisan Card 1: Thabo Mokoena -->
+<div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/40 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between overflow-hidden">
+<!-- Card Header & Bio -->
+<div class="p-6">
+<div class="flex items-start justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<img class="w-14 h-14 rounded-xl object-cover border border-outline-variant/30 shrink-0" data-alt="A portrait of Thabo Mokoena, a cheerful and dependable 34-year-old South African handyman in a clean navy collared work shirt, standing against a neutral studio backdrop with warm soft lighting. He has a warm confident smile and well-groomed facial hair." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGiq36KEEfetl6hgxAm2QV-ExdQ050_oTRbfEdBLpVZc2u51geNRLvMBQ3aHQUbMNePCZ3bRodMm0Z6IayBaIrVAXqBnxVEcbhy6FcMFNxenEa3Lw57vldRUmWcQ7DPU-KWmK7fFzyhRyJF-kOZi4JyLE2rRqFBcPQGaxnGuDXokrMtRTUGiHjQZvJfLEEqleHJk34knFiBL8X97tNuwMYeJekJejvDGv1hMVBNbFg8UKmPQ76TE2jAQ"/>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold leading-snug">Thabo Mokoena</h3>
+<div class="flex items-center gap-1 text-on-surface-variant text-label-sm font-label-sm mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="location_on">location_on</span>
+<span>Fourways, Sandton</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container/40 text-on-secondary-container text-label-sm font-label-sm font-bold shrink-0">
+<span class="material-symbols-outlined text-[14px]" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span>Verified</span>
+</span>
+</div>
+<!-- Skills & Metrics -->
+<div class="mt-4 pt-4 border-t border-outline-variant/20 flex flex-wrap gap-1.5">
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">General Handyman</span>
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Plumbing</span>
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Painting</span>
+</div>
+<div class="mt-3 flex items-center justify-between text-body-sm font-body-sm text-on-surface-variant">
+<div class="flex items-center gap-1 font-bold text-on-surface">
+<span class="text-primary font-bold">★ 4.8</span>
+<span class="text-on-surface-variant font-normal">(42 reviews)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-outline" data-icon="work_history">work_history</span>
+<span>5+ years exp.</span>
+</div>
+</div>
+<!-- 3 Preview Portfolio Thumbnails -->
+<div class="mt-5">
+<span class="text-label-sm font-label-sm text-on-surface-variant font-semibold block mb-2">Recent Verified Work</span>
+<div class="grid grid-cols-3 gap-2">
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="A close-up photograph of a newly fitted, gleaming chrome basin mixer tap installed into a pristine white quartz bathroom countertop in a contemporary Fourways residence. Clean silicone bead lines and modern minimalist decor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD24659PbNKx-czMc-CxLbPsJYpqGWKBoiQjhbUFwG9dkMIPHQIyR0Q94gI-E9g-_YwTGiXBSjfh4_bMY016RKcph2Qb_P2-omFpiaLJ3dusIvJc7W65YGG9iCmtxwqYBaOKgTMZrhG0b8PWrAnv5sBQyBNuJ389Vy-eCRsv2k_Rh6P63WNaHYDdVKW-0Kd2SkLITlLrgmm2LwOYmKuobK8xVfUG_fPPR6v2S-fEBFklbMxPmrzyqr72Q"/>
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="A crisp interior wall corner freshly painted in elegant warm greige, with clean white skirting boards and spotless timber flooring in a bright suburban home. Perfect line precision and spotless workspace." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCJMxk5wH3AvQLtjpwqODSvoRFXsU75B_8Ew2CQZCdDS4XOSbi3nIPGh4SR5z0NDgk1h34kvdbNeV9KkUgq4X0s21TyqXnrxUMwblfEgLglLS5pNP7OpUaublYgcQq8pervj5n2cDncmvZ-K_FADjpykNQLwJO14N_mt45K6_rVSm8a6pvdkibH35EsN15v5F9D_cfZY-ckdmwti26VK54qpbL9XwdzHwvuqUc_MGQssb34xeZ6zOuPjw"/>
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="A neatly mounted large 65-inch flat screen television with hidden wiring neatly recessed into a stylish wooden accent slat wall inside a modern South African lounge." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCI7suRUn17nEP0WgIVDM5sehTyaXiBs9zNhl7cSmFIsDCuIJ_HN3uRjLZrqkk6-8H57Ub4i9hhpisHoL98uLlH0UUDcop2-0JJ__Ck8hysm15h_WuGa8wsRy2HLjZ0Q2Czgh6z6vYFGNvlJZsldIIYgTNQ1x5G5j7uFf9BCjOvN9lg-xXFmdEraGJaG0v0hRpPzszl4mvZeoh7DXaLQmIGEXS_5zLP2AwmscPDO-8iZJu7UkioZkX9uA"/>
+</div>
+</div>
+</div>
+<!-- Card Footer (Pricing & Dual CTAs) -->
+<div class="px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 flex items-center justify-between gap-2">
+<div>
+<span class="text-[11px] text-on-surface-variant uppercase font-semibold block leading-none">Starting from</span>
+<span class="text-price-display font-price-display text-primary font-extrabold">R350</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-2 bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant/40 rounded-xl font-label-md font-bold text-label-md transition-colors">
+                View Profile
+              </button>
+<button class="px-3.5 py-2 bg-primary hover:bg-[#0369a1] text-on-primary rounded-xl font-label-md font-bold text-label-md shadow-sm transition-all active:scale-98">
+                Request Job
+              </button>
+</div>
+</div>
+</div>
+<!-- Artisan Card 2: Sipho Ndlovu -->
+<div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/40 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between overflow-hidden">
+<!-- Card Header & Bio -->
+<div class="p-6">
+<div class="flex items-start justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<img class="w-14 h-14 rounded-xl object-cover border border-outline-variant/30 shrink-0" data-alt="A portrait of Sipho Ndlovu, an experienced 41-year-old South African master electrician wearing a neat high-visibility trim charcoal work vest and clear protective eyewear propped on his forehead. Warm professional expression with confident eye contact." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTMJwQe0A-yekgc01zY2QJiPYkqoxJdb6am7kflMZ_kO7XqmK12SalJZlrWPjOFxlNnG__b2LwVlhMBndoY_Cthp7axw0JZaqI7Tf3_aV5t_AND7R6vI9cug6-Ret5drNMwUMI2InrnVoNVkKAGJHdstgm0g4xCrmRq-Aq04-4uM5uN25iLnIJYNZWSDq39Fef9alVkkeUkSbTpDTlORpYptuhDp3LbrL-TQsE3MZuc0rhPbDlcavQJw"/>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold leading-snug">Sipho Ndlovu</h3>
+<div class="flex items-center gap-1 text-on-surface-variant text-label-sm font-label-sm mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="location_on">location_on</span>
+<span>Sandton Central</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container/40 text-on-secondary-container text-label-sm font-label-sm font-bold shrink-0">
+<span class="material-symbols-outlined text-[14px]" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span>Verified</span>
+</span>
+</div>
+<!-- Skills & Metrics -->
+<div class="mt-4 pt-4 border-t border-outline-variant/20 flex flex-wrap gap-1.5">
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Master Electrician</span>
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Solar Backup</span>
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">COC Certificates</span>
+</div>
+<div class="mt-3 flex items-center justify-between text-body-sm font-body-sm text-on-surface-variant">
+<div class="flex items-center gap-1 font-bold text-on-surface">
+<span class="text-primary font-bold">★ 4.9</span>
+<span class="text-on-surface-variant font-normal">(58 reviews)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-outline" data-icon="work_history">work_history</span>
+<span>8+ years exp.</span>
+</div>
+</div>
+<!-- 3 Preview Portfolio Thumbnails -->
+<div class="mt-5">
+<span class="text-label-sm font-label-sm text-on-surface-variant font-semibold block mb-2">Recent Verified Work</span>
+<div class="grid grid-cols-3 gap-2">
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="A pristine modern residential electrical distribution board (DB box) with perfectly straight, zip-tied colorful wiring, certified circuit breakers, and clean professional labels inside a luxury Sandton home." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBanrsw9beY2TGsfIAOsYh5zDqMK_vikNktyyjJtZKIILbaZ0_LQRgOVhVILOG91Td4I5H1VrDWO5bmI1v8cqvF66ix18gPl5_GwYO3fvevjrgIecLRcu6P5iGVdhBlQbxowwHQWKbQ17dKC4qJkIKsrp8JZVclZAi7d-Gw5_ZnbhexaT5BaEFeUJcml6TyKBTXv7dLNlW-fHWwI2NU4K2iSvfPWmGLZgVO97IVdZeHvTDvw8Idv7iP8w"/>
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="A sleek 5kW lithium hybrid solar inverter cleanly mounted on a painted garage wall with neat electrical conduit tubing and emergency shutoff switches." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBstc00g4opQd_Pl03VNAWIGe02FYqdYNc8HsEp05ow2R44tAWwWnFKr3K2Vupbh_E_OKnUN2h7MZKtw1LPlAWCnlijRn_9lBoBEd1w88DBRj96WAtxFRawkxhDgD-oIl4Gfm1BbnhiW5a5GmZlqsgR8yKFkkEmXSoxWEgfXIdUMKdQ-oL2IIWgM0S2B997iC4vatsQXsrp6Y2bHUYBmHpisWR6GFgHj6x1jngl20lmj46SP95yZHwFAA"/>
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="Under-cabinet warm LED strip illumination installed seamlessly below modern matte charcoal kitchen cupboards, casting a gentle glow over marble countertops." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaFar5thH713b8uxFVRvaBrpgzqhYToA2X3fuq5rXUYx7cBsbL_MRsIA5JXMzE-A1TRkL4HSMbbRHam9V-u3KfMhLTh8Cs9g8DnV7QlJHqr6NX1viwH8Trm2bCQuWPfbEihj7mTSiyjd1AW44mKaVBWb7ViVNqv3izOlUxCurMUs8SzTnilZO8ti3SnzFk1nLTRaHiUjRg6w1BUexJpaPVtQaPjo50jOCmKUILMVFrGGKsp1_1s4qF8g"/>
+</div>
+</div>
+</div>
+<!-- Card Footer (Pricing & Dual CTAs) -->
+<div class="px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 flex items-center justify-between gap-2">
+<div>
+<span class="text-[11px] text-on-surface-variant uppercase font-semibold block leading-none">Starting from</span>
+<span class="text-price-display font-price-display text-primary font-extrabold">R450</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-2 bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant/40 rounded-xl font-label-md font-bold text-label-md transition-colors">
+                View Profile
+              </button>
+<button class="px-3.5 py-2 bg-primary hover:bg-[#0369a1] text-on-primary rounded-xl font-label-md font-bold text-label-md shadow-sm transition-all active:scale-98">
+                Request Job
+              </button>
+</div>
+</div>
+</div>
+<!-- Artisan Card 3: Johan van der Merwe -->
+<div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/40 shadow-tier-1 shadow-card-hover transition-all duration-200 flex flex-col justify-between overflow-hidden">
+<!-- Card Header & Bio -->
+<div class="p-6">
+<div class="flex items-start justify-between gap-4">
+<div class="flex items-center gap-3.5">
+<img class="w-14 h-14 rounded-xl object-cover border border-outline-variant/30 shrink-0" data-alt="A portrait of Johan van der Merwe, a friendly 38-year-old South African artisan carpenter and tiler in a tailored light grey work shirt. He stands in his bright workshop with timber planks and precise measuring instruments behind him, smiling warmly." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfzD9-LJF1AYruksRnkyXx-m0Whm-W687HQBEKSAkVp-l6bOls2Ec8PTgA-SFNFLbIL89nkSYAhPJuCmWSO5TsfWBcii4sMq0yYPvIHtBeJKBt_Dv5d6UioogxlOiL8HXGYUrZ2pxjDTYsmEaskSFM_7GOyCFPUM6JmA-JXDs-dly7XivLsWF6Tcck_8V8Rn2ygpUBEfeqeSvRVgoT_jTDzW8e9Mm4UFobDkQLJOwxzIWn4HGkBWgt-w"/>
+<div>
+<h3 class="text-headline-sm font-headline-sm text-on-surface font-bold leading-snug">Johan van der Merwe</h3>
+<div class="flex items-center gap-1 text-on-surface-variant text-label-sm font-label-sm mt-0.5">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="location_on">location_on</span>
+<span>Bryanston East</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container/40 text-on-secondary-container text-label-sm font-label-sm font-bold shrink-0">
+<span class="material-symbols-outlined text-[14px]" data-icon="verified" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span>Verified</span>
+</span>
+</div>
+<!-- Skills & Metrics -->
+<div class="mt-4 pt-4 border-t border-outline-variant/20 flex flex-wrap gap-1.5">
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Precision Carpentry</span>
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Porcelain Tiling</span>
+<span class="text-[12px] font-semibold bg-surface-container px-2.5 py-1 rounded-md text-on-surface-variant">Decking</span>
+</div>
+<div class="mt-3 flex items-center justify-between text-body-sm font-body-sm text-on-surface-variant">
+<div class="flex items-center gap-1 font-bold text-on-surface">
+<span class="text-primary font-bold">★ 4.7</span>
+<span class="text-on-surface-variant font-normal">(36 reviews)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-outline" data-icon="work_history">work_history</span>
+<span>6+ years exp.</span>
+</div>
+</div>
+<!-- 3 Preview Portfolio Thumbnails -->
+<div class="mt-5">
+<span class="text-label-sm font-label-sm text-on-surface-variant font-semibold block mb-2">Recent Verified Work</span>
+<div class="grid grid-cols-3 gap-2">
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="Expertly laid large-format grey porcelain floor tiles in an expansive Bryanston open-plan living room with razor-sharp 2mm grout joints and seamless patio transition." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-MhBmEAQzbH01rnpng4k58itOTlthA3MtmGXe2E_4LicrZaSS1Ijo6Tx2lHAU-y3Bw_-hHSmQGuB-76zkWl6FyM7jCaYemrYf20bdm7tAZAdnMWp8-H1nx1Z_5oPxPRoZALW4XAVjdZOkpNDAwSDcI0SwOonIlqGk3YdQOBR_99Qr18GWe_YeqJ5OVqIrNLW6NIyR3tLOIoSnr0E6sX4xJNHT8yILcVAj7GXiSwGciDkhwHn_vr85NQ"/>
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="Custom handcrafted solid oak bathroom floating vanity unit with dovetail joinery details and a matte polyurethane water-resistant seal." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCg91NUUbwGq8VQV44xF0AB-SP56DZedCVHcX0q2qAUhqXFZFJm3VmLs5opSCRuV_UNGFGTuVRqHh5CH64kdFGFARR0MOaFGOVoT__Q4NjshK9h_upEATXLfiChzP4IOSRRgyJTQ8FoPPlyansnUPeEf3XA2y1KpeacglBwqbZmjHvDZeBcMwKAxOpCYjHbTvJLqXwx46Vtf60W-eQv9NK01Ue5ZYFWvfH_uEzv6ZZfLDpm1mQ3J2JKkQ"/>
+<img class="w-full h-18 rounded-lg object-cover border border-outline-variant/20" data-alt="Newly completed balau timber poolside deck with hidden stainless steel deck fasteners and smooth bevelled edge planks in afternoon sunlight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqT4ucMnKiZNPtdGRlGLcpAZOmaZhnhSkeHqebuVMBivXmd_2wOuOEJsQlAWdn1XdMikiCQMTTIwIESpoFiM0cc0NSIdzBvzE7eRxatrTnR-cMIHg9RA5q6DsiBprxONghnLe6OJNaIthgrj7z7uiNZOlzXxJxc91E0kAb6mW8TAPVhVOdJuc99D2P8X_-0EkWaRCZmMUlxSNO4HtLBoLF7FCAYCVnXrvHz90Nh4a1y12UrEThtMjSbg"/>
+</div>
+</div>
+</div>
+<!-- Card Footer (Pricing & Dual CTAs) -->
+<div class="px-6 py-4 bg-surface-container-low border-t border-outline-variant/30 flex items-center justify-between gap-2">
+<div>
+<span class="text-[11px] text-on-surface-variant uppercase font-semibold block leading-none">Starting from</span>
+<span class="text-price-display font-price-display text-primary font-extrabold">R400</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-2 bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant/40 rounded-xl font-label-md font-bold text-label-md transition-colors">
+                View Profile
+              </button>
+<button class="px-3.5 py-2 bg-primary hover:bg-[#0369a1] text-on-primary rounded-xl font-label-md font-bold text-label-md shadow-sm transition-all active:scale-98">
+                Request Job
+              </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- TRUST & PROOF SPLIT SECTION (See Their Work Before You Hire) -->
+<section class="py-16 md:py-24 bg-surface-container-lowest border-y border-outline-variant/30">
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+<!-- Left: Visual Collage / Bento Proof Grid (6 cols) -->
+<div class="lg:col-span-6 grid grid-cols-2 gap-4">
+<div class="space-y-4">
+<div class="rounded-2xl overflow-hidden border border-outline-variant/30 shadow-tier-1 relative group">
+<img class="w-full h-52 object-cover group-hover:scale-103 transition-transform duration-300" data-alt="A modern, high-end bathroom renovation showcase in Johannesburg featuring seamless subway tiling, frameless glass shower panel, and brushed brass fixtures in pristine condition." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgAPdBwUtWpjOF-d1nmxDmIEIXSnZiiaBXb6yMBU3uoK2wPHT7MlHpcHK5uQEWA_okE3YoScPgFcwUNBvgIDZDYxOLQ_Xp2Ymrt514leuQfJShIRwSD3Qu4Qk-Svr2kD8wjSNxLuf8j1r7KzA_7fse1rP7gkqfD_wMGujtx9yVKHKftmuWJczEB8-7OOcqfWM3izi7Cb7dyXUeYX7HnJDRniPyeISUEvmmMg79bjJadVuQfbQNaT0ttg"/>
+<span class="absolute bottom-2 left-2 bg-on-surface/80 backdrop-blur-sm text-surface px-2 py-1 rounded text-[11px] font-semibold">Bathroom Revamp • Fourways</span>
+</div>
+<div class="rounded-2xl overflow-hidden border border-outline-variant/30 shadow-tier-1 relative group">
+<img class="w-full h-40 object-cover group-hover:scale-103 transition-transform duration-300" data-alt="A clean copper pipe water manifold repair under a modern kitchen sink with dual brass shutoff valves, tidy pipe clamps, and zero dampness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDotrApdD08UpdaK_ONtK31Cl-EoLP63oejYQjsk3qvLNebUVzYKhuyVFBfCHferiuhb5NwbisuERkWt9-VCbZa-cFrlQdhvFtAr7gswjsPj_s_MDucuwqd-6Q5CJ39hDeXZeGLuS-tCyttIpHKrRR8kxx8oJGpq133C4njhXelc-SZZtxHq8hfWoQQRYxMoA6sSjmCXu8NyesgIFqZOEji3BTywzrv3iPXl05OcSgO_nVJ1lGDH8-C3Q"/>
+<span class="absolute bottom-2 left-2 bg-on-surface/80 backdrop-blur-sm text-surface px-2 py-1 rounded text-[11px] font-semibold">Plumbing Fix • Bryanston</span>
+</div>
+</div>
+<div class="space-y-4 pt-6">
+<div class="rounded-2xl overflow-hidden border border-outline-variant/30 shadow-tier-1 relative group">
+<img class="w-full h-40 object-cover group-hover:scale-103 transition-transform duration-300" data-alt="A sunlit outdoor covered patio featuring newly laid textured sandstone paving tiles leading out to a clean suburban swimming pool." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaIZxwm8Hj1mDIAbgb_AoJqTIIQDicZ9IQ5879_JLjAsZpxsukvC6EIVJP5ugipJNDDtGocCzQrBvk1YmhCgmFy8rWl0lWk-dU3uDpSphixTawYZHwEJOw_ucU6qjBMIg1PREX3MOAn34qDtu8j_yOAd1guEm6LNajsdEpclW4GrtCumoQtG3MCAOqoyvZia2Ta25g6WDlynz_ZcnArfdhkVrtKbIltf44C7CUtsOpnTKLlwRTUXWshg"/>
+<span class="absolute bottom-2 left-2 bg-on-surface/80 backdrop-blur-sm text-surface px-2 py-1 rounded text-[11px] font-semibold">Patio Tiling • Sandton</span>
+</div>
+<div class="rounded-2xl overflow-hidden border border-outline-variant/30 shadow-tier-1 relative group">
+<img class="w-full h-52 object-cover group-hover:scale-103 transition-transform duration-300" data-alt="A freshly painted architectural feature wall painted in calm sage green with wooden floating display shelving mounted with millimeter accuracy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA23PBenPEoyEg9908J1wKeQD3N94CtFYzrUyBt0wOiIMJ5zyAGVPqPhngY3zhxnwhuIM9OmvijHFfHOXROrsQZ3DgtJC7n1yqnCrMTdkaARM3QKzl2Ao00MGgyIxDcfFsiV0NHJNmGFCCOn5jfYa2eDjduCWlKrawjvcnexG5lC5TcIAjJsHYvq3wglHVVbDqxvsVgPa6z_vftTbnq4KYwAQG1tGuEeJcYmUcdme3SeFzJA-Kt0VrUqw"/>
+<span class="absolute bottom-2 left-2 bg-on-surface/80 backdrop-blur-sm text-surface px-2 py-1 rounded text-[11px] font-semibold">Carpentry &amp; Paint • Rosebank</span>
+</div>
+</div>
+</div>
+<!-- Right: Text & Feature Checklist (6 cols) -->
+<div class="lg:col-span-6 flex flex-col items-start lg:pl-6">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary-container/40 text-on-secondary-container text-label-sm font-label-sm font-bold mb-4">
+<span class="material-symbols-outlined text-[16px]" data-icon="policy">policy</span>
+<span>Proof-First Marketplace</span>
+</div>
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-on-surface tracking-tight">
+            See their work before you hire.
+          </h2>
+<p class="text-body-md md:text-body-lg font-body-md md:font-body-lg text-on-surface-variant mt-4 mb-8">
+            Every professional can showcase their previous work, experience, qualifications and customer reviews — so you can make a confident decision without taking chances.
+          </p>
+<!-- 5 Feature Checkpoints -->
+<div class="space-y-4 w-full mb-8">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] font-bold" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<span class="text-label-md font-label-md text-on-surface font-bold">Previous work</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant"> — High resolution photos of completed local projects.</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] font-bold" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<span class="text-label-md font-label-md text-on-surface font-bold">Certificates &amp; Trade Tests</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant"> — Verified trade diplomas and South African COC accreditations.</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] font-bold" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<span class="text-label-md font-label-md text-on-surface font-bold">Customer reviews</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant"> — Rated exclusively by confirmed clients who paid through the platform.</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] font-bold" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<span class="text-label-md font-label-md text-on-surface font-bold">Verified experience</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant"> — Track record of documented on-site home service years.</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary/15 text-secondary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[16px] font-bold" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<span class="text-label-md font-label-md text-on-surface font-bold">Local service area</span>
+<span class="text-body-sm font-body-sm text-on-surface-variant"> — Precise radius coverage for Fourways, Sandton, Bryanston &amp; Randburg.</span>
+</div>
+</div>
+</div>
+<a class="inline-flex items-center gap-2 bg-secondary hover:bg-on-secondary-container text-on-secondary font-label-lg font-bold px-7 py-3.5 rounded-xl shadow-sm transition-all duration-150 active:scale-98" href="#featured">
+<span>Explore Professionals</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- BOTTOM CTA BANNER -->
+<section class="py-14 md:py-20 bg-surface-container-high relative overflow-hidden">
+<div class="absolute -right-10 -bottom-10 w-80 h-80 bg-primary-fixed/40 rounded-full blur-3xl pointer-events-none"></div>
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin text-center relative z-10">
+<div class="max-w-3xl mx-auto">
+<h2 class="text-headline-lg-mobile md:text-headline-lg font-headline-lg-mobile md:font-headline-lg text-on-surface font-extrabold tracking-tight">
+          Need something fixed? Find a trusted professional near you.
+        </h2>
+<p class="text-body-md md:text-body-lg font-body-md md:font-body-lg text-on-surface-variant mt-3 mb-8">
+          Join thousands of South African homeowners in Sandton and Fourways getting repairs done right, on time, and on budget.
+        </p>
+<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+<a class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary hover:bg-[#0369a1] text-on-primary font-label-lg font-bold px-8 py-4 rounded-xl shadow-md transition-all duration-150 active:scale-98" href="#search-anchor">
+<span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
+<span>Find a Handyman</span>
+</a>
+<a class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-surface-container-lowest hover:bg-surface-container text-on-surface border border-outline-variant/40 font-label-lg font-bold px-8 py-4 rounded-xl shadow-tier-1 transition-colors" href="#artisan-signup">
+<span class="material-symbols-outlined text-[20px]" data-icon="handyman">handyman</span>
+<span>Join as a Handyman</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- FOOTER (Semantic Shell mapping JSON) -->
+<footer class="bg-surface border-t border-outline-variant/30 text-on-surface-variant">
+<div class="w-full px-margin-mobile md:px-margin py-space-xl max-w-7xl mx-auto">
+<div class="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+<!-- Brand & Description (2 cols on md) -->
+<div class="col-span-2">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[20px]" data-icon="handyman" style="font-variation-settings: 'FILL' 1;">handyman</span>
+</div>
+<span class="text-headline-md font-headline-md text-primary font-extrabold tracking-tight">HANDYLINK</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant max-w-sm">
+            South Africa's modern marketplace connecting verified local artisans with homeowners. Built for speed, trust, and quality craft.
+          </p>
+<div class="mt-4 flex items-center gap-3 text-secondary font-semibold text-label-sm font-label-sm">
+<span class="inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="lock">lock</span>
+<span>256-bit Secure Bookings</span>
+</span>
+</div>
+</div>
+<!-- Services Column -->
+<div>
+<h4 class="text-headline-sm font-headline-sm text-primary text-sm font-bold mb-4">Services</h4>
+<ul class="space-y-2.5 text-body-sm font-body-sm">
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Plumbing</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Electrical</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Handyman</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Carpentry</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Painting</a></li>
+</ul>
+</div>
+<!-- Popular Suburbs Column -->
+<div>
+<h4 class="text-headline-sm font-headline-sm text-primary text-sm font-bold mb-4">Areas Covered</h4>
+<ul class="space-y-2.5 text-body-sm font-body-sm">
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Fourways</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Sandton</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Bryanston</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Randburg</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Rosebank</a></li>
+</ul>
+</div>
+<!-- Trust & Company Column -->
+<div>
+<h4 class="text-headline-sm font-headline-sm text-primary text-sm font-bold mb-4">Trust &amp; Safety</h4>
+<ul class="space-y-2.5 text-body-sm font-body-sm">
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Trust &amp; Safety</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Join as an Artisan</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Background Checks</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Privacy Policy</a></li>
+<li><a class="hover:text-primary transition-colors duration-150" href="#">Terms of Service</a></li>
+</ul>
+</div>
+</div>
+<!-- Copyright Bottom Bar -->
+<div class="pt-8 border-t border-outline-variant/30 flex flex-col md:flex-row items-center justify-between gap-4 text-body-sm font-body-sm">
+<p>© 2025 HANDYLINK (Pty) Ltd. South Africa. All rights reserved.</p>
+<div class="flex items-center gap-6 text-label-sm font-label-sm">
+<span>Johannesburg</span>
+<span>•</span>
+<span>Pretoria</span>
+<span>•</span>
+<span>Cape Town</span>
+</div>
+</div>
+</div>
+</footer>
+</body></html>

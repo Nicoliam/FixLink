@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Request a Job - HandyLink South Africa</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary-container": "#fdfcff",
+            "secondary-container": "#99efe5",
+            "tertiary": "#006194",
+            "outline-variant": "#cbd5e1",
+            "secondary-fixed-dim": "#80d5cb",
+            "secondary-fixed": "#9cf2e8",
+            "error-container": "#ffdad6",
+            "on-primary-fixed-variant": "#004b73",
+            "inverse-primary": "#93ccff",
+            "on-surface-variant": "#475569",
+            "on-surface": "#131b2e",
+            "surface-tint": "#0284c7",
+            "on-secondary-fixed-variant": "#00504a",
+            "on-secondary-fixed": "#00201d",
+            "outline": "#64748b",
+            "on-tertiary-fixed": "#001d31",
+            "on-secondary-container": "#006f67",
+            "on-primary-fixed": "#001d31",
+            "surface": "#faf8ff",
+            "on-background": "#131b2e",
+            "surface-container-low": "#f2f3ff",
+            "on-secondary": "#ffffff",
+            "on-tertiary-fixed-variant": "#004b73",
+            "primary-container": "#e0f2fe",
+            "surface-container": "#eaedff",
+            "surface-dim": "#d2d9f4",
+            "surface-container-high": "#e2e7ff",
+            "on-primary-container": "#0369a1",
+            "surface-variant": "#dae2fd",
+            "primary-fixed-dim": "#93ccff",
+            "on-error-container": "#93000a",
+            "tertiary-container": "#007bb9",
+            "primary-fixed": "#cce5ff",
+            "error": "#ba1a1a",
+            "surface-container-highest": "#dae2fd",
+            "on-error": "#ffffff",
+            "background": "#faf8ff",
+            "surface-container-lowest": "#ffffff",
+            "tertiary-fixed-dim": "#93ccff",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "surface-bright": "#faf8ff",
+            "primary": "#0284c7",
+            "inverse-surface": "#283044",
+            "tertiary-fixed": "#cce5ff",
+            "secondary": "#006a63",
+            "inverse-on-surface": "#eef0ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2.5rem",
+            "gutter": "1.25rem",
+            "space-sm": "0.5rem",
+            "margin": "2rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.5rem",
+            "margin-mobile": "1rem",
+            "gutter-mobile": "0.75rem"
+          },
+          "fontFamily": {
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-xl-mobile": ["Plus Jakarta Sans"],
+            "price-display": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "headline-xl": ["Plus Jakarta Sans"],
+            "headline-lg-mobile": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-xl-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "price-display": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "800" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "700" }],
+            "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+            "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "headline-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-xl": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "34px", "letterSpacing": "-0.015em", "fontWeight": "700" }],
+            "label-md": ["14px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+            "label-lg": ["16px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .material-symbols-fill {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased selection:bg-primary/10 selection:text-primary min-h-screen flex flex-col justify-between">
+<!-- Header: Clean Minimal HandyLink Header -->
+<header class="sticky top-0 z-40 bg-surface-container-lowest/95 backdrop-blur shadow-sm">
+<div class="flex justify-between items-center w-full px-margin-mobile md:px-margin max-w-7xl mx-auto h-20">
+<!-- Left: Logo & Back Action -->
+<div class="flex items-center space-x-4 md:space-x-6">
+<a class="flex items-center gap-1 group text-on-surface-variant hover:text-primary transition-colors py-2" href="#" title="Back to Search">
+<span class="material-symbols-outlined text-lg" data-icon="arrow_back">arrow_back</span>
+<span class="font-label-md text-label-md hidden sm:inline">Back to Search</span>
+</a>
+<div class="h-5 w-px bg-outline-variant/40 hidden sm:block"></div>
+<a class="flex items-center gap-2" href="#">
+<span class="font-headline-md text-headline-md text-[#0284C7] tracking-tight font-extrabold">HANDYLINK</span>
+<span class="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-secondary/10 text-secondary border border-secondary/20">
+            PRO DIRECT
+          </span>
+</a>
+</div>
+<!-- Right: Direct Support Contact -->
+<div class="flex items-center gap-4">
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-3 py-1.5 rounded-xl border border-outline-variant/30 bg-surface-container-lowest" href="tel:0114650000">
+<span class="material-symbols-outlined text-primary text-base" data-icon="support_agent">support_agent</span>
+<span class="font-label-md text-label-md hidden lg:inline">Need help?</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">011 465 0000</span>
+</a>
+<div class="flex items-center gap-1.5 text-xs text-secondary font-semibold bg-secondary/10 px-2.5 py-1 rounded-full border border-secondary/20">
+<span class="inline-block w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span>Fourways Dispatch Active</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Sticky Step Breadcrumb Bar -->
+<section class="sticky top-20 z-30 bg-surface-container-lowest border-t border-outline-variant/20 shadow-sm py-3 px-margin-mobile md:px-margin">
+<div class="max-w-4xl mx-auto">
+<nav aria-label="Booking steps" class="flex items-center justify-between relative">
+<!-- Connecting Progress Line -->
+<div class="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-surface-container w-full z-0 rounded-full"></div>
+<div class="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-secondary w-5/12 z-0 rounded-full transition-all duration-500"></div>
+<!-- Step 1: Service (Completed) -->
+<div class="relative z-10 flex flex-col items-center group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-label-md text-label-md shadow-sm">
+<span class="material-symbols-outlined text-base" data-icon="check">check</span>
+</div>
+<span class="font-label-sm text-label-sm mt-1.5 text-on-surface font-semibold hidden sm:block">1. Service</span>
+</div>
+<!-- Step 2: Details (Completed) -->
+<div class="relative z-10 flex flex-col items-center group cursor-pointer">
+<div class="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center font-label-md text-label-md shadow-sm">
+<span class="material-symbols-outlined text-base" data-icon="check">check</span>
+</div>
+<span class="font-label-sm text-label-sm mt-1.5 text-on-surface font-semibold hidden sm:block">2. Details</span>
+</div>
+<!-- Step 3: Photos (Active) -->
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-9 h-9 rounded-full bg-[#0284C7] text-on-primary ring-4 ring-[#0284C7]/20 flex items-center justify-center font-label-md text-label-md shadow-md">
+<span class="font-bold">3</span>
+</div>
+<span class="font-label-sm text-label-sm mt-1 text-[#0284C7] font-bold">3. Photos</span>
+</div>
+<!-- Step 4: Location (Upcoming) -->
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center font-label-md text-label-md">
+<span>4</span>
+</div>
+<span class="font-label-sm text-label-sm mt-1.5 text-on-surface-variant font-medium hidden sm:block">4. Location</span>
+</div>
+<!-- Step 5: Schedule (Upcoming) -->
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center font-label-md text-label-md">
+<span>5</span>
+</div>
+<span class="font-label-sm text-label-sm mt-1.5 text-on-surface-variant font-medium hidden sm:block">5. Schedule</span>
+</div>
+<!-- Step 6: Review (Upcoming) -->
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center font-label-md text-label-md">
+<span>6</span>
+</div>
+<span class="font-label-sm text-label-sm mt-1.5 text-on-surface-variant font-medium hidden sm:block">6. Review</span>
+</div>
+</nav>
+</div>
+</section>
+<!-- Main Wizard Flow Container -->
+<main class="flex-grow py-8 px-margin-mobile md:px-margin">
+<div class="max-w-4xl mx-auto space-y-6">
+<!-- Header Titles & Artisan Context Banner -->
+<div class="space-y-3">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-2">
+<div>
+<span class="font-label-sm text-label-sm text-[#0284C7] uppercase tracking-wider font-bold">Step 3 of 6</span>
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-extrabold tracking-tight">Request a Job from Verified Handymen</h1>
+</div>
+<span class="inline-flex items-center gap-1.5 text-xs text-secondary font-semibold bg-secondary/10 px-3 py-1.5 rounded-full border border-secondary/20 self-start md:self-auto">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="verified_user">verified_user</span>
+            Background Checked Pros Only
+          </span>
+</div>
+<!-- Target Artisan Match Pill -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-3.5 shadow-sm flex items-center justify-between flex-wrap gap-3">
+<div class="flex items-center gap-3">
+<div class="relative">
+<div class="w-11 h-11 rounded-xl bg-surface-container flex items-center justify-center text-[#0284C7] font-bold border border-outline-variant/30 overflow-hidden">
+<span class="font-headline-sm text-headline-sm">TM</span>
+</div>
+<span class="absolute -bottom-1 -right-1 bg-secondary text-white rounded-full p-0.5 text-[10px] flex items-center justify-center shadow">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-bold">Sending request to Thabo Mokoena</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">+ 2 other top-rated Fourways artisans for price comparison</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#0284C7]/10 text-[#0284C7]">
+<span class="material-symbols-outlined text-xs material-symbols-fill" data-icon="star">star</span>
+              4.98 (142 reviews)
+            </span>
+</div>
+</div>
+</div>
+<!-- Main Interactive Wizard Card -->
+<div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-sm overflow-hidden divide-y divide-outline-variant/20">
+<!-- 1. Service Selected & Job Details Summaries (Collapsed Review Panels) -->
+<div class="p-6 bg-surface-container-low/40 grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Summary Left: Service -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex flex-col justify-between">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-lg" data-icon="plumbing">plumbing</span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Selected Service</span>
+<p class="font-label-md text-label-md text-on-surface font-bold">Plumbing</p>
+</div>
+</div>
+<button class="text-xs font-bold text-[#0284C7] hover:underline transition-colors py-1 px-2 rounded">
+                Change
+              </button>
+</div>
+<div class="mt-2.5 inline-flex items-center text-xs font-medium text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-lg w-fit">
+              Kitchen Tap &amp; Under-sink Pipe Leak
+            </div>
+</div>
+<!-- Summary Right: Job Brief -->
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 flex flex-col justify-between">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-lg bg-[#0284C7]/10 text-[#0284C7] flex items-center justify-center">
+<span class="material-symbols-outlined text-lg" data-icon="notes">notes</span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm text-on-surface-variant block">Job Scope Description</span>
+<p class="font-label-md text-label-md text-on-surface font-bold">Base leak &amp; cupboard drip</p>
+</div>
+</div>
+<button class="text-xs font-bold text-[#0284C7] hover:underline transition-colors py-1 px-2 rounded">
+                Edit
+              </button>
+</div>
+<p class="mt-2.5 font-body-sm text-body-sm text-on-surface-variant line-clamp-1 italic">
+              "Our kitchen mixer tap is leaking around the base, and water is dripping into the under-sink cupboard."
+            </p>
+</div>
+</div>
+<!-- 2. Photo Upload Section (Current Focal Step) -->
+<div class="p-6 md:p-8 space-y-6">
+<div class="space-y-1">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold flex items-center gap-2">
+<span>Upload Photos of the Issue</span>
+<span class="text-xs bg-[#0284C7]/10 text-[#0284C7] px-2.5 py-0.5 rounded-full font-bold">Step 3 Active</span>
+</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant">3 of 5 photos uploaded</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+              Photos help artisans give you accurate quotes without unexpected surprise costs or unnecessary site trips.
+            </p>
+</div>
+<!-- Drag and Drop Canvas -->
+<div class="border-2 border-dashed border-outline-variant/60 rounded-2xl p-6 md:p-8 text-center bg-surface hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="max-w-md mx-auto space-y-3">
+<div class="w-14 h-14 mx-auto rounded-2xl bg-[#0284C7]/10 text-[#0284C7] flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+<span class="material-symbols-outlined text-3xl" data-icon="cloud_upload">cloud_upload</span>
+</div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface font-bold">
+                  Drag and drop your photos here, or <span class="text-[#0284C7] hover:underline">browse from device</span>
+</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                  Supports PNG, JPG, or HEIC up to 10MB each. Up to 5 photos.
+                </p>
+</div>
+<div class="flex items-center justify-center gap-4 pt-1 text-xs text-on-surface-variant">
+<span class="inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="bolt">bolt</span>
+                  Instant upload
+                </span>
+<span class="inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="lock">lock</span>
+                  Private &amp; secure
+                </span>
+</div>
+</div>
+</div>
+<!-- Uploaded Photos Grid (3 Interactive Preview Tiles + Add Tile) -->
+<div class="space-y-3">
+<label class="font-label-md text-label-md text-on-surface font-bold block">
+              Attached Job Photos (3)
+            </label>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<!-- Photo 1 -->
+<div class="group relative rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-low shadow-sm flex flex-col justify-between aspect-square">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Close up photograph of a modern chrome kitchen tap mixer with water droplets and noticeable moisture pooling at the circular metallic base fixture against clean white quartz countertop. Sharp daylight highlights the leaking seal in a clean contemporary South African kitchen setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYh4ejQUcDYVQX8cKdczu0MZ79XLCQVQ7ro-jZn_IExBLsTUjB8-HuNGvPxpnSk0r2ZkjXO0erbKSYpZ-zsID3dlyjX2lTF0WkyI1WSznCBd1us8WxWM55YLHL6--UofqaXFD6xRwD6iw-mB1bpDj3p_M_HHHyMv6veyp1BoLs4E_nsOe4Yg3yB_oB-ND9k4xvtDLDNew9kb-v2G3jbwxsgM44yAF_ljaR2zjem-5Hj5GE0j8IRgt_5Q"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none"></div>
+<!-- Delete Action -->
+<button aria-label="Remove photo" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-error text-white flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="close">close</span>
+</button>
+<!-- Photo Tag Badge -->
+<div class="absolute bottom-2 left-2 right-2">
+<span class="inline-block bg-surface-container-lowest/90 backdrop-blur text-on-surface text-[11px] font-bold px-2 py-0.5 rounded shadow-sm truncate max-w-full">
+                    Problem area
+                  </span>
+</div>
+</div>
+<!-- Photo 2 -->
+<div class="group relative rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-low shadow-sm flex flex-col justify-between aspect-square">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Interior view under a contemporary kitchen sink cabinet with white melamime walls showing complex PVC drainage p-trap pipes, flexible braided stainless steel water supply hoses, and small water droplets on the wood floor. Natural interior lighting with high detail." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAB0Tk51GHszEB8fHjPRwPXzaBFRNV-2kOtOcwRL97pfaDzeheewjDIBmS6-h1bQRiIfNHatsjGiMOt2Xuuvg5i7sjbluU1B-8Jpd9r3g8x5vZrsg4OkBjTtDa6fS5V7Rfvu_u7ugLRzlHeeCg866jsZM2R8slSCXFtsRYFrZLy_0lLZOtUL0vlflCqKYOB6udhcE7Z_jL3-91DgbG-uO1Ze-KWgmKutAQTTTKXcsyvnZyiOrCCgb4YIg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none"></div>
+<!-- Delete Action -->
+<button aria-label="Remove photo" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-error text-white flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="close">close</span>
+</button>
+<!-- Photo Tag Badge -->
+<div class="absolute bottom-2 left-2 right-2">
+<span class="inline-block bg-surface-container-lowest/90 backdrop-blur text-on-surface text-[11px] font-bold px-2 py-0.5 rounded shadow-sm truncate max-w-full">
+                    Plumbing setup
+                  </span>
+</div>
+</div>
+<!-- Photo 3 -->
+<div class="group relative rounded-xl border border-outline-variant/30 overflow-hidden bg-surface-container-low shadow-sm flex flex-col justify-between aspect-square">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" data-alt="Macro close-up shot of a stainless steel plumbing brand logo and engraved model serial specifications label on the back side of a faucet valve neck. Clean crisp high resolution product details illuminated under soft overhead spotlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbPFnm0R42m7Cfo-MLZ-RVoXGV2Mc3-9NM0dFqM4rFTumGqhiLLwDqc0IszJnQDCLlPeMEkVKzbFXulwxF16e5NG4ZJHm7mrYYDbvvbYbATREf7dKfu6hub9v5e1qiopqc_lDIc-ud8QAaNAri52mQLF5JwShhY8BtDBBoJaIMSC4DVgFDrMDuH1YK2n7Jh3nkcLufcz5NxPXGXBQagILqCBqIsJGHNCfqB6O0DpTUiPnZvIUB7CLK3Q"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 pointer-events-none"></div>
+<!-- Delete Action -->
+<button aria-label="Remove photo" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-error text-white flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="close">close</span>
+</button>
+<!-- Photo Tag Badge -->
+<div class="absolute bottom-2 left-2 right-2">
+<span class="inline-block bg-surface-container-lowest/90 backdrop-blur text-on-surface text-[11px] font-bold px-2 py-0.5 rounded shadow-sm truncate max-w-full">
+                    Parts reference
+                  </span>
+</div>
+</div>
+<!-- Slot 4: + Add Another Photo Card -->
+<button class="rounded-xl border-2 border-dashed border-outline-variant/50 hover:border-primary bg-surface hover:bg-primary/5 flex flex-col items-center justify-center p-4 transition-all duration-150 aspect-square group text-center">
+<div class="w-10 h-10 rounded-full bg-[#0284C7]/10 text-[#0284C7] flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-xl" data-icon="add_photo_alternate">add_photo_alternate</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-bold mt-2">Add another photo</span>
+<span class="font-label-sm text-[11px] text-on-surface-variant">2 slots left</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 3. Quick Location & Timing Preference Section -->
+<div class="p-6 md:p-8 space-y-6 bg-surface-container-low/20">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Location &amp; Arrival Timing Preference</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">You will verify full street address details in Step 4.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Location pill/field -->
+<div class="space-y-2">
+<label class="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base text-[#0284C7]" data-icon="location_on">location_on</span>
+                Suburban Location
+              </label>
+<div class="flex items-center justify-between p-3.5 bg-surface-container-lowest border border-outline-variant/30 rounded-xl">
+<div class="flex items-center gap-2.5">
+<div class="w-2.5 h-2.5 rounded-full bg-secondary"></div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-bold">Fourways, Sandton</p>
+<p class="font-body-sm text-xs text-on-surface-variant">Johannesburg, Gauteng</p>
+</div>
+</div>
+<span class="text-xs bg-surface-container text-on-surface-variant px-2.5 py-1 rounded font-semibold">
+                  Detected
+                </span>
+</div>
+</div>
+<!-- Timing Preference Selector (Radio group) -->
+<div class="space-y-2">
+<label class="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-base text-[#0284C7]" data-icon="calendar_month">calendar_month</span>
+                When do you need this done?
+              </label>
+<div class="space-y-2">
+<!-- Option 1: Urgent -->
+<label class="flex items-center p-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest hover:border-[#0284C7]/50 cursor-pointer transition-colors">
+<input class="w-4 h-4 text-[#0284C7] focus:ring-[#0284C7] border-outline-variant" name="timing_preference" type="radio" value="urgent"/>
+<div class="ml-3 flex items-center justify-between w-full">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Urgent (Within 24 hours)</span>
+<span class="text-xs font-bold text-[#0284C7] bg-[#0284C7]/10 px-2 py-0.5 rounded">Fast Response</span>
+</div>
+</label>
+<!-- Option 2: Standard (Checked) -->
+<label class="flex items-center p-3 rounded-xl border-2 border-[#0284C7] bg-[#0284C7]/5 cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 text-[#0284C7] focus:ring-[#0284C7] border-[#0284C7]" name="timing_preference" type="radio" value="standard"/>
+<div class="ml-3 flex items-center justify-between w-full">
+<div>
+<span class="font-label-md text-label-md text-on-surface font-bold block">Standard (Scheduled date)</span>
+<span class="font-body-sm text-xs text-secondary font-semibold">Selected: Tomorrow at 10:00 AM</span>
+</div>
+<span class="material-symbols-outlined text-[#0284C7] text-base" data-icon="check_circle">check_circle</span>
+</div>
+</label>
+<!-- Option 3: Flexible -->
+<label class="flex items-center p-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest hover:border-[#0284C7]/50 cursor-pointer transition-colors">
+<input class="w-4 h-4 text-[#0284C7] focus:ring-[#0284C7] border-outline-variant" name="timing_preference" type="radio" value="flexible"/>
+<div class="ml-3 flex items-center justify-between w-full">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Flexible within this week</span>
+<span class="text-xs text-on-surface-variant">Best quote rates</span>
+</div>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- 4. Trust & Protection Guarantee Banner -->
+<div class="p-6 bg-secondary/10 border-t border-secondary/20 flex items-start gap-4">
+<div class="w-10 h-10 rounded-xl bg-secondary text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-xl" data-icon="verified">verified</span>
+</div>
+<div class="space-y-1">
+<h4 class="font-label-lg text-label-lg text-secondary font-bold flex items-center gap-1.5">
+              HandyLink Payment Escrow Protection
+            </h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Money is held securely in escrow and only released once you confirm the plumbing job is satisfactorily completed. Free replacement or full refund if work doesn't meet standard.
+            </p>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation Controller -->
+<div class="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-2">
+<!-- Back Button -->
+<button class="w-full sm:w-auto px-6 py-3.5 rounded-xl border border-outline-variant/40 bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 transition-all" type="button">
+<span class="material-symbols-outlined text-base" data-icon="arrow_back">arrow_back</span>
+<span>Back: Step 2</span>
+</button>
+<!-- Forward Continue CTA Button -->
+<button class="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-[#0284C7] hover:bg-[#0369a1] text-white font-label-lg text-label-lg font-extrabold flex items-center justify-center gap-2 shadow-lg shadow-[#0284C7]/20 hover:scale-[1.01] active:scale-[0.99] transition-all" type="button">
+<span>Continue to Step 4: Location &amp; Schedule</span>
+<span class="material-symbols-outlined text-base" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Simplified Trust & Security Wizard Footer -->
+<footer class="mt-12 bg-surface-container-lowest border-t border-outline-variant/30 py-8 px-margin-mobile md:px-margin">
+<div class="max-w-4xl mx-auto space-y-6">
+<!-- Trust badges row -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 pb-6 border-b border-outline-variant/20 text-center md:text-left">
+<div class="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="lock">lock</span>
+<span class="font-label-sm text-label-sm font-semibold">256-bit SSL Escrow</span>
+</div>
+<div class="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="shield">shield</span>
+<span class="font-label-sm text-label-sm font-semibold">POPIA Act Compliant</span>
+</div>
+<div class="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="handshake">handshake</span>
+<span class="font-label-sm text-label-sm font-semibold">R1,000,000 Public Liability</span>
+</div>
+<div class="flex items-center justify-center md:justify-start gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="military_tech">military_tech</span>
+<span class="font-label-sm text-label-sm font-semibold">Guaranteed Workmanship</span>
+</div>
+</div>
+<!-- Bottom Copyright & Region Notice -->
+<div class="flex flex-col sm:flex-row items-center justify-between text-on-surface-variant text-xs gap-3">
+<p>© 2025 HANDYLINK (Pty) Ltd. South Africa. All rights reserved.</p>
+<div class="flex items-center gap-4">
+<a class="hover:underline hover:text-[#0284C7]" href="#">Trust &amp; Safety</a>
+<span>•</span>
+<a class="hover:underline hover:text-[#0284C7]" href="#">Terms of Service</a>
+<span>•</span>
+<a class="hover:underline hover:text-[#0284C7]" href="#">Privacy Policy</a>
+<span>•</span>
+<span class="text-on-surface font-semibold">Johannesburg / Sandton Hub</span>
+</div>
+</div>
+</div>
+</footer>
+</body></html>
