@@ -177,3 +177,67 @@ No database migration was required in Stage 6E (existing
 `jobs.status` ENUM, `jobs.scheduled_at` and `job_status_history`
 reused); the `database/tests/schema.test.js` suite still requires a
 live MySQL instance and is unchanged.
+
+## Stage 6F — Job Execution & Work Documentation
+
+Backend (`backend/tests/job-execution.test.ts`, in-memory stores plus
+isolated local-storage tmp dirs, no MySQL required — run with
+`npm test` from `backend/`):
+
+- Work documentation: addressed provider uploads `BEFORE`/`DURING`/
+  `AFTER` photos (`201`, metadata only — no binary, path or storage
+  key) and creates `BEFORE`/`DURING`/`AFTER` notes (`201`); uploads
+  and notes on `SCHEDULED` jobs → `422`.
+- Media authorization: customer upload and provider update → `403`;
+  unrelated provider upload/update → `404`; technician update →
+  `403`; another customer's photo list/bytes → `404`;
+  unauthenticated → `401`; owner customer and addressed provider
+  retrieve metadata and bytes (`200`, correct MIME).
+- Media validation: invalid phase, `text/plain` upload, spoofed PNG
+  content (sniffed) and oversized files → `422`.
+- Photo deletion: uploader deletes own photo while `IN_PROGRESS`
+  (`200`, list shrinks); customer delete → `403`; deletion after
+  completion → `422`.
+- Progress updates: empty and overlong notes → `422`; customer and
+  foreign-provider creation rejected.
+- Completion: `IN_PROGRESS` job with a note → `200` (`COMPLETED` +
+  AFTER record); `SCHEDULED`/`ACCEPTED` jobs → `422`; missing/blank
+  and overlong notes → `422`; `IN_PROGRESS → COMPLETED` history
+  recorded; failure leaves the job `IN_PROGRESS`; customer completion
+  → `403`.
+- Confirmation: owning customer confirms `COMPLETED` → `200` with
+  the `CLOSED` job; `IN_PROGRESS` → `422`; another customer's job →
+  `404`; provider → `403`; `COMPLETED → CONFIRMED` and
+  `CONFIRMED → CLOSED` history recorded; failure leaves the job
+  `COMPLETED`; repeat confirm → `422`.
+- Guards: `CLOSED` jobs reject updates/uploads/completion/
+  confirmation; `SCHEDULED → COMPLETED`, `IN_PROGRESS → CONFIRMED`
+  (via confirm) and `COMPLETED → IN_PROGRESS` (via start) are all
+  rejected; timeline contains `REQUESTED`…`CLOSED` plus update and
+  image events for both viewers; malformed/unknown ids and
+  unauthenticated calls keep the standard envelopes.
+
+Frontend (`apps/web`, run with `npx ng test --watch=false`):
+
+- `job.service.spec.ts`: multipart photo upload (phase + file),
+  photo list and authorized file URL, photo delete, update create
+  (trimmed) and list, timeline fetch, complete (trimmed note) and
+  confirm calls.
+- `job-detail.spec.ts`: `IN_PROGRESS` Before/During/After sections
+  with notes, photo rendering via blob object URLs, work loading and
+  error/retry states, `COMPLETED` completion record with Confirm
+  Completion / Not Yet actions, confirming state, error surface,
+  Not-Yet guidance without state change, `CLOSED` read-only state
+  with timeline, and absence of provider-only controls.
+- `request-detail.spec.ts`: `IN_PROGRESS` Before/During/After
+  sections, per-phase photo upload (call args, uploading state,
+  error surface), note validation and save, Complete Job disabled
+  until the completion note exists, completion confirmation and
+  success (`COMPLETED`, no further actions), completing state,
+  error surface with `IN_PROGRESS` intact, `COMPLETED` record
+  without customer actions, and `CLOSED` read-only state.
+
+One additive migration in Stage 6F (`009_job_execution.sql`:
+nullable `job_updates.phase` + `job_images.original_filename`);
+the `database/tests/schema.test.js` suite still requires a live
+MySQL instance and is unchanged.

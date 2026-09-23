@@ -61,6 +61,12 @@ export interface JobDto {
   agreedAmount: number | null;
   /** `jobs.currency` (MVP: ZAR only, recorded — never charged). */
   currency: string;
+  /** Stage 6F: `jobs.completed_at` (COMPLETED), null until completed. */
+  completedAt: string | null;
+  /** Stage 6F: `jobs.confirmed_at` (CONFIRMED), null until confirmed. */
+  confirmedAt: string | null;
+  /** Stage 6F: `jobs.closed_at` (CLOSED), null until closed. */
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

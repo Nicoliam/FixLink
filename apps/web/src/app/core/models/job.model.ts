@@ -1,14 +1,15 @@
 /**
- * FixLink job models — Stage 6B + 6C + 6D + 6E.
+ * FixLink job models — Stage 6B + 6C + 6D + 6E + 6F.
  *
  * Client-side projections of the customer job-request API
  * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id), the
  * Stage 6C provider request + quote API (GET /api/v1/provider/requests,
  * POST /api/v1/jobs/:id/quotes), the Stage 6D customer acceptance API
- * (POST /api/v1/jobs/:id/quotes/:quoteId/accept) and the Stage 6E
+ * (POST /api/v1/jobs/:id/quotes/:quoteId/accept), the Stage 6E
  * provider scheduling/start API (POST /api/v1/jobs/:id/schedule,
- * POST /api/v1/jobs/:id/start). Completion and payment arrive in later
- * stages.
+ * POST /api/v1/jobs/:id/start) and the Stage 6F execution API
+ * (photos, progress notes, completion, confirmation, timeline).
+ * Completion and payment arrive in later stages.
  */
 
 export type JobSource = 'MARKETPLACE' | 'INTERNAL';
@@ -58,6 +59,10 @@ export interface Job {
   agreedAmount?: number | null;
   /** Recorded currency (MVP: ZAR, arranged directly — never charged). */
   currency?: string;
+  /** Stage 6F terminal timestamps (null until each transition runs). */
+  completedAt?: string | null;
+  confirmedAt?: string | null;
+  closedAt?: string | null;
   /** Quotes submitted on this job (embedded in detail responses). */
   quotes?: Quote[];
 }
@@ -140,6 +145,10 @@ export interface ProviderRequest {
   preferredDate: string | null;
   scheduledAt: string | null;
   createdAt: string;
+  /** Stage 6F terminal timestamps (null until each transition runs). */
+  completedAt?: string | null;
+  confirmedAt?: string | null;
+  closedAt?: string | null;
   customer: { displayName: string };
   quotes: Quote[];
 }
@@ -178,8 +187,7 @@ export function quoteStatusLabel(status: QuoteStatus): string {
 }
 
 /** Human-friendly label for the REQUESTED-family statuses shown to customers. */
-export function jobStatusLabel(status: JobStatus): string {
-  switch (status) {
+export function jobStatusLabel(status: JobStatus): string {  switch (status) {
     case 'REQUESTED':
       return 'Requested';
     case 'QUOTED':
@@ -235,4 +243,82 @@ export function formatScheduledAt(iso: string | null | undefined): string {
     hour12: false,
   }).format(instant);
   return `${date} at ${time}`;
+}
+
+/** Work-documentation phase for job photos and progress notes. */
+export type WorkPhase = 'BEFORE' | 'DURING' | 'AFTER';
+
+/** Human-friendly label for work phases shown in Job Progress. */
+export function workPhaseLabel(phase: WorkPhase): string {
+  switch (phase) {
+    case 'BEFORE':
+      return 'Before work';
+    case 'DURING':
+      return 'During work';
+    case 'AFTER':
+      return 'After work';
+  }
+}
+
+/**
+ * File metadata for a job photo (Stage 6F). The API never returns
+ * binaries, raw paths or storage keys — only this metadata. Bytes load
+ * through the authorized file endpoint (see JobService.imageFileUrl).
+ */
+export interface JobImage {
+  id: string;
+  jobId: string;
+  uploadedBy: string;
+  phase: WorkPhase;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+export interface JobImageList {
+  items: JobImage[];
+  total: number;
+}
+
+/** A written progress update / completion note on a job (Stage 6F). */
+export interface JobUpdate {
+  id: string;
+  jobId: string;
+  authorId: string;
+  phase: WorkPhase;
+  note: string;
+  createdAt: string;
+}
+
+export interface JobUpdateList {
+  items: JobUpdate[];
+  total: number;
+}
+
+export type TimelineEventKind = 'status' | 'update' | 'image';
+
+/** One entry of the job timeline (status, update or photo). */
+export interface TimelineEvent {
+  kind: TimelineEventKind;
+  createdAt: string;
+  actor: 'customer' | 'provider';
+  status?: JobStatus;
+  previousStatus?: JobStatus | null;
+  reason?: string | null;
+  phase?: WorkPhase;
+  note?: string;
+  imageId?: string;
+  mimeType?: string;
+}
+
+export interface JobTimeline {
+  job: Job;
+  events: TimelineEvent[];
+}
+
+/** Result of POST /api/v1/jobs/:id/complete (job + completion record). */
+export interface CompleteJobResult {
+  job: Job;
+  update: JobUpdate;
 }

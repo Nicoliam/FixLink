@@ -4,7 +4,15 @@ import { of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { JobDetailComponent } from './job-detail';
 import { JobService } from '../../core/services/job.service';
-import type { AcceptQuoteResult, Job, Quote } from '../../core/models/job.model';
+import type {
+  AcceptQuoteResult,
+  Job,
+  JobImage,
+  JobTimeline,
+  JobUpdate,
+  Quote,
+  TimelineEvent,
+} from '../../core/models/job.model';
 
 const job: Job = {
   id: '7',
@@ -70,7 +78,17 @@ describe('JobDetailComponent', () => {
   }
 
   function apiWith(current: Job, accept: ReturnType<typeof vi.fn> = vi.fn()): Record<string, ReturnType<typeof vi.fn>> {
-    return { getJob: vi.fn().mockReturnValue(of(current)), acceptQuote: accept };
+    return {
+      getJob: vi.fn().mockReturnValue(of(current)),
+      acceptQuote: accept,
+      listJobImages: vi.fn().mockReturnValue(of([])),
+      listJobUpdates: vi.fn().mockReturnValue(of([])),
+      getJobTimeline: vi.fn().mockReturnValue(of({ job: current, events: [] })),
+      confirmJob: vi.fn(),
+      // Blob loading fails by default so jsdom never needs createObjectURL
+      // unless a test opts into photo rendering explicitly.
+      fetchImageBlob: vi.fn().mockReturnValue(throwError(() => new Error('no blob'))),
+    };
   }
 
   function buttonWithText(text: string): HTMLButtonElement | null {
@@ -262,6 +280,228 @@ describe('JobDetailComponent', () => {
         expect(buttonWithText('Accept Quote')).toBeNull();
         TestBed.resetTestingModule();
       }
+    });
+  });
+
+  describe('Stage 6F — work documentation, confirmation and closure (read-only)', () => {
+    const inProgressJob: Job = {
+      ...acceptedJob,
+      status: 'IN_PROGRESS',
+      preferredDate: '2026-10-05',
+      scheduledAt: '2026-10-05T08:00:00.000Z',
+    };
+    const completedJob: Job = {
+      ...inProgressJob,
+      status: 'COMPLETED',
+      completedAt: '2026-10-06T08:00:00.000Z',
+    };
+    const closedJob: Job = {
+      ...completedJob,
+      status: 'CLOSED',
+      confirmedAt: '2026-10-06T09:00:00.000Z',
+      closedAt: '2026-10-06T09:00:00.000Z',
+    };
+
+    const beforeUpdate: JobUpdate = {
+      id: 'u1',
+      jobId: '7',
+      authorId: '2',
+      phase: 'BEFORE',
+      note: 'Existing pipe is damaged near the kitchen sink.',
+      createdAt: '2026-10-05T10:05:00.000Z',
+    };
+    const duringUpdate: JobUpdate = {
+      id: 'u2',
+      jobId: '7',
+      authorId: '2',
+      phase: 'DURING',
+      note: 'Removed damaged section and preparing replacement.',
+      createdAt: '2026-10-05T10:30:00.000Z',
+    };
+    const afterUpdate: JobUpdate = {
+      id: 'u3',
+      jobId: '7',
+      authorId: '2',
+      phase: 'AFTER',
+      note: 'Replacement pipe installed and tested for leaks.',
+      createdAt: '2026-10-06T08:00:00.000Z',
+    };
+
+    const beforeImage: JobImage = {
+      id: 'img-1',
+      jobId: '7',
+      uploadedBy: '2',
+      phase: 'BEFORE',
+      originalFilename: 'before.png',
+      mimeType: 'image/png',
+      size: 1234,
+      createdAt: '2026-10-05T10:06:00.000Z',
+    };
+
+    const statusEvents: TimelineEvent[] = (
+      ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CONFIRMED', 'CLOSED'] as const
+    ).map((status, index) => ({
+      kind: 'status' as const,
+      createdAt: `2026-10-0${Math.min(6, 5 + index)}T08:00:00.000Z`,
+      actor: (status === 'REQUESTED' || status === 'ACCEPTED' ? 'customer' : 'provider') as 'customer' | 'provider',
+      status,
+      previousStatus: null,
+      reason: null,
+    }));
+
+    function apiWithWork(current: Job, overrides: Record<string, unknown> = {}): Record<string, ReturnType<typeof vi.fn>> {
+      const api = apiWith(current);
+      (api['listJobImages'] as ReturnType<typeof vi.fn>).mockReturnValue(
+        of((overrides['images'] as JobImage[] | undefined) ?? []),
+      );
+      (api['listJobUpdates'] as ReturnType<typeof vi.fn>).mockReturnValue(
+        of((overrides['updates'] as JobUpdate[] | undefined) ?? []),
+      );
+      (api['getJobTimeline'] as ReturnType<typeof vi.fn>).mockReturnValue(
+        of({
+          job: current,
+          events: (overrides['events'] as TimelineEvent[] | undefined) ?? [],
+        } as JobTimeline),
+      );
+      return api;
+    }
+
+    it('shows the Before/During/After progress with notes for IN_PROGRESS jobs', async () => {
+      await setup('7', apiWithWork(inProgressJob, { updates: [beforeUpdate, duringUpdate] }));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Job progress');
+      expect(text).toContain('Before work');
+      expect(text).toContain('During work');
+      expect(text).toContain('After work');
+      expect(text).toContain('Existing pipe is damaged near the kitchen sink.');
+      expect(text).toContain('Removed damaged section and preparing replacement.');
+    });
+
+    it('renders authorized photos once their bytes load', async () => {
+      Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:mock-photo'), configurable: true });
+      Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
+      const api = apiWithWork(inProgressJob, { images: [beforeImage] });
+      (api['fetchImageBlob'] as ReturnType<typeof vi.fn>).mockReturnValue(
+        of(new Blob(['fake'], { type: 'image/png' })),
+      );
+      await setup('7', api);
+      fixture.detectChanges();
+      const img = fixture.nativeElement.querySelector('img[alt="Before work photo"]') as HTMLImageElement | null;
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute('src')).toBe('blob:mock-photo');
+    });
+
+    it('shows the upload loading state while the work record loads', async () => {
+      const pending = new Subject<JobImage[]>();
+      const api = apiWith(inProgressJob);
+      (api['listJobImages'] as ReturnType<typeof vi.fn>).mockReturnValue(pending.asObservable());
+      await setup('7', api);
+      expect((fixture.nativeElement.textContent as string)).toContain('Loading work updates…');
+      pending.next([]);
+      fixture.detectChanges();
+    });
+
+    it('shows the work error state with a retry action', async () => {
+      const api = apiWith(inProgressJob);
+      (api['listJobImages'] as ReturnType<typeof vi.fn>).mockReturnValue(
+        throwError(() => new Error('down')),
+      );
+      await setup('7', api);
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Could not load the work record.');
+      expect(buttonWithText('Try again')).not.toBeNull();
+    });
+
+    it('shows the completion record with a Confirm Completion action', async () => {
+      await setup('7', apiWithWork(completedJob, { updates: [beforeUpdate, duringUpdate, afterUpdate] }));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Completed');
+      expect(text).toContain('Replacement pipe installed and tested for leaks.');
+      expect(text).toContain('Has the work been completed?');
+      expect(buttonWithText('Confirm Completion')).not.toBeNull();
+      expect(buttonWithText('Not Yet')).not.toBeNull();
+    });
+
+    it('confirms completion and shows the closed state', async () => {
+      const confirm = vi.fn().mockReturnValue(of(closedJob));
+      const api = apiWithWork(completedJob, { updates: [afterUpdate] });
+      api['confirmJob'] = confirm;
+      await setup('7', api);
+      buttonWithText('Confirm Completion')?.click();
+      fixture.detectChanges();
+      // Confirmation step with direct-payment wording.
+      expect((fixture.nativeElement.textContent as string)).toContain('Confirm this job as complete?');
+      buttonWithText('Confirm Completion')?.click();
+      fixture.detectChanges();
+      expect(confirm).toHaveBeenCalledWith('7');
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Job closed');
+      expect(text).toContain('Closed');
+      expect(buttonWithText('Confirm Completion')).toBeNull();
+    });
+
+    it('shows the confirming state while the request is in flight', async () => {
+      const pending = new Subject<Job>();
+      const api = apiWithWork(completedJob, { updates: [afterUpdate] });
+      api['confirmJob'] = vi.fn().mockReturnValue(pending.asObservable());
+      await setup('7', api);
+      buttonWithText('Confirm Completion')?.click();
+      fixture.detectChanges();
+      buttonWithText('Confirm Completion')?.click();
+      fixture.detectChanges();
+      expect((fixture.nativeElement.textContent as string)).toContain('Confirming…');
+      expect(buttonWithText('Confirming…')?.disabled).toBe(true);
+      pending.next(closedJob);
+      fixture.detectChanges();
+      expect((fixture.nativeElement.textContent as string)).toContain('Job closed');
+    });
+
+    it('surfaces confirmation errors without losing the COMPLETED state', async () => {
+      const api = apiWithWork(completedJob, { updates: [afterUpdate] });
+      api['confirmJob'] = vi
+        .fn()
+        .mockReturnValue(throwError(() => ({ error: { error: { code: 'VALIDATION_ERROR', message: 'Already confirmed.' } } })));
+      await setup('7', api);
+      buttonWithText('Confirm Completion')?.click();
+      fixture.detectChanges();
+      buttonWithText('Confirm Completion')?.click();
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Already confirmed.');
+      expect(text).toContain('Completed');
+    });
+
+    it('guides the customer to the provider on Not Yet without changing state', async () => {
+      const confirm = vi.fn();
+      const api = apiWithWork(completedJob, { updates: [afterUpdate] });
+      api['confirmJob'] = confirm;
+      await setup('7', api);
+      buttonWithText('Not Yet')?.click();
+      fixture.detectChanges();
+      expect(confirm).not.toHaveBeenCalled();
+      expect((fixture.nativeElement.textContent as string)).toContain('Please contact the provider');
+    });
+
+    it('keeps closed jobs read-only with the timeline', async () => {
+      await setup('7', apiWithWork(closedJob, { updates: [afterUpdate], events: statusEvents }));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Job closed');
+      expect(text).toContain('read-only');
+      expect(text).toContain('Timeline');
+      expect(text).toContain('Completed');
+      expect(text).toContain('Closed');
+      expect(buttonWithText('Confirm Completion')).toBeNull();
+      expect(buttonWithText('Not Yet')).toBeNull();
+      expect(buttonWithText('Accept Quote')).toBeNull();
+    });
+
+    it('shows no provider-only work actions to the customer', async () => {
+      await setup('7', apiWithWork(inProgressJob, { updates: [beforeUpdate] }));
+      const inputs = fixture.nativeElement.querySelectorAll('input[type="file"]');
+      expect(inputs.length).toBe(0);
+      expect(buttonWithText('Complete Job')).toBeNull();
+      expect(buttonWithText('Add Note')).toBeNull();
+      expect(buttonWithText('Add Progress Update')).toBeNull();
     });
   });
 });

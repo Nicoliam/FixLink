@@ -86,6 +86,9 @@ interface JobRow extends RowDataPacket {
   city: string | null;
   province: string | null;
   scheduled_at: Date | string | null;
+  completed_at: Date | string | null;
+  confirmed_at: Date | string | null;
+  closed_at: Date | string | null;
   created_at: Date | string;
 }
 
@@ -119,9 +122,9 @@ const JOB_DETAIL_SELECT = `
          j.\`professional_id\`, j.\`business_id\`,
          pp.\`display_name\` AS \`professional_name\`,
          bp.\`business_name\` AS \`business_name\`,
-         j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
-         j.\`description\`, j.\`address_line1\`, j.\`city\`, j.\`province\`,
-         j.\`scheduled_at\`, j.\`created_at\`
+          j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
+          j.\`description\`, j.\`address_line1\`, j.\`city\`, j.\`province\`,
+          j.\`scheduled_at\`, j.\`completed_at\`, j.\`confirmed_at\`, j.\`closed_at\`, j.\`created_at\`
     FROM \`jobs\` j
     LEFT JOIN \`professional_profiles\` pp ON pp.\`id\` = j.\`professional_id\`
     LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = j.\`business_id\`
@@ -162,6 +165,9 @@ function mapJobRow(row: JobRow): Omit<ProviderRequestDto, 'customer' | 'quotes'>
     province: row.province,
     preferredDate: scheduledAt === null ? null : scheduledAt.slice(0, 10),
     scheduledAt,
+    completedAt: toIso(row.completed_at),
+    confirmedAt: toIso(row.confirmed_at),
+    closedAt: toIso(row.closed_at),
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
   };
 }

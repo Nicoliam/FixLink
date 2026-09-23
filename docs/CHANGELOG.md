@@ -1,5 +1,55 @@
 # FixLink — Changelog
 
+## Stage 6F — Job Execution & Work Documentation (2026-09-23)
+
+- Providers can now document work on in-progress marketplace jobs and
+  complete them: `POST /api/v1/jobs/:jobId/images` (multipart `image`
+  + `phase` → `201` metadata; JPEG/PNG/WebP, 5MB max, magic-byte
+  sniffed, server-generated storage keys),
+  `GET /api/v1/jobs/:jobId/images` and
+  `GET /api/v1/jobs/:jobId/images/:imageId/file` (private retrieval
+  for the owning customer or addressed provider only),
+  `DELETE /api/v1/jobs/:jobId/images/:imageId` (uploader, while
+  `IN_PROGRESS`), `POST /api/v1/jobs/:jobId/updates`
+  (`{ phase, note }` → `201`), `GET /api/v1/jobs/:jobId/updates`,
+  `GET /api/v1/jobs/:jobId/timeline` (`{ job, events }` oldest
+  first), `POST /api/v1/jobs/:jobId/complete` (`{ note }` required →
+  `IN_PROGRESS → COMPLETED` with the AFTER record, `Provider
+  completed job` history) and `POST /api/v1/jobs/:jobId/confirm`
+  (owning customer → `COMPLETED → CONFIRMED → CLOSED` in one
+  transaction, both history entries, final `CLOSED` job returned).
+  Every transition runs atomically with guarded status updates;
+  failures leave the job untouched. File bytes live in the local MVP
+  storage dir (`backend/uploads`, `FILE_STORAGE_DIR`-overridable,
+  `FileStorage` seam for future object storage); MySQL stores
+  metadata only. No payment, technician, parts, approval or
+  notification functionality was added.
+- Authorization: only the addressed `PROFESSIONAL` / `BUSINESS_OWNER`
+  / `BUSINESS_MANAGER` may document or complete (others' jobs read as
+  `404`; customers/technicians receive `403`); only the owning
+  `CUSTOMER` may confirm (others → `404`, providers → `403`).
+  State is server-enforced (work requires `IN_PROGRESS`, completion
+  requires `IN_PROGRESS` + note, confirmation requires `COMPLETED`,
+  `CLOSED` rejects everything); photo deletion additionally requires
+  the uploader. One additive migration (`009_job_execution.sql`:
+  nullable `job_updates.phase` + `job_images.original_filename`) —
+  no new tables, no duplicate job tables.
+- Angular: `/requests/:id` shows Job Progress (Before/During/After
+  photo uploads with progress and error states, notes, completion
+  note gating the Complete Job action with confirmation, then the
+  read-only completed/closed states); `/my-jobs/:id` shows the
+  read-only progress, the completion record with a single Confirm
+  Completion action (plus a state-safe Not Yet path), the closed
+  history and the timeline; both lists badge the new statuses with
+  existing pill styles.
+- Tests: `backend/tests/job-execution.test.ts` (42 cases:
+  uploads incl. content sniffing, private retrieval incl. bytes,
+  deletion, updates, completion, confirmation incl. atomic closure,
+  guards, timeline, rollback, envelopes) plus customer/provider/
+  service frontend specs. Full suites green: backend 190/190, web
+  141/141; `tsc --noEmit` (backend, web app + spec) and the
+  production Angular build pass.
+
 ## Stage 6E — Scheduling & Job Execution Start (2026-09-23)
 
 - Providers can now schedule accepted marketplace jobs and start

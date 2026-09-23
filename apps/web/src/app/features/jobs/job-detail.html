@@ -90,6 +90,136 @@
         }
         <p class="fl-card-text">Payment is arranged directly with the professional.</p>
       </section>
+
+      <section class="fl-card" aria-label="Job progress">
+        <p class="fl-card-label">Job progress</p>
+        @if (workStatus() === 'loading') {
+          <p class="fl-card-text" role="status">Loading work updates…</p>
+        } @else if (workStatus() === 'error') {
+          <p class="fl-alert-error" role="alert">{{ workError() }}</p>
+          <button type="button" class="fl-btn fl-btn-secondary" (click)="retryWork()">Try again</button>
+        } @else if (workStatus() === 'ready') {
+          @for (phase of ['BEFORE', 'DURING', 'AFTER']; track phase) {
+            <div [attr.aria-label]="phaseLabel($any(phase))">
+              <p class="fl-card-title">{{ phaseLabel($any(phase)) }}</p>
+              @if (notesFor($any(phase)).length === 0 && imagesFor($any(phase)).length === 0) {
+                <p class="fl-card-text">No updates yet.</p>
+              }
+              @for (note of notesFor($any(phase)); track note.id) {
+                <p class="fl-card-text">{{ note.note }}</p>
+              }
+              @for (photo of imagesFor($any(phase)); track photo.id) {
+                @if (photoUrl(photo.id)) {
+                  <img class="fl-photo" [src]="photoUrl(photo.id)" [alt]="phaseLabel($any(phase)) + ' photo'" loading="lazy" />
+                } @else {
+                  <p class="fl-card-text">{{ photo.originalFilename ?? 'Photo' }}</p>
+                }
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+
+    @if (detail.status === 'COMPLETED') {
+      <section class="fl-card" aria-label="Job completed">
+        <p class="fl-card-label">Completed</p>
+        @if (completionNote()) {
+          <p class="fl-card-title">{{ completionNote() }}</p>
+        }
+        @for (photo of imagesFor('AFTER'); track photo.id) {
+          @if (photoUrl(photo.id)) {
+            <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Completed work photo" loading="lazy" />
+          }
+        }
+        @if (completionAt()) {
+          <p class="fl-card-text">Completed: {{ completionAt() }}</p>
+        }
+        <p class="fl-card-text">Payment is arranged directly with the professional.</p>
+      </section>
+
+      <section class="fl-card" aria-label="Confirm completion">
+        <p class="fl-card-label">Has the work been completed?</p>
+        @if (!showConfirm()) {
+          <p class="fl-card-text">Review the completed work above before confirming.</p>
+          @if (confirmDeclined()) {
+            <p class="fl-card-text">Please contact the provider to resolve any outstanding work.</p>
+          }
+          <button type="button" class="fl-btn fl-btn-primary" (click)="startConfirm()">Confirm Completion</button>
+          <button type="button" class="fl-btn fl-btn-secondary" (click)="declineConfirm()">Not Yet</button>
+        } @else {
+          <div role="group" aria-label="Confirm job completion">
+            <p class="fl-card-text"><strong>Confirm this job as complete?</strong></p>
+            <p class="fl-card-text">Confirming closes the job. Payment is arranged directly with the professional.</p>
+            @if (confirmError()) {
+              <p class="fl-alert-error" role="alert">{{ confirmError() }}</p>
+            }
+            <button type="button" class="fl-btn fl-btn-secondary" (click)="cancelConfirm()" [disabled]="confirming()">
+              Cancel
+            </button>
+            <button type="button" class="fl-btn fl-btn-primary" (click)="confirmCompletion()" [disabled]="confirming()">
+              {{ confirming() ? 'Confirming…' : 'Confirm Completion' }}
+            </button>
+          </div>
+        }
+      </section>
+
+      <section class="fl-card" aria-label="Job progress">
+        <p class="fl-card-label">Job progress</p>
+        @if (workStatus() === 'loading') {
+          <p class="fl-card-text" role="status">Loading work updates…</p>
+        } @else if (workStatus() === 'error') {
+          <p class="fl-alert-error" role="alert">{{ workError() }}</p>
+          <button type="button" class="fl-btn fl-btn-secondary" (click)="retryWork()">Try again</button>
+        } @else if (workStatus() === 'ready') {
+          @for (phase of ['BEFORE', 'DURING', 'AFTER']; track phase) {
+            <div [attr.aria-label]="phaseLabel($any(phase))">
+              <p class="fl-card-title">{{ phaseLabel($any(phase)) }}</p>
+              @for (note of notesFor($any(phase)); track note.id) {
+                <p class="fl-card-text">{{ note.note }}</p>
+              }
+              @for (photo of imagesFor($any(phase)); track photo.id) {
+                @if (photoUrl(photo.id)) {
+                  <img class="fl-photo" [src]="photoUrl(photo.id)" [alt]="phaseLabel($any(phase)) + ' photo'" loading="lazy" />
+                }
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+
+    @if (detail.status === 'CONFIRMED' || detail.status === 'CLOSED') {
+      <section class="fl-card" aria-label="Job closed">
+        <p class="fl-card-label">Job closed</p>
+        <p class="fl-card-text">Completed and confirmed. This job is read-only.</p>
+        @if (completionNote()) {
+          <p class="fl-card-text">{{ completionNote() }}</p>
+        }
+        @if (closedAt()) {
+          <p class="fl-card-text">Closed: {{ closedAt() }}</p>
+        }
+      </section>
+
+      @if (workStatus() === 'ready' && timeline().length > 0) {
+        <section class="fl-card" aria-label="Job timeline">
+          <p class="fl-card-label">Timeline</p>
+          <ul>
+            @for (event of timeline(); track $index) {
+              <li class="fl-card-text">
+                @if (event.kind === 'status') {
+                  {{ statusLabel(event.status!) }}
+                } @else if (event.kind === 'update') {
+                  {{ phaseLabel(event.phase!) }} update
+                } @else {
+                  {{ phaseLabel(event.phase!) }} photo
+                }
+                · {{ event.createdAt }}
+              </li>
+            }
+          </ul>
+        </section>
+      }
     }
 
     @if (detail.quotes && detail.quotes.length > 0) {
@@ -163,6 +293,16 @@
         <p class="fl-card-text">
           Work is in progress. {{ detail.provider.name }} will keep the job updated —
           payment is arranged directly with them.
+        </p>
+      } @else if (detail.status === 'COMPLETED') {
+        <p class="fl-card-text">
+          The work is marked complete. Review it and confirm completion —
+          payment is arranged directly with them.
+        </p>
+      } @else if (detail.status === 'CONFIRMED' || detail.status === 'CLOSED') {
+        <p class="fl-card-text">
+          This job is closed. You can review the work record above —
+          payment was arranged directly with them.
         </p>
       } @else {
         <p class="fl-card-text">

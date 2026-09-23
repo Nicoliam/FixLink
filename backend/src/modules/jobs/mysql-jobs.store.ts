@@ -57,6 +57,9 @@ interface JobRow extends RowDataPacket {
   scheduled_at: Date | string | null;
   agreed_amount: number | string | null;
   currency: string;
+  completed_at: Date | string | null;
+  confirmed_at: Date | string | null;
+  closed_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -90,6 +93,9 @@ function mapRow(row: JobRow): JobDto {
     scheduledAt,
     agreedAmount: row.agreed_amount === null ? null : toNumber(row.agreed_amount),
     currency: row.currency,
+    completedAt: toIso(row.completed_at),
+    confirmedAt: toIso(row.confirmed_at),
+    closedAt: toIso(row.closed_at),
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
   };
@@ -103,6 +109,7 @@ const JOB_DETAIL_SELECT = `
          j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
           j.\`description\`, j.\`address_line1\`, j.\`city\`, j.\`province\`,
           j.\`scheduled_at\`, j.\`agreed_amount\`, j.\`currency\`,
+          j.\`completed_at\`, j.\`confirmed_at\`, j.\`closed_at\`,
           j.\`created_at\`, j.\`updated_at\`
      FROM \`jobs\` j
     LEFT JOIN \`professional_profiles\` pp ON pp.\`id\` = j.\`professional_id\`

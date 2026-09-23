@@ -143,6 +143,202 @@
             <p class="fl-card-label">In progress</p>
             <p class="fl-card-text">The job is active. Scheduled: {{ scheduledDisplay() }}</p>
           </div>
+
+          <div aria-label="Job progress">
+            <p class="fl-card-label">Job progress</p>
+            <p class="fl-card-text">Document the work with photos and notes for each phase.</p>
+            @if (workStatus() === 'loading') {
+              <p class="fl-card-text" role="status">Loading work record…</p>
+            } @else if (workStatus() === 'error') {
+              <p class="fl-alert-error" role="alert">{{ workError() }}</p>
+              <button type="button" class="fl-btn fl-btn-secondary" (click)="retryWork()">Try again</button>
+            } @else if (workStatus() === 'ready') {
+              <div aria-label="Before work">
+                <p class="fl-card-title">Before work</p>
+                @for (note of notesFor('BEFORE'); track note.id) {
+                  <p class="fl-card-text">{{ note.note }}</p>
+                }
+                @for (photo of imagesFor('BEFORE'); track photo.id) {
+                  @if (photoUrl(photo.id)) {
+                    <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Before work photo" loading="lazy" />
+                  }
+                  <button
+                    type="button"
+                    class="fl-btn fl-btn-secondary fl-btn-sm"
+                    (click)="deletePhoto(photo.id)"
+                    [disabled]="deletingImageId() === photo.id"
+                  >
+                    {{ deletingImageId() === photo.id ? 'Deleting…' : 'Delete photo' }}
+                  </button>
+                }
+                <form class="fl-form" [formGroup]="beforeForm" (ngSubmit)="saveNote('BEFORE')" novalidate>
+                  <div class="fl-field">
+                    <label class="fl-label" for="before-note">Add note</label>
+                    <textarea id="before-note" class="fl-input" rows="2" formControlName="note"></textarea>
+                  </div>
+                  <button type="submit" class="fl-btn fl-btn-secondary" [disabled]="savingNote() === 'BEFORE'">
+                    {{ savingNote() === 'BEFORE' ? 'Saving…' : 'Add Note' }}
+                  </button>
+                </form>
+                <div class="fl-field">
+                  <label class="fl-label" for="before-photo">Add photos</label>
+                  <input
+                    id="before-photo"
+                    class="fl-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    (change)="onFileSelected($event, 'BEFORE')"
+                    [disabled]="uploadingPhase() !== null"
+                  />
+                </div>
+              </div>
+
+              <div aria-label="During work">
+                <p class="fl-card-title">During work</p>
+                @for (note of notesFor('DURING'); track note.id) {
+                  <p class="fl-card-text">{{ note.note }}</p>
+                }
+                @for (photo of imagesFor('DURING'); track photo.id) {
+                  @if (photoUrl(photo.id)) {
+                    <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Progress photo" loading="lazy" />
+                  }
+                  <button
+                    type="button"
+                    class="fl-btn fl-btn-secondary fl-btn-sm"
+                    (click)="deletePhoto(photo.id)"
+                    [disabled]="deletingImageId() === photo.id"
+                  >
+                    {{ deletingImageId() === photo.id ? 'Deleting…' : 'Delete photo' }}
+                  </button>
+                }
+                <form class="fl-form" [formGroup]="duringForm" (ngSubmit)="saveNote('DURING')" novalidate>
+                  <div class="fl-field">
+                    <label class="fl-label" for="during-note">Add progress update</label>
+                    <textarea id="during-note" class="fl-input" rows="2" formControlName="note"></textarea>
+                  </div>
+                  <button type="submit" class="fl-btn fl-btn-secondary" [disabled]="savingNote() === 'DURING'">
+                    {{ savingNote() === 'DURING' ? 'Saving…' : 'Add Progress Update' }}
+                  </button>
+                </form>
+                <div class="fl-field">
+                  <label class="fl-label" for="during-photo">Add photos</label>
+                  <input
+                    id="during-photo"
+                    class="fl-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    (change)="onFileSelected($event, 'DURING')"
+                    [disabled]="uploadingPhase() !== null"
+                  />
+                </div>
+              </div>
+
+              <div aria-label="After work">
+                <p class="fl-card-title">After work</p>
+                @for (photo of imagesFor('AFTER'); track photo.id) {
+                  @if (photoUrl(photo.id)) {
+                    <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Final photo" loading="lazy" />
+                  }
+                  <button
+                    type="button"
+                    class="fl-btn fl-btn-secondary fl-btn-sm"
+                    (click)="deletePhoto(photo.id)"
+                    [disabled]="deletingImageId() === photo.id"
+                  >
+                    {{ deletingImageId() === photo.id ? 'Deleting…' : 'Delete photo' }}
+                  </button>
+                }
+                <div class="fl-field">
+                  <label class="fl-label" for="after-photo">Add final photos</label>
+                  <input
+                    id="after-photo"
+                    class="fl-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    (change)="onFileSelected($event, 'AFTER')"
+                    [disabled]="uploadingPhase() !== null"
+                  />
+                </div>
+                @if (uploadingPhase()) {
+                  <p class="fl-card-text" role="status">Uploading photo…</p>
+                }
+                @if (uploadError()) {
+                  <p class="fl-alert-error" role="alert">{{ uploadError() }}</p>
+                }
+                @if (noteError()) {
+                  <p class="fl-alert-error" role="alert">{{ noteError() }}</p>
+                }
+                @if (deleteError()) {
+                  <p class="fl-alert-error" role="alert">{{ deleteError() }}</p>
+                }
+                <form class="fl-form" [formGroup]="completionForm" novalidate>
+                  <div class="fl-field">
+                    <label class="fl-label" for="completion-note">Add completion note</label>
+                    <textarea id="completion-note" class="fl-input" rows="3" formControlName="note"></textarea>
+                    @if (completionForm.controls.note.invalid && completionForm.controls.note.touched) {
+                      <p class="fl-field-error" role="alert">A completion note is required to complete the job.</p>
+                    }
+                  </div>
+                </form>
+              </div>
+
+              @if (!showCompleteConfirm()) {
+                @if (completeError()) {
+                  <p class="fl-alert-error" role="alert">{{ completeError() }}</p>
+                }
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-primary fl-btn-block"
+                  (click)="startComplete()"
+                  [disabled]="!canComplete()"
+                >
+                  Complete Job
+                </button>
+              } @else {
+                <div role="group" aria-label="Confirm job completion">
+                  <p class="fl-card-text"><strong>Mark this job as complete?</strong></p>
+                  <p class="fl-card-text">The customer will review the work and confirm completion.</p>
+                  @if (completeError()) {
+                    <p class="fl-alert-error" role="alert">{{ completeError() }}</p>
+                  }
+                  <button type="button" class="fl-btn fl-btn-secondary" (click)="cancelComplete()" [disabled]="completing()">
+                    Cancel
+                  </button>
+                  <button type="button" class="fl-btn fl-btn-primary" (click)="confirmComplete()" [disabled]="completing()">
+                    {{ completing() ? 'Completing…' : 'Complete Job' }}
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        }
+
+        @if (detail.status === 'COMPLETED') {
+          <div aria-label="Job completed">
+            <p class="fl-card-label">Completed</p>
+            @if (completionNote()) {
+              <p class="fl-card-text">{{ completionNote() }}</p>
+            }
+            @for (photo of imagesFor('AFTER'); track photo.id) {
+              @if (photoUrl(photo.id)) {
+                <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Completed work photo" loading="lazy" />
+              }
+            }
+            @if (completionAt()) {
+              <p class="fl-card-text">Completed: {{ completionAt() }}</p>
+            }
+            <p class="fl-card-text">The customer will review the work and confirm completion.</p>
+          </div>
+        }
+
+        @if (detail.status === 'CONFIRMED' || detail.status === 'CLOSED') {
+          <div aria-label="Job closed">
+            <p class="fl-card-label">Closed</p>
+            <p class="fl-card-text">This job is closed. The work record is read-only.</p>
+            @if (completionNote()) {
+              <p class="fl-card-text">{{ completionNote() }}</p>
+            }
+          </div>
         }
 
         <a class="fl-btn fl-btn-secondary" routerLink="/requests">Back to Requests</a>

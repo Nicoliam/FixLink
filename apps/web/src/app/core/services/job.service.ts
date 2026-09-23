@@ -5,19 +5,27 @@ import { API_BASE_URL } from '../config/api-config';
 import type { ApiSuccess } from '../models/api.model';
 import type {
   AcceptQuoteResult,
+  CompleteJobResult,
   CreateJobRequest,
   CreateQuoteRequest,
   Job,
+  JobImage,
+  JobImageList,
   JobList,
+  JobTimeline,
+  JobUpdate,
+  JobUpdateList,
   ProviderRequest,
   ProviderRequestList,
   Quote,
+  WorkPhase,
 } from '../models/job.model';
 
 /**
  * FixLink jobs API client — Stage 6B (customer requests) + Stage 6C
  * (provider requests and quotes) + Stage 6D (customer quote acceptance)
- * + Stage 6E (provider scheduling and start).
+ * + Stage 6E (provider scheduling and start) + Stage 6F (work
+ * documentation, completion, confirmation, timeline).
  *
  * Single owner of job/quote calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); customer ownership and
@@ -141,5 +149,99 @@ export class JobService {
     return this.http
       .get<ApiSuccess<Quote>>(`${this.baseUrl}/quotes/${encodeURIComponent(id)}`)
       .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Upload a BEFORE/DURING/AFTER photo for an IN_PROGRESS job (provider
+   * only). Sent as multipart FormData (`image` file + `phase` field);
+   * resolves with the stored file metadata (never binaries or paths).
+   */
+  uploadJobImage(jobId: string, phase: WorkPhase, file: File): Observable<JobImage> {
+    const form = new FormData();
+    form.append('phase', phase);
+    form.append('image', file, file.name);
+    return this.http
+      .post<ApiSuccess<JobImage>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/images`, form)
+      .pipe(map((res) => res.data));
+  }
+
+  /** List authorized photo metadata for a job (customer or provider). */
+  listJobImages(jobId: string): Observable<JobImage[]> {
+    return this.http
+      .get<ApiSuccess<JobImageList>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/images`)
+      .pipe(map((res) => res.data.items));
+  }
+
+  /**
+   * Authorized URL for photo bytes (backend checks ownership/provider
+   * association; the browser sends the Bearer token via the interceptor
+   * for XHR — for <img> use an object URL from fetch where needed).
+   */
+  imageFileUrl(jobId: string, imageId: string): string {
+    return `${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/images/${encodeURIComponent(imageId)}/file`;
+  }
+
+  /**
+   * Fetch authorized photo bytes as a Blob (the interceptor attaches the
+   * Bearer token; callers turn the blob into an object URL for <img>).
+   */
+  fetchImageBlob(jobId: string, imageId: string): Observable<Blob> {
+    return this.http.get(this.imageFileUrl(jobId, imageId), { responseType: 'blob' });
+  }
+
+  /** Delete an uploaded photo while the job is still IN_PROGRESS. */
+  deleteJobImage(jobId: string, imageId: string): Observable<void> {
+    return this.http
+      .delete<ApiSuccess<{ deleted: boolean }>>(
+        `${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/images/${encodeURIComponent(imageId)}`,
+      )
+      .pipe(map(() => undefined));
+  }
+
+  /** Save a BEFORE/DURING/AFTER progress note (IN_PROGRESS, provider only). */
+  createJobUpdate(jobId: string, phase: WorkPhase, note: string): Observable<JobUpdate> {
+    return this.http
+      .post<ApiSuccess<JobUpdate>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/updates`, {
+        phase,
+        note: note.trim(),
+      })
+      .pipe(map((res) => res.data));
+  }
+
+  /** List authorized progress notes for a job (customer or provider). */
+  listJobUpdates(jobId: string): Observable<JobUpdate[]> {
+    return this.http
+      .get<ApiSuccess<JobUpdateList>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/updates`)
+      .pipe(map((res) => res.data.items));
+  }
+
+  /** Retrieve the combined timeline (status + updates + photos). */
+  getJobTimeline(jobId: string): Observable<JobTimeline> {
+    return this.http
+      .get<ApiSuccess<JobTimeline>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/timeline`)
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Complete an IN_PROGRESS job (→ COMPLETED). The completion note is
+   * required and stored as the AFTER record; the backend validates the
+   * provider and state server-side.
+   */
+  completeJob(jobId: string, note: string): Observable<CompleteJobResult> {
+    return this.http
+      .post<ApiSuccess<CompleteJobResult>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/complete`, {
+        note: note.trim(),
+      })
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Confirm a COMPLETED job (→ CONFIRMED → CLOSED server-side, owning
+   * customer only). Resolves with the final CLOSED job.
+   */
+  confirmJob(jobId: string): Observable<Job> {
+    return this.http
+      .post<ApiSuccess<{ job: Job }>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/confirm`, {})
+      .pipe(map((res) => res.data.job));
   }
 }

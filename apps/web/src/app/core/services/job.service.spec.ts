@@ -181,4 +181,83 @@ describe('JobService', () => {
     });
     expect(result).toEqual({ id: '7', status: 'IN_PROGRESS' });
   });
+
+  it('uploads a job photo as multipart with phase and file', () => {
+    let result: unknown = null;
+    const file = new File(['fake'], 'before.png', { type: 'image/png' });
+    service.uploadJobImage('7', 'BEFORE', file).subscribe((image) => (result = image));
+    const req = httpMock.expectOne(`${API}/jobs/7/images`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body instanceof FormData).toBe(true);
+    expect((req.request.body as FormData).get('phase')).toBe('BEFORE');
+    req.flush({ success: true, data: { id: 'img-1', phase: 'BEFORE' }, message: 'ok' });
+    expect(result).toEqual({ id: 'img-1', phase: 'BEFORE' });
+  });
+
+  it('lists job photos and builds the authorized file URL', () => {
+    let items: unknown = null;
+    service.listJobImages('7').subscribe((images) => (items = images));
+    const listReq = httpMock.expectOne(`${API}/jobs/7/images`);
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush({ success: true, data: { items: [{ id: 'img-1' }], total: 1 }, message: 'ok' });
+    expect(items).toEqual([{ id: 'img-1' }]);
+    expect(service.imageFileUrl('7', 'img-1')).toBe(`${API}/jobs/7/images/img-1/file`);
+  });
+
+  it('deletes a job photo', () => {
+    let done = false;
+    service.deleteJobImage('7', 'img-1').subscribe(() => (done = true));
+    const req = httpMock.expectOne(`${API}/jobs/7/images/img-1`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ success: true, data: { deleted: true }, message: 'ok' });
+    expect(done).toBe(true);
+  });
+
+  it('creates and lists job updates with trimmed notes', () => {
+    let result: unknown = null;
+    service.createJobUpdate('7', 'DURING', '  Removed damaged section.  ').subscribe((update) => (result = update));
+    const req = httpMock.expectOne(`${API}/jobs/7/updates`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ phase: 'DURING', note: 'Removed damaged section.' });
+    req.flush({ success: true, data: { id: 'u1', phase: 'DURING' }, message: 'ok' });
+    expect(result).toEqual({ id: 'u1', phase: 'DURING' });
+
+    let items: unknown = null;
+    service.listJobUpdates('7').subscribe((updates) => (items = updates));
+    const listReq = httpMock.expectOne(`${API}/jobs/7/updates`);
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush({ success: true, data: { items: [{ id: 'u1' }], total: 1 }, message: 'ok' });
+    expect(items).toEqual([{ id: 'u1' }]);
+  });
+
+  it('fetches the job timeline', () => {
+    let result: unknown = null;
+    service.getJobTimeline('7').subscribe((timeline) => (result = timeline));
+    const req = httpMock.expectOne(`${API}/jobs/7/timeline`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: { job: { id: '7' }, events: [] }, message: 'ok' });
+    expect(result).toEqual({ job: { id: '7' }, events: [] });
+  });
+
+  it('completes a job with a trimmed note and confirms a completed job', () => {
+    let completed: unknown = null;
+    service.completeJob('7', '  Replacement pipe installed.  ').subscribe((result) => (completed = result));
+    const completeReq = httpMock.expectOne(`${API}/jobs/7/complete`);
+    expect(completeReq.request.method).toBe('POST');
+    expect(completeReq.request.body).toEqual({ note: 'Replacement pipe installed.' });
+    completeReq.flush({
+      success: true,
+      data: { job: { id: '7', status: 'COMPLETED' }, update: { id: 'u3', phase: 'AFTER' } },
+      message: 'ok',
+    });
+    expect(completed).toEqual({ job: { id: '7', status: 'COMPLETED' }, update: { id: 'u3', phase: 'AFTER' } });
+
+    let closed: unknown = null;
+    service.confirmJob('7').subscribe((job) => (closed = job));
+    const confirmReq = httpMock.expectOne(`${API}/jobs/7/confirm`);
+    expect(confirmReq.request.method).toBe('POST');
+    expect(confirmReq.request.body).toEqual({});
+    confirmReq.flush({ success: true, data: { job: { id: '7', status: 'CLOSED' } }, message: 'ok' });
+    expect(closed).toEqual({ id: '7', status: 'CLOSED' });
+  });
 });

@@ -61,6 +61,10 @@ export interface ProviderRequestDto {
   province: string | null;
   preferredDate: string | null;
   scheduledAt: string | null;
+  /** Stage 6F terminal timestamps (null until each transition runs). */
+  completedAt: string | null;
+  confirmedAt: string | null;
+  closedAt: string | null;
   createdAt: string;
   /** Privacy-limited customer display info (first name + last initial). */
   customer: {

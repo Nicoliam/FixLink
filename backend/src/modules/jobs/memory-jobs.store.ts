@@ -86,6 +86,10 @@ export class MemoryJobsStore implements JobsStore {
       // Stage 6D: no agreed amount until the customer accepts a quote.
       agreedAmount: null,
       currency: 'ZAR',
+      // Stage 6F: terminal timestamps, null until each transition runs.
+      completedAt: null,
+      confirmedAt: null,
+      closedAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -159,6 +163,30 @@ export class MemoryJobsStore implements JobsStore {
   debugSetJobInProgress(jobId: string): void {
     const job = this.jobs.get(jobId);
     if (job) this.jobs.set(jobId, { ...job, status: 'IN_PROGRESS', updatedAt: nowIso() });
+  }
+
+  /** Stage 6F helper used by the memory execution store: record completion. */
+  debugSetJobCompleted(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (job) {
+      this.jobs.set(jobId, { ...job, status: 'COMPLETED', completedAt: nowIso(), updatedAt: nowIso() });
+    }
+  }
+
+  /** Stage 6F helper used by the memory execution store: record confirmation. */
+  debugSetJobConfirmed(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (job) {
+      this.jobs.set(jobId, { ...job, status: 'CONFIRMED', confirmedAt: nowIso(), updatedAt: nowIso() });
+    }
+  }
+
+  /** Stage 6F helper used by the memory execution store: record closure. */
+  debugSetJobClosed(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (job) {
+      this.jobs.set(jobId, { ...job, status: 'CLOSED', closedAt: nowIso(), updatedAt: nowIso() });
+    }
   }
 
   /** Stage 6D test helper: simulate a non-marketplace job row. */

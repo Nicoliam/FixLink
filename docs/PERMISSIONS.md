@@ -544,3 +544,68 @@ rejection, business owner/manager scheduling, missing/malformed/past
 `scheduledAt`, no-accepted-quote rejection, state guards, history,
 rollback atomicity, customer visibility of `SCHEDULED`/`IN_PROGRESS`,
 accepted-quote integrity, and envelope consistency.
+
+
+# 25. Stage 6F Implementation Notes — Job Execution & Work Documentation
+
+Implemented 2026-09-23 (`backend/src/modules/execution/`,
+`backend/src/services/file-storage.ts`,
+`POST /api/v1/jobs/:jobId/images|updates|complete|confirm`,
+`GET /api/v1/jobs/:jobId/images|images/:imageId/file|updates|timeline`,
+`DELETE /api/v1/jobs/:jobId/images/:imageId`).
+
+- Only the addressed provider may document work or complete: the
+  `PROFESSIONAL` owning the job's professional profile, or a
+  `BUSINESS_OWNER` / `BUSINESS_MANAGER` of the job's business
+  (ownership derived server-side — never from the request). Another
+  provider's job reads as `404 NOT_FOUND`, never `403`, so job and
+  image ids cannot be probed across providers.
+- `CUSTOMER` actors on provider endpoints, `TECHNICIAN`-only actors
+  on marketplace execution and providers on confirmation receive
+  `403 FORBIDDEN_ROLE` — technicians cannot perform marketplace
+  execution in Stage 6F, customers cannot upload/complete, and
+  providers cannot confirm.
+- Only the owning `CUSTOMER` may confirm (ownership derived from the
+  session); another customer's job reads as `404`.
+- Read access (photos, bytes, updates, timeline) is limited to the
+  owning customer and the addressed provider; media stays private
+  (no public URLs, paths or storage keys in responses) and is never
+  auto-published to portfolios.
+- Photo deletion additionally requires the caller to be the uploader
+  and the job to still be `IN_PROGRESS` (same-job foreign delete →
+  `403`; completed/closed job → `422`).
+- State is enforced server-side: work documentation requires
+  `IN_PROGRESS`; completion requires `IN_PROGRESS` plus a 1–2000
+  char note; confirmation requires `COMPLETED`; `CLOSED` jobs reject
+  every modification (`422`).
+
+Role summary for marketplace execution in Stage 6F:
+
+PROFESSIONAL:
+- add BEFORE/DURING/AFTER photos and notes on own IN_PROGRESS jobs
+- delete own photos while IN_PROGRESS
+- complete own IN_PROGRESS jobs (note required)
+- view own job work and timeline
+
+BUSINESS_OWNER:
+- same for applicable business marketplace jobs
+
+BUSINESS_MANAGER:
+- same for applicable business marketplace jobs
+
+CUSTOMER:
+- view own job work and timeline (read-only)
+- confirm own COMPLETED marketplace job (closes it server-side)
+- cannot upload, note, complete, start, schedule or close arbitrarily
+
+TECHNICIAN:
+- cannot perform marketplace execution in Stage 6F
+
+Permission tests added (`backend/tests/job-execution.test.ts`):
+own/other-provider uploads and updates, customer/technician/provider
+rejection paths, phase/MIME/size/content validation, private
+retrieval (owner/provider vs foreign/unauthenticated, metadata and
+bytes), uploader-only deletion, completion guards and note
+requirement, confirmation ownership and atomic closure, closed-job
+immutability, bypass attempts, timeline contents, rollback atomicity,
+and envelope consistency.

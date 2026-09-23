@@ -1021,3 +1021,34 @@ as In Progress") → Job In Progress (active state).
 Explicitly out of scope for Stage 6E: payment processing of any kind,
 technician marketplace transitions, Before/During/After execution
 media, completion/confirmation/reviews, and notifications.
+
+# 20. STAGE 6F IMPLEMENTATION NOTES — JOB EXECUTION & WORK DOCUMENTATION
+
+Implemented 2026-09-23. Covers the IN_PROGRESS → COMPLETED →
+CONFIRMED → CLOSED segment of flow §12 for marketplace jobs: the
+provider side of §3.2 (Before Work), §3.3 (During Work, minus voice
+notes), §3.5 (Work Completed, minus notifications) and the customer
+side of §3.6 (Customer Confirms Completion, minus the review prompt).
+
+Provider:
+
+Start Job (IN_PROGRESS) → Before Work (photos + note) → During Work
+(multiple progress updates + photos) → After Work (final photos +
+completion note) → Complete Job (completion note required →
+COMPLETED) → Await customer confirmation (read-only; the provider
+never sees a confirmation action).
+
+Customer:
+
+View Work (IN_PROGRESS — read-only Job Progress with BEFORE/DURING/
+AFTER photos and notes) → See Completion (COMPLETED — completion
+note, after photos, timestamp) → Confirm Completion (single action;
+backend records CONFIRMED then CLOSED and returns the closed job) →
+Job Closed (read-only history + timeline). Choosing "Not Yet" changes
+nothing — the customer is guided to contact the provider instead of
+an invented dispute/new status.
+
+Explicitly out of scope for Stage 6F: payment processing of any kind,
+technician marketplace execution, parts requests, manager approvals,
+portfolio publishing (photos stay private), voice notes, the review
+flow, and notifications.

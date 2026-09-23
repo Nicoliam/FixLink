@@ -388,7 +388,6 @@ columns were created.
 
 
 ## 10.4 Jobs — Stage 6E Implementation Notes (Scheduling & Start)
-
 Stage 6E implements provider scheduling and start
 (`backend/src/modules/quotes/` — the provider-identity service, plus
 `schedule.validation.ts`): the transitions
@@ -436,6 +435,90 @@ performed entirely server-side. The frontend never sends a status.
   ENUM, `jobs.scheduled_at` and `job_status_history` rows are reused.
 
 MVP payment position (unchanged): scheduling and starting never
+charge the customer; the agreed quote remains the recorded price the
+customer pays the professional directly outside the platform.
+
+
+## 10.5 Jobs — Stage 6F Implementation Notes (Execution & Completion)
+
+Stage 6F implements work documentation, completion and confirmation
+(`backend/src/modules/execution/` + `backend/src/services/file-storage.ts`):
+the transitions
+
+IN_PROGRESS → COMPLETED → CONFIRMED → CLOSED
+
+performed entirely server-side. The frontend never sends a status.
+
+- `POST /api/v1/jobs/:jobId/images` (requires
+  `Authorization: Bearer <accessToken>`, `PROFESSIONAL` /
+  `BUSINESS_OWNER` / `BUSINESS_MANAGER` roles) uploads one
+  BEFORE/DURING/AFTER photo for an `IN_PROGRESS` `MARKETPLACE` job
+  addressed to the authenticated provider/business. Multipart body:
+  `image` file field + `phase` text field (`BEFORE` | `DURING` |
+  `AFTER`). Only `image/jpeg`, `image/png` and `image/webp` are
+  accepted (5MB max); the stored type is sniffed from magic bytes, so
+  spoofed extensions/MIMEs are rejected. Filenames are generated
+  server-side (`job-images/<jobId>/<randomHex>.<ext>`); the original
+  name is stored sanitized in `job_images.original_filename` and never
+  used for paths. Success → `201` with the image metadata (no binary,
+  no path, no storage key).
+- `GET /api/v1/jobs/:jobId/images` → `200 { items, total }` for the
+  owning customer or the addressed provider (others → `404`; file
+  bytes are never embedded).
+- `GET /api/v1/jobs/:jobId/images/:imageId/file` streams the stored
+  bytes with the recorded MIME type under the same authorization
+  (foreign/unknown jobs → `404`, unauthenticated → `401`).
+- `DELETE /api/v1/jobs/:jobId/images/:imageId` → `200
+  { deleted: true }`: the uploader may delete their own photo while
+  the job is `IN_PROGRESS` (another user's photo → `403`, completed
+  or closed job → `422`).
+- `POST /api/v1/jobs/:jobId/updates` (same provider roles) saves a
+  progress note: `{ "phase": "BEFORE" | "DURING" | "AFTER",
+  "note": "1–2000 chars" }` → `201` with the update (stored in
+  `job_updates` with `phase`). Only `IN_PROGRESS` jobs accept notes.
+- `GET /api/v1/jobs/:jobId/updates` → `200 { items, total }` for the
+  owning customer or the addressed provider.
+- `GET /api/v1/jobs/:jobId/timeline` → `200 { job, events }` for the
+  owning customer or the addressed provider: status transitions from
+  `job_status_history` plus updates and photo events, oldest first.
+  Actors are role labels (`customer`/`provider`) only — no contact
+  details.
+- `POST /api/v1/jobs/:jobId/complete` (same provider roles, body
+  `{ "note": "required completion note, 1–2000 chars" }`) completes an
+  `IN_PROGRESS` job. On success (`200` with `{ job, update }`,
+  message `Job completed successfully`): the note is stored as the
+  AFTER record, the job becomes `COMPLETED` (`jobs.completed_at`
+  recorded) and a `job_status_history` entry (`IN_PROGRESS →
+  COMPLETED`, reason `Provider completed job`) is written —
+  atomically (a failure leaves the job `IN_PROGRESS`).
+- `POST /api/v1/jobs/:jobId/confirm` (requires `CUSTOMER` role, empty
+  body) confirms a `COMPLETED` job owned by the authenticated
+  customer. On success (`200` with `{ job }`, message `Job confirmed
+  successfully`): the backend records `COMPLETED → CONFIRMED`
+  (`Customer confirmed job`) and `CONFIRMED → CLOSED` (`Job closed
+  after customer confirmation`) in one transaction
+  (`jobs.confirmed_at`/`closed_at` recorded) and returns the final
+  `CLOSED` job — the customer confirms once, never twice.
+- State is enforced server-side: `SCHEDULED`/`ACCEPTED` jobs cannot
+  be completed, `IN_PROGRESS` jobs cannot be confirmed, `COMPLETED`
+  jobs cannot be restarted, and `CLOSED` jobs reject every
+  modification (`422 VALIDATION_ERROR`). The frontend never sends a
+  status.
+- Errors: malformed job/image ids → `400 VALIDATION_ERROR`; unknown
+  jobs, another provider's or another customer's jobs and `INTERNAL`
+  jobs → `404 NOT_FOUND` (no cross-account probing); `CUSTOMER`
+  actors on provider endpoints, `TECHNICIAN`-only actors on
+  marketplace execution and providers on confirmation → `403
+  FORBIDDEN_ROLE`; unauthenticated → `401 UNAUTHORIZED`.
+- No new tables were created — the existing `jobs.status` ENUM,
+  `jobs.completed_at`/`confirmed_at`/`closed_at`, `job_images`,
+  `job_updates` (plus migration 009's nullable `phase` /
+  `original_filename` columns) and `job_status_history` rows are
+  reused. File bytes live in the local MVP storage dir
+  (`backend/uploads`, overridable via `FILE_STORAGE_DIR`); MySQL
+  stores metadata only.
+
+MVP payment position (unchanged): completion and confirmation never
 charge the customer; the agreed quote remains the recorded price the
 customer pays the professional directly outside the platform.
 
@@ -588,20 +671,30 @@ receipt exists — the UI must never imply otherwise. No new tables
 were created.
 
 
-# 14. Job Media
+# 14. Job Media (Stage 6F — Implemented)
 
-POST /api/v1/jobs/:id/images
+POST /api/v1/jobs/:jobId/images (multipart: `image` + `phase`)
 
-GET /api/v1/jobs/:id/images
+GET /api/v1/jobs/:jobId/images
 
-DELETE /api/v1/jobs/:id/images/:imageId
+GET /api/v1/jobs/:jobId/images/:imageId/file (authorized bytes)
+
+DELETE /api/v1/jobs/:jobId/images/:imageId
+
+See §10.5 for authentication, authorization, upload rules, responses
+and status-transition behaviour.
 
 
-# 15. Job Updates
+# 15. Job Updates (Stage 6F — Implemented)
 
-POST /api/v1/jobs/:id/updates
+POST /api/v1/jobs/:jobId/updates (`{ phase, note }`)
 
-GET /api/v1/jobs/:id/updates
+GET /api/v1/jobs/:jobId/updates
+
+GET /api/v1/jobs/:jobId/timeline (`{ job, events }`)
+
+See §10.5 for authentication, authorization, request bodies, responses
+and error cases.
 
 
 # 16. Voice Notes

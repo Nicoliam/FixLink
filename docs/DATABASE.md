@@ -819,3 +819,19 @@ hashing/verification service.
 ### 40.10 `audit_logs` is immutable by design
 
 No `updated_at` column; rows are insert-only. Corrections are new rows.
+
+### 40.11 Stage 6F work-documentation columns (migration 009)
+
+`database/migrations/009_job_execution.sql` adds exactly two NULLABLE
+columns — no new tables, no data rewrite, earlier stages unaffected:
+
+- `job_updates.phase` (`ENUM('BEFORE','DURING','AFTER') NULL`,
+  indexed via `idx_job_updates_job_phase`) distinguishes progress
+  notes per work phase. Rows written before this migration keep
+  `phase = NULL`; readers treat them as `DURING`.
+- `job_images.original_filename` (`VARCHAR(255) NULL`) preserves the
+  sanitized upload name for display. `file_reference` remains the
+  opaque server-side storage key and is never a filesystem path.
+
+`jobs.completed_at`/`confirmed_at`/`closed_at` (migration 004) record
+the Stage 6F terminal transitions; no job-table change was required.
