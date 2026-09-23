@@ -1,0 +1,40 @@
+<div class="fl-landing">
+  <div class="fl-landing-card">
+    <img
+      ngSrc="brand/fixlink-logo.png"
+      width="178"
+      height="60"
+      priority
+      alt="FixLink — Connect. Quote. Fix."
+      class="fl-landing-logo"
+    />
+    <p class="fl-eyebrow">Connect. Quote. Fix.</p>
+    <h1 class="fl-landing-title">Trusted home services, across South Africa</h1>
+    <p class="fl-landing-text">
+      FixLink connects customers with verified professionals and service businesses —
+      from plumbing and electrical to painting, building and more.
+    </p>
+
+    @if (auth.isRestoring()) {
+      <p class="fl-landing-text" role="status">Checking your session…</p>
+    } @else if (auth.isAuthenticated() && auth.currentUser()) {
+      <p class="fl-landing-text" role="status">
+        Signed in as <strong>{{ auth.currentUser()?.email }}</strong>
+      </p>
+      <div class="fl-landing-actions">
+        <a class="fl-btn fl-btn-primary" routerLink="/account">Go to my account</a>
+      </div>
+    } @else {
+      <div class="fl-landing-actions">
+        <a class="fl-btn fl-btn-primary" routerLink="/register">Create an account</a>
+        <a class="fl-btn fl-btn-secondary" routerLink="/login">Log in</a>
+      </div>
+    }
+
+    <ul class="fl-trust-list" aria-label="Why FixLink">
+      <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Verified professionals</li>
+      <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Upfront quotes in Rand</li>
+      <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Before / During / After photo proof</li>
+    </ul>
+  </div>
+</div>

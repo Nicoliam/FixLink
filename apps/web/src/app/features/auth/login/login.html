@@ -1,0 +1,68 @@
+<app-auth-shell
+  title="Welcome back"
+  subtitle="Log in to manage your FixLink jobs, quotes and messages."
+  footerPrompt="New to FixLink?"
+  footerLinkLabel="Create an account"
+  footerLinkTo="/register"
+>
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="fl-form">
+    @if (apiError()) {
+      <div class="fl-alert fl-alert-error" role="alert" data-testid="login-error">
+        {{ apiError() }}
+      </div>
+    }
+
+    <div class="fl-field">
+      <label class="fl-label" for="login-email">Email address</label>
+      <input
+        id="login-email"
+        class="fl-input"
+        type="email"
+        autocomplete="email"
+        placeholder="you@example.co.za"
+        formControlName="email"
+        [attr.aria-invalid]="email.invalid && email.touched"
+        [attr.aria-describedby]="email.invalid && email.touched ? 'login-email-error' : null"
+      />
+      @if (email.touched && email.hasError('required')) {
+        <p id="login-email-error" class="fl-field-error" role="alert">Email address is required.</p>
+      } @else if (email.touched && email.hasError('email')) {
+        <p id="login-email-error" class="fl-field-error" role="alert">Enter a valid email address.</p>
+      }
+    </div>
+
+    <div class="fl-field">
+      <label class="fl-label" for="login-password">Password</label>
+      <input
+        id="login-password"
+        class="fl-input"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Your password"
+        formControlName="password"
+        [attr.aria-invalid]="password.invalid && password.touched"
+        [attr.aria-describedby]="password.invalid && password.touched ? 'login-password-error' : null"
+      />
+      @if (password.touched && password.hasError('required')) {
+        <p id="login-password-error" class="fl-field-error" role="alert">Password is required.</p>
+      }
+    </div>
+
+    <button
+      type="submit"
+      class="fl-btn fl-btn-primary fl-btn-block"
+      [disabled]="isSubmitting()"
+      [attr.aria-busy]="isSubmitting()"
+      data-testid="login-submit"
+    >
+      {{ isSubmitting() ? 'Logging in…' : 'Log in' }}
+    </button>
+
+    <p class="fl-form-note">
+      Payment is arranged directly with your professional. FixLink never asks for card details here.
+    </p>
+    <p class="fl-form-note">
+      <a class="fl-link" routerLink="/">Back to home</a>
+    </p>
+  </form>
+</app-auth-shell>

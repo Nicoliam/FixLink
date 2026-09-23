@@ -1,0 +1,43 @@
+<div class="fl-auth-page">
+  <div class="fl-auth-card" role="main" aria-labelledby="account-title">
+    <span class="fl-pill fl-pill-verified" role="status">✓ Signed in</span>
+    <h1 id="account-title" class="fl-auth-title">My account</h1>
+    <p class="fl-auth-subtitle">You are authenticated. Role dashboards arrive in the next stage.</p>
+
+    @if (currentUser(); as user) {
+      <dl class="fl-account-list" data-testid="account-details">
+        <div class="fl-account-row">
+          <dt>Email</dt>
+          <dd>{{ user.email }}</dd>
+        </div>
+        <div class="fl-account-row">
+          <dt>Roles</dt>
+          <dd>
+            @for (role of user.roles; track role) {
+              <span class="fl-pill fl-pill-info">{{ role }}</span>
+            }
+          </dd>
+        </div>
+        <div class="fl-account-row">
+          <dt>Status</dt>
+          <dd>{{ user.status }}</dd>
+        </div>
+      </dl>
+    } @else {
+      <p class="fl-auth-subtitle" role="status">Loading your session…</p>
+    }
+
+    <button
+      type="button"
+      class="fl-btn fl-btn-secondary fl-btn-block"
+      (click)="logout()"
+      [disabled]="isLoggingOut()"
+      data-testid="account-logout"
+    >
+      {{ isLoggingOut() ? 'Logging out…' : 'Log out' }}
+    </button>
+    <p class="fl-form-note">
+      <a class="fl-link" routerLink="/">Back to home</a>
+    </p>
+  </div>
+</div>

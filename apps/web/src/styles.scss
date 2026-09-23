@@ -1,1 +1,596 @@
-/* You can add global styles to this file, and also import other style files */
+/* FixLink global styles — Oceanic Modern Marketplace (docs/DESIGN-SYSTEM.md). */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+
+:root {
+  --fl-primary: #0284c7;
+  --fl-primary-hover: #0369a1;
+  --fl-trust: #0f766e;
+  --fl-accent: #e05a12;
+  --fl-ink: #0f172a;
+  --fl-canvas: #f8fafc;
+  --fl-surface: #ffffff;
+  --fl-muted-surface: #f1f5f9;
+  --fl-border: #e2e8f0;
+  --fl-input-border: #cbd5e1;
+  --fl-verified: #059669;
+  --fl-verified-bg: #ecfdf5;
+  --fl-alert: #dc2626;
+  --fl-alert-bg: #fef2f2;
+  --fl-focus-ring: 0 0 0 3px rgba(2, 132, 199, 0.25);
+  --fl-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fl-radius-control: 12px;
+  --fl-radius-card: 16px;
+  --fl-card-shadow:
+    0 1px 3px 0 rgba(15, 23, 42, 0.04),
+    0 1px 2px -1px rgba(15, 23, 42, 0.04);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--fl-font);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--fl-ink);
+  background: var(--fl-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--fl-focus-ring);
+}
+
+/* ---------- App shell ---------- */
+
+.fl-header {
+  background: var(--fl-surface);
+  border-bottom: 1px solid var(--fl-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.fl-header-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.fl-brand {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.fl-brand-logo {
+  height: 44px;
+  width: auto;
+}
+
+.fl-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fl-nav-status {
+  font-size: 14px;
+  color: #475569;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fl-main {
+  min-height: calc(100dvh - 140px);
+}
+
+.fl-footer {
+  text-align: center;
+  padding: 1.5rem 1rem 2rem;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.fl-footer p {
+  margin: 0;
+}
+
+/* ---------- Links & buttons ---------- */
+
+.fl-link {
+  color: var(--fl-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fl-link:hover {
+  color: var(--fl-primary-hover);
+  text-decoration: underline;
+}
+
+.fl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--fl-font);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--fl-radius-control);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
+}
+
+.fl-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.fl-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.fl-btn-primary {
+  background: var(--fl-primary);
+  color: #fff;
+}
+
+.fl-btn-primary:hover:not(:disabled) {
+  background: var(--fl-primary-hover);
+}
+
+.fl-btn-secondary {
+  background: var(--fl-muted-surface);
+  color: var(--fl-ink);
+  border-color: var(--fl-border);
+}
+
+.fl-btn-secondary:hover:not(:disabled) {
+  background: var(--fl-border);
+}
+
+.fl-btn-block {
+  width: 100%;
+}
+
+.fl-btn-sm {
+  padding: 0.5rem 0.9rem;
+  font-size: 13px;
+}
+
+/* ---------- Auth pages ---------- */
+
+.fl-auth-page {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 1rem 3rem;
+}
+
+.fl-auth-card {
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-border);
+  border-radius: var(--fl-radius-card);
+  box-shadow: var(--fl-card-shadow);
+  width: 100%;
+  max-width: 480px;
+  padding: 2rem;
+}
+
+.fl-auth-logo {
+  height: 50px;
+  width: auto;
+  margin-bottom: 1.25rem;
+}
+
+.fl-auth-title {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+}
+
+.fl-auth-subtitle {
+  font-size: 16px;
+  line-height: 24px;
+  color: #475569;
+  margin: 0 0 1.5rem;
+}
+
+.fl-auth-footer {
+  margin: 1.5rem 0 0;
+  font-size: 14px;
+  color: #475569;
+  text-align: center;
+}
+
+/* ---------- Forms ---------- */
+
+.fl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fl-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.fl-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.fl-optional {
+  font-weight: 400;
+  color: #64748b;
+}
+
+.fl-input {
+  font-family: var(--fl-font);
+  font-size: 16px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--fl-input-border);
+  border-radius: var(--fl-radius-control);
+  background: var(--fl-surface);
+  color: var(--fl-ink);
+  width: 100%;
+}
+
+.fl-input::placeholder {
+  color: #94a3b8;
+}
+
+.fl-input:focus {
+  outline: none;
+  border-color: var(--fl-primary);
+  box-shadow: var(--fl-focus-ring);
+}
+
+.fl-field-error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--fl-alert);
+}
+
+.fl-form-note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #64748b;
+  text-align: center;
+}
+
+.fl-alert {
+  border-radius: var(--fl-radius-control);
+  padding: 0.75rem 1rem;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fl-alert-error {
+  background: var(--fl-alert-bg);
+  color: var(--fl-alert);
+  border: 1px solid #fecaca;
+}
+
+/* ---------- Role selector ---------- */
+
+.fl-role-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.fl-role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--fl-input-border);
+  border-radius: var(--fl-radius-control);
+  background: var(--fl-surface);
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.fl-role-card:hover {
+  border-color: var(--fl-primary);
+}
+
+.fl-role-card-selected {
+  border-color: var(--fl-primary);
+  box-shadow: var(--fl-focus-ring);
+}
+
+.fl-role-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fl-role-description {
+  font-size: 14px;
+  line-height: 20px;
+  color: #475569;
+}
+
+/* ---------- Pills ---------- */
+
+.fl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.fl-pill-verified {
+  background: var(--fl-verified-bg);
+  color: var(--fl-verified);
+  margin-bottom: 0.75rem;
+}
+
+.fl-pill-info {
+  background: #f0f9ff;
+  color: var(--fl-primary);
+  margin-right: 0.375rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ---------- Success state ---------- */
+
+.fl-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+.fl-success-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: var(--fl-verified-bg);
+  color: var(--fl-verified);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.fl-success-title {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fl-success-text {
+  font-size: 16px;
+  color: #475569;
+  margin: 0 0 0.5rem;
+}
+
+.fl-success .fl-btn {
+  margin-top: 0.5rem;
+}
+
+/* ---------- Account page ---------- */
+
+.fl-account-list {
+  margin: 0 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--fl-border);
+  border-radius: var(--fl-radius-control);
+  overflow: hidden;
+}
+
+.fl-account-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+.fl-account-row + .fl-account-row {
+  border-top: 1px solid var(--fl-border);
+}
+
+.fl-account-row dt {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin: 0;
+}
+
+.fl-account-row dd {
+  font-size: 16px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Landing ---------- */
+
+.fl-landing {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 1rem 3rem;
+}
+
+.fl-landing-card {
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-border);
+  border-radius: 24px;
+  box-shadow: var(--fl-card-shadow);
+  width: 100%;
+  max-width: 720px;
+  padding: 2.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fl-landing-logo {
+  height: 60px;
+  width: auto;
+}
+
+.fl-eyebrow {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--fl-primary);
+}
+
+.fl-landing-title {
+  margin: 0;
+  font-size: 36px;
+  line-height: 44px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.fl-landing-text {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  color: #475569;
+  max-width: 560px;
+}
+
+.fl-landing-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.fl-trust-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.fl-trust-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--fl-verified-bg);
+  color: var(--fl-verified);
+  font-size: 12px;
+  margin-right: 0.375rem;
+}
+
+/* ---------- Utilities ---------- */
+
+.fl-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Responsive (Oceanic breakpoints) ---------- */
+
+@media (max-width: 767px) {
+  .fl-header-inner {
+    padding: 0.625rem 1rem;
+  }
+
+  .fl-nav-status {
+    display: none;
+  }
+
+  .fl-auth-page,
+  .fl-landing {
+    padding: 1.5rem 1rem 2rem;
+  }
+
+  .fl-auth-card {
+    padding: 1.5rem;
+  }
+
+  .fl-landing-card {
+    padding: 1.5rem;
+  }
+
+  .fl-landing-title {
+    font-size: 26px;
+    line-height: 34px;
+  }
+
+  .fl-landing-text {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .fl-btn {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .fl-header-inner {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}

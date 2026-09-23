@@ -1,0 +1,19 @@
+<div class="fl-auth-page">
+  <div class="fl-auth-card" role="main" aria-labelledby="fl-auth-title">
+    <img
+      ngSrc="brand/fixlink-logo.png"
+      width="148"
+      height="50"
+      priority
+      alt="FixLink — Connect. Quote. Fix."
+      class="fl-auth-logo"
+    />
+    <h1 id="fl-auth-title" class="fl-auth-title">{{ title() }}</h1>
+    <p class="fl-auth-subtitle">{{ subtitle() }}</p>
+    <ng-content />
+    <p class="fl-auth-footer">
+      {{ footerPrompt() }}
+      <a class="fl-link" [routerLink]="footerLinkTo()">{{ footerLinkLabel() }}</a>
+    </p>
+  </div>
+</div>

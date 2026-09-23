@@ -1,12 +1,20 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
+import { RouterLink, RouterOutlet } from '@angular/router';
+import { AuthService } from './core/services/auth.service';
 
+/**
+ * FixLink application shell — Stage 5B.
+ *
+ * Oceanic header with the FixLink logo and session-aware navigation,
+ * plus the routed content. Dashboards arrive in later stages.
+ */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [NgOptimizedImage, RouterLink, RouterOutlet],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
-  styleUrl: './app.scss'
 })
 export class App {
-  protected readonly title = signal('web');
+  protected readonly auth = inject(AuthService);
 }
