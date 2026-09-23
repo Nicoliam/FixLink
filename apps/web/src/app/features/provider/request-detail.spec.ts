@@ -114,6 +114,19 @@ describe('RequestDetailComponent', () => {
     expect(text).not.toContain('Submit a quote');
   });
 
+  it('shows the accepted state when the customer accepts the quote', async () => {
+    const accepted: Quote = { ...submittedQuote, status: 'ACCEPTED' };
+    await setup('3', apiWith({ ...detail, status: 'ACCEPTED', quotes: [accepted] }));
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Accepted');
+    expect(text).toContain('R1,250');
+    expect(text).toContain('has accepted your quote');
+    expect(text).toContain('Agreed amount: R1,250');
+    expect(text).toContain('payment is arranged directly with the customer');
+    expect(text).not.toContain('Submit a quote');
+    expect(text).not.toContain('payment successful');
+  });
+
   it('shows the not-found state for unknown requests', async () => {
     await setup(
       '9999',

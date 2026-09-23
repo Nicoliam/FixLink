@@ -83,6 +83,9 @@ export class MemoryJobsStore implements JobsStore {
       // Wall-clock echo of the submitted date/time (no timezone shift), so
       // the preferred slot the customer picked is what the API reports.
       scheduledAt: input.scheduledAt === null ? null : input.scheduledAt.replace(' ', 'T'),
+      // Stage 6D: no agreed amount until the customer accepts a quote.
+      agreedAmount: null,
+      currency: 'ZAR',
       createdAt: now,
       updatedAt: now,
     };
@@ -122,6 +125,22 @@ export class MemoryJobsStore implements JobsStore {
   debugSetJobStatus(jobId: string, status: JobDto['status']): void {
     const job = this.jobs.get(jobId);
     if (job) this.jobs.set(jobId, { ...job, status, updatedAt: nowIso() });
+  }
+
+  /**
+   * Stage 6D test helper: record acceptance exactly as the quotes store
+   * does (status ACCEPTED + agreed amount/currency). Production updates
+   * these columns in the same acceptance transaction.
+   */
+  debugSetJobAccepted(jobId: string, agreedAmount: number, currency: string): void {
+    const job = this.jobs.get(jobId);
+    if (job) this.jobs.set(jobId, { ...job, status: 'ACCEPTED', agreedAmount, currency, updatedAt: nowIso() });
+  }
+
+  /** Stage 6D test helper: simulate a non-marketplace job row. */
+  debugSetJobSource(jobId: string, source: JobDto['source']): void {
+    const job = this.jobs.get(jobId);
+    if (job) this.jobs.set(jobId, { ...job, source, updatedAt: nowIso() });
   }
 }
 

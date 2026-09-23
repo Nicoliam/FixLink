@@ -1,11 +1,12 @@
 /**
- * FixLink job models — Stage 6B + 6C.
+ * FixLink job models — Stage 6B + 6C + 6D.
  *
  * Client-side projections of the customer job-request API
- * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id) and the
+ * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id), the
  * Stage 6C provider request + quote API (GET /api/v1/provider/requests,
- * POST /api/v1/jobs/:id/quotes). Execution and payment arrive in later
- * stages.
+ * POST /api/v1/jobs/:id/quotes) and the Stage 6D customer acceptance
+ * API (POST /api/v1/jobs/:id/quotes/:quoteId/accept). Execution and
+ * payment arrive in later stages.
  */
 
 export type JobSource = 'MARKETPLACE' | 'INTERNAL';
@@ -51,6 +52,10 @@ export interface Job {
   scheduledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Agreed quote amount recorded at acceptance; null until ACCEPTED. */
+  agreedAmount?: number | null;
+  /** Recorded currency (MVP: ZAR, arranged directly — never charged). */
+  currency?: string;
   /** Quotes submitted on this job (embedded in detail responses). */
   quotes?: Quote[];
 }
@@ -107,6 +112,17 @@ export interface CreateQuoteRequest {
   items?: Array<{ description: string; quantity: number; unitPrice: number }>;
 }
 
+/**
+ * Result of POST /api/v1/jobs/:id/quotes/:quoteId/accept — the accepted
+ * quote plus the updated job (status ACCEPTED, agreed amount recorded).
+ * No payment is processed: the total is the agreed price the customer
+ * pays the professional directly.
+ */
+export interface AcceptQuoteResult {
+  job: Job;
+  quote: Quote;
+}
+
 /** Provider-facing projection of a marketplace request. */
 export interface ProviderRequest {
   id: string;
@@ -139,6 +155,24 @@ export function formatZar(amount: number): string {
   const [whole, fraction] = rounded.toFixed(2).split('.') as [string, string];
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return fraction === '00' ? `R${grouped}` : `R${grouped}.${fraction}`;
+}
+
+/** Human-friendly label for quote statuses shown to customers/providers. */
+export function quoteStatusLabel(status: QuoteStatus): string {
+  switch (status) {
+    case 'DRAFT':
+      return 'Draft';
+    case 'SUBMITTED':
+      return 'Submitted';
+    case 'ACCEPTED':
+      return 'Accepted';
+    case 'DECLINED':
+      return 'No longer available';
+    case 'WITHDRAWN':
+      return 'Withdrawn';
+    case 'EXPIRED':
+      return 'Expired';
+  }
 }
 
 /** Human-friendly label for the REQUESTED-family statuses shown to customers. */

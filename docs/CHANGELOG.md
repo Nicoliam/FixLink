@@ -1,5 +1,40 @@
 # FixLink — Changelog
 
+## Stage 6D — Customer Quote Acceptance (2026-09-23)
+
+- Customers can now accept marketplace quotes:
+  `POST /api/v1/jobs/:jobId/quotes/:quoteId/accept` (owning
+  `CUSTOMER` only, empty body) performs `QUOTED → ACCEPTED`
+  atomically — quote `ACCEPTED`, competing quotes retired to
+  `DECLINED` (never deleted), job `ACCEPTED` with `agreed_amount`/
+  `currency` recorded, plus a `job_status_history` entry
+  (`Customer accepted provider quote`). The frontend never sends a
+  status. No new tables or columns — existing `quotes.status`,
+  `jobs.agreed_amount`/`currency`, `job_status_history` and the
+  creation-time `job_assignments` row are reused; no technician is
+  assigned.
+- Authorization: ownership derived from the session; other
+  customers' jobs/quotes, unknown or mismatched quotes and
+  `INTERNAL` jobs read as `404`; provider/technician/manager-only/
+  admin actors receive `403`; repeat acceptance → `409`;
+  ineligible quotes and non-`QUOTED` jobs → `422`.
+- `GET /api/v1/jobs` / `:id` now expose `agreedAmount`/`currency`.
+  Angular: `/my-jobs/:id` shows per-quote `Accept Quote` actions on
+  `QUOTED` jobs with a confirmation step (agreed amount +
+  direct-payment wording), a `Quote accepted` success state (status,
+  provider, agreed price, payment wording), and retired-quote
+  display; `/requests/:id` shows the provider-side `Accepted` state
+  with the agreed amount. No payment processing (explicit: the
+  accepted total is the agreed price; payment is arranged directly),
+  no scheduling, no technician workflow, no decline/withdrawal.
+- Tests: `backend/tests/quote-acceptance.test.ts` (22 cases:
+  retrieval, acceptance, transitions, provider association,
+  history, ownership, roles incl. dual-role owner-manager,
+  conflicts, state guards, `INTERNAL`, rollback, multi-quote,
+  envelopes, provider visibility) plus customer/provider frontend
+  specs. Full suites green: backend 117/117, web 94/94;
+  `tsc --noEmit` (app + spec) and both builds pass.
+
 ## Stage 6C — Provider Requests & Quotes (2026-09-23)
 
 - Providers can now receive marketplace requests and submit quotes:

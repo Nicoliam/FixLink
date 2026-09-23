@@ -123,6 +123,23 @@ describe('JobService', () => {
     expect(result).toEqual({ id: '11', total: 1250 });
   });
 
+  it('accepts a quote and resolves the accepted job and quote', () => {
+    let result: unknown = null;
+    service.acceptQuote('7', '11').subscribe((acceptance) => (result = acceptance));
+    const req = httpMock.expectOne(`${API}/jobs/7/quotes/11/accept`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({
+      success: true,
+      data: { job: { id: '7', status: 'ACCEPTED', agreedAmount: 1250 }, quote: { id: '11', status: 'ACCEPTED' } },
+      message: 'ok',
+    });
+    expect(result).toEqual({
+      job: { id: '7', status: 'ACCEPTED', agreedAmount: 1250 },
+      quote: { id: '11', status: 'ACCEPTED' },
+    });
+  });
+
   it('lists quotes for a job and fetches a single quote', () => {
     let items: unknown = null;
     service.listJobQuotes('3').subscribe((quotes) => (items = quotes));

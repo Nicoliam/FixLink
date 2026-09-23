@@ -455,3 +455,33 @@ Permission tests added (`backend/tests/quotes.test.ts`): unrelated
 providers/businesses isolated, technician/customer/admin rejection,
 malformed/unknown ids, duplicate-quote conflict, and failure
 atomicity (failed quote leaves the job `REQUESTED`).
+
+
+# 23. Stage 6D Implementation Notes — Customer Quote Acceptance
+
+Implemented 2026-09-23 (`backend/src/modules/quotes/`,
+`POST /api/v1/jobs/:jobId/quotes/:quoteId/accept`).
+
+- Only the `CUSTOMER` who owns the `MARKETPLACE` job may accept, and
+  ownership is derived server-side from the session user id (no
+  `customer_id` is read from the request). A user holding
+  `BUSINESS_MANAGER` (or any other role) alongside `CUSTOMER` may
+  accept only their own customer-owned job — role alone never grants
+  acceptance.
+- `PROFESSIONAL` / `BUSINESS_OWNER` / `BUSINESS_MANAGER`-only,
+  `TECHNICIAN`-only and `ADMIN`-only actors receive `403
+  FORBIDDEN_ROLE` — a provider can never accept their own quote.
+- Another customer's job, an `INTERNAL` job, an unknown quote, or a
+  quote belonging to another job all read as `404 NOT_FOUND`, never
+  `403`, so job/quote ids cannot be probed across accounts.
+- State is enforced server-side: only a `SUBMITTED` quote on a
+  `QUOTED` job is accepted (already-accepted → `409 CONFLICT`;
+  withdrawn/declined or wrong job state → `422`). The frontend never
+  sends a status.
+
+Permission tests added (`backend/tests/quote-acceptance.test.ts`):
+cross-customer and cross-job rejection, provider/technician/
+manager-only/admin rejection, dual-role owner-manager acceptance,
+already-accepted conflict, ineligible and wrong-state rejection,
+`INTERNAL` rejection, rollback atomicity, and multi-quote
+retirement.

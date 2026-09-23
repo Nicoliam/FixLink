@@ -963,3 +963,34 @@ Explicitly out of scope for Stage 6C: quote acceptance/decline/
 withdrawal, payment processing (the customer pays the professional
 directly outside the platform in MVP), scheduling beyond the existing
 preferred date/time, technician assignment, and notifications.
+
+# 18. STAGE 6D IMPLEMENTATION NOTES — CUSTOMER QUOTE ACCEPTANCE
+
+Implemented 2026-09-23. Covers flow §2.8 up to acceptance (scheduling
+itself remains a later stage) and the provider side of §6.2 up to
+"Job becomes ACCEPTED".
+
+Customer:
+
+Request job → Receive quote → Review quote (`/my-jobs/:id` shows
+each quote with provider, amount, currency, message and line items;
+no auto-selection, ranking or recommendation — the customer picks) →
+Accept Quote (per-quote button, only on `QUOTED` jobs for `SUBMITTED`
+quotes) → confirmation ("Accept this quote? By accepting, you agree
+to the quoted amount of R…. Payment is arranged directly with the
+professional." — Cancel / Accept Quote) → Job accepted (banner:
+Quote accepted, status `ACCEPTED`, provider, agreed price, and the
+direct-payment wording).
+
+Provider:
+
+Receive request → Submit quote → Quote accepted (the request detail
+shows the `Accepted` state with the agreed amount and `ACCEPTED`
+status; the quote form is gone and the provider cannot accept,
+change or re-open the acceptance) → Await next job step.
+
+Explicitly out of scope for Stage 6D: payment processing of any kind
+(no gateway, escrow, transaction or receipt — the accepted total is
+the agreed price only), technician assignment, the full scheduling
+workflow, Before/During/After execution, quote decline/withdrawal,
+and notifications.

@@ -49,35 +49,84 @@
       <p class="fl-card-text">{{ detail.createdAt }}</p>
     </section>
 
+    @if (acceptedQuote(); as accepted) {
+      <section class="fl-card" aria-label="Quote accepted">
+        <p class="fl-card-label">Quote accepted</p>
+        <p class="fl-card-text">Job status: {{ statusLabel(detail.status) }}</p>
+        <p class="fl-card-text">Provider: {{ accepted.provider.name }}</p>
+        <p class="fl-card-title">Agreed price: {{ formatAmount(detail.agreedAmount ?? accepted.total) }} {{ accepted.currency }}</p>
+        <p class="fl-card-text">Payment is arranged directly with the professional.</p>
+      </section>
+    }
+
     @if (detail.quotes && detail.quotes.length > 0) {
-      <section class="fl-card" aria-label="Quote received">
-        <p class="fl-card-label">Quote received — review the details</p>
-        @for (quote of detail.quotes; track quote.id) {
-          <p class="fl-card-title">{{ formatAmount(quote.total) }} {{ quote.currency }}</p>
-          <p class="fl-card-text">{{ quote.provider.name }} · {{ quote.status }}</p>
-          @if (quote.message) {
-            <p class="fl-card-text">{{ quote.message }}</p>
-          }
-          @if (quote.items.length > 0) {
-            <ul>
-              @for (item of quote.items; track item.id) {
-                <li class="fl-card-text">
-                  {{ item.description }} — {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
-                </li>
-              }
-            </ul>
-          }
+      <section class="fl-card" aria-label="Quotes">
+        @if (!acceptedQuote()) {
+          <p class="fl-card-label">Quote received — review the details</p>
+        } @else {
+          <p class="fl-card-label">Quotes</p>
         }
-        <p class="fl-card-text">Payment is arranged directly with your professional.</p>
+        @for (quote of detail.quotes; track quote.id) {
+          <div class="fl-quote">
+            <p class="fl-card-title">{{ formatAmount(quote.total) }} {{ quote.currency }}</p>
+            <p class="fl-card-text">{{ quote.provider.name }} · {{ quoteLabel(quote.status) }}</p>
+            @if (quote.message) {
+              <p class="fl-card-text">{{ quote.message }}</p>
+            }
+            @if (quote.items.length > 0) {
+              <ul>
+                @for (item of quote.items; track item.id) {
+                  <li class="fl-card-text">
+                    {{ item.description }} — {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
+                  </li>
+                }
+              </ul>
+            }
+            @if (canAccept(quote)) {
+              @if (pendingQuoteId() === quote.id) {
+                <div role="group" aria-label="Confirm quote acceptance">
+                  <p class="fl-card-text"><strong>Accept this quote?</strong></p>
+                  <p class="fl-card-text">
+                    By accepting, you agree to the quoted amount of
+                    {{ formatAmount(quote.total) }}. Payment is arranged directly with the professional.
+                  </p>
+                  @if (acceptError()) {
+                    <p class="fl-alert-error" role="alert">{{ acceptError() }}</p>
+                  }
+                  <button type="button" class="fl-btn fl-btn-secondary" (click)="cancelAccept()" [disabled]="accepting()">
+                    Cancel
+                  </button>
+                  <button type="button" class="fl-btn fl-btn-primary" (click)="confirmAccept(quote)" [disabled]="accepting()">
+                    {{ accepting() ? 'Accepting…' : 'Accept Quote' }}
+                  </button>
+                </div>
+              } @else {
+                <button type="button" class="fl-btn fl-btn-primary" (click)="startAccept(quote.id)">
+                  Accept Quote
+                </button>
+              }
+            }
+          </div>
+        }
+        @if (!acceptedQuote()) {
+          <p class="fl-card-text">Payment is arranged directly with your professional.</p>
+        }
       </section>
     }
 
     <section class="fl-card" aria-label="What happens next">
       <p class="fl-card-label">What happens next</p>
-      <p class="fl-card-text">
-        Your request has been sent to {{ detail.provider.name }}. They will respond with a quote —
-        payment is arranged directly with them.
-      </p>
+      @if (detail.status === 'ACCEPTED') {
+        <p class="fl-card-text">
+          Your quote has been accepted. {{ detail.provider.name }} will be in touch about the next
+          step — payment is arranged directly with them.
+        </p>
+      } @else {
+        <p class="fl-card-text">
+          Your request has been sent to {{ detail.provider.name }}. They will respond with a quote —
+          payment is arranged directly with them.
+        </p>
+      }
     </section>
   </div>
 }

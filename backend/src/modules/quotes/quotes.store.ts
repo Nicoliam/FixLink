@@ -6,6 +6,12 @@
  * automated tests with the same rules. Provider identity resolution lives
  * here because it is persistence-specific: production reads
  * `professional_profiles` / `business_members`, tests use explicit links.
+ *
+ * Stage 6D adds `acceptQuote`: the transactional customer acceptance
+ * (SUBMITTED → ACCEPTED, QUOTED → ACCEPTED with agreed amount, competing
+ * quotes declined, history entry). No schema change was required — the
+ * existing `quotes.status` ENUM, `jobs.agreed_amount`/`currency` and
+ * `job_status_history` columns already support it.
  */
 import type { JobDto } from '../jobs/jobs.types';
 import type {
@@ -32,6 +38,30 @@ export class QuoteConflictError extends Error {
   }
 }
 
+/** The job is not in a state that allows acceptance (must be QUOTED). */
+export class JobNotAcceptableError extends Error {
+  constructor(message = 'This job cannot accept a quote in its current state.') {
+    super(message);
+    this.name = 'JobNotAcceptableError';
+  }
+}
+
+/** The quote is not eligible (withdrawn, declined, expired or draft). */
+export class QuoteNotEligibleError extends Error {
+  constructor(message = 'This quote can no longer be accepted.') {
+    super(message);
+    this.name = 'QuoteNotEligibleError';
+  }
+}
+
+/** The quote was already accepted — acceptance is idempotent-safe via 409. */
+export class QuoteAlreadyAcceptedError extends QuoteConflictError {
+  constructor(message = 'This quote has already been accepted.') {
+    super(message);
+    this.name = 'QuoteAlreadyAcceptedError';
+  }
+}
+
 export interface ProviderRequestFilter {
   professionalIds: string[];
   businessIds: string[];
@@ -51,6 +81,20 @@ export interface CreateQuotePersistInput {
   createdBy: string;
 }
 
+export interface AcceptQuotePersistInput {
+  /** Live job row (re-read under lock by the store); ownership checked by the service. */
+  jobId: string;
+  quoteId: string;
+  /** Authenticated customer user id — recorded in `job_status_history.changed_by`. */
+  acceptedBy: string;
+}
+
+export interface AcceptQuoteResult {
+  quote: QuoteDto;
+  /** Competing quotes on the job that were retired (now DECLINED). */
+  retiredQuoteIds: string[];
+}
+
 export interface QuotesStore {
   /** Professional profile owned by the user, or null (e.g. never onboarded). */
   findProfessionalProfileByUserId(userId: string): Promise<ProfessionalIdentity | null>;
@@ -67,6 +111,19 @@ export interface QuotesStore {
    * job stays REQUESTED when creation fails.
    */
   createQuote(input: CreateQuotePersistInput): Promise<QuoteDto>;
+  /**
+   * Accept a SUBMITTED quote on a QUOTED job, atomically: the quote
+   * becomes ACCEPTED, competing active quotes become DECLINED, the job
+   * becomes ACCEPTED with the agreed amount recorded, and a
+   * `job_status_history` entry is written. Throws
+   * JobNotAcceptableError / QuoteNotEligibleError /
+   * QuoteAlreadyAcceptedError on rule violations; a failed acceptance
+   * leaves every row untouched. The accepted provider needs no extra
+   * row: the job's `professional_id`/`business_id` and the creation-time
+   * `job_assignments` entry already identify it, and technician
+   * assignment belongs to the later business workflow.
+   */
+  acceptQuote(input: AcceptQuotePersistInput): Promise<AcceptQuoteResult>;
   listQuotesByJobId(jobId: string): Promise<QuoteDto[]>;
   getQuoteById(quoteId: string): Promise<QuoteDto | null>;
 }

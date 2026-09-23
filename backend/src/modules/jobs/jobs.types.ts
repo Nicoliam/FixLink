@@ -5,6 +5,11 @@
  * (see database/migrations/004_jobs_core.sql). Stage 6B only creates
  * `source = MARKETPLACE` jobs in `status = REQUESTED`. Quotes, assignment,
  * execution and payment belong to later stages.
+ *
+ * Stage 6D: `agreedAmount`/`currency` surface the recorded agreed quote
+ * amount (`jobs.agreed_amount`, recorded only — no payment processing in
+ * the MVP). They are NULL/`ZAR` until the owning customer accepts a
+ * quote (QUOTED → ACCEPTED).
  */
 
 export type JobSource = 'MARKETPLACE' | 'INTERNAL';
@@ -52,6 +57,10 @@ export interface JobDto {
   preferredDate: string | null;
   /** `jobs.scheduled_at` derived from the preferred date/time. */
   scheduledAt: string | null;
+  /** Agreed quote amount recorded at acceptance; null until ACCEPTED. */
+  agreedAmount: number | null;
+  /** `jobs.currency` (MVP: ZAR only, recorded — never charged). */
+  currency: string;
   createdAt: string;
   updatedAt: string;
 }

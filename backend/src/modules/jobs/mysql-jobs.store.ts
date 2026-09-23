@@ -23,6 +23,10 @@ function toStringId(value: number | string): string {
   return String(value);
 }
 
+function toNumber(value: number | string): number {
+  return typeof value === 'number' ? value : Number(value);
+}
+
 interface CustomerRow extends RowDataPacket {
   id: number;
 }
@@ -51,6 +55,8 @@ interface JobRow extends RowDataPacket {
   city: string | null;
   province: string | null;
   scheduled_at: Date | string | null;
+  agreed_amount: number | string | null;
+  currency: string;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -82,6 +88,8 @@ function mapRow(row: JobRow): JobDto {
     province: row.province,
     preferredDate: scheduledAt === null ? null : scheduledAt.slice(0, 10),
     scheduledAt,
+    agreedAmount: row.agreed_amount === null ? null : toNumber(row.agreed_amount),
+    currency: row.currency,
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
   };
@@ -93,9 +101,10 @@ const JOB_DETAIL_SELECT = `
          pp.\`display_name\` AS \`professional_name\`,
          bp.\`business_name\` AS \`business_name\`,
          j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
-         j.\`description\`, j.\`address_line1\`, j.\`city\`, j.\`province\`,
-         j.\`scheduled_at\`, j.\`created_at\`, j.\`updated_at\`
-    FROM \`jobs\` j
+          j.\`description\`, j.\`address_line1\`, j.\`city\`, j.\`province\`,
+          j.\`scheduled_at\`, j.\`agreed_amount\`, j.\`currency\`,
+          j.\`created_at\`, j.\`updated_at\`
+     FROM \`jobs\` j
     LEFT JOIN \`professional_profiles\` pp ON pp.\`id\` = j.\`professional_id\`
     LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = j.\`business_id\`
     LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\``;

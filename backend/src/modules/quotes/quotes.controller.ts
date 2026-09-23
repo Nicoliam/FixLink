@@ -65,6 +65,16 @@ export function makeQuotesController(service: QuotesService) {
       }
     },
 
+    async accept(req: Request, res: Response): Promise<void> {
+      try {
+        const user = authUser(req);
+        const result = await service.acceptQuote(user.id, req.params['jobId'] ?? '', req.params['quoteId'] ?? '');
+        send(res, result, 'Quote accepted.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not accept the quote. Please try again.', 500);
+      }
+    },
+
     async listForJob(req: Request, res: Response): Promise<void> {
       try {
         const user = authUser(req);

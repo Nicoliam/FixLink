@@ -377,6 +377,16 @@ response: `GET /api/v1/jobs/:id` returns the job with a `quotes` array
 (§13.1). No new job tables were created.
 
 
+## 10.3 Jobs — Stage 6D Implementation Notes
+
+Stage 6D surfaces the recorded agreed price on the job: `GET
+/api/v1/jobs` / `GET /api/v1/jobs/:id` now include `agreedAmount`
+(`jobs.agreed_amount`, `null` until acceptance) and `currency`
+(`jobs.currency`, MVP: `ZAR`). Both are written by the acceptance
+transaction (§13.2) — never by the client. No new job tables or
+columns were created.
+
+
 # 11. Job Requests
 
 GET /api/v1/jobs/requests
@@ -474,6 +484,53 @@ MVP payment position (unchanged): FixLink does not process customer
 payment. Quote submission does not charge the customer; the customer
 pays the professional directly outside the platform. Quote acceptance
 is NOT part of Stage 6C.
+
+
+## 13.2 Quotes — Stage 6D Implementation Notes (Customer Acceptance)
+
+Stage 6D implements customer quote acceptance
+(`backend/src/modules/quotes/`): the transition
+
+REQUESTED → QUOTED → ACCEPTED
+
+with the acceptance performed entirely server-side. The frontend never
+sends `status = ACCEPTED`.
+
+- `POST /api/v1/jobs/:jobId/quotes/:quoteId/accept` (requires
+  `Authorization: Bearer <accessToken>`, `CUSTOMER` role) accepts one
+  eligible quote on an owned `MARKETPLACE` job. The request body is
+  empty (`{}`); customer ownership, role, quote↔job match and state
+  are all derived/validated by the backend.
+- On success (`200` with `{ job, quote }`): the quote becomes
+  `ACCEPTED`, any competing active quotes become `DECLINED` (retired,
+  never deleted), the job becomes `ACCEPTED` with `agreed_amount` /
+  `currency` recorded from the accepted quote, and a
+  `job_status_history` entry (`QUOTED → ACCEPTED`, reason
+  `Customer accepted provider quote`) is written — atomically, in a
+  single transaction (a failure leaves every row untouched). The
+  accepted provider needs no extra row: the job's `professional_id` /
+  `business_id` and the creation-time `job_assignments` entry already
+  identify it. No technician is assigned (later business workflow).
+- Errors: malformed job/quote ids → `400 VALIDATION_ERROR`; unknown
+  job, another customer's job, internal (`INTERNAL`) job, unknown
+  quote or quote↔job mismatch → `404 NOT_FOUND` (no cross-account
+  probing); non-customer roles (provider, technician, manager-only,
+  admin) → `403 FORBIDDEN_ROLE`; already-accepted quote → `409
+  CONFLICT`; withdrawn/declined quote or a job that is not `QUOTED`
+  (`REQUESTED`, `ACCEPTED`, `COMPLETED`, `CANCELLED`, `DISPUTED`, …)
+  → `422 VALIDATION_ERROR`. Unauthenticated → `401 UNAUTHORIZED`.
+- `GET /api/v1/jobs/:jobId/quotes`, `GET /api/v1/quotes/:id` and the
+  embedded `GET /api/v1/jobs/:id` quotes now surface `ACCEPTED` /
+  `DECLINED` states so both sides see the outcome; providers see the
+  accepted quote and `ACCEPTED` status on
+  `GET /api/v1/provider/requests/:id` but cannot change it.
+
+MVP payment position (unchanged and explicit): FixLink does NOT
+process customer payment in Stage 6D. The accepted quote represents
+the agreed price only; payment is arranged directly between customer
+and professional. No payment gateway, escrow, transaction id or
+receipt exists — the UI must never imply otherwise. No new tables
+were created.
 
 
 # 14. Job Media

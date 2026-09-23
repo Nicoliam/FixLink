@@ -11,8 +11,13 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import type { JobDto, JobStatus } from '../jobs/jobs.types';
 import {
+  JobNotAcceptableError,
   JobNotQuoteableError,
+  QuoteAlreadyAcceptedError,
   QuoteConflictError,
+  QuoteNotEligibleError,
+  type AcceptQuotePersistInput,
+  type AcceptQuoteResult,
   type CreateQuotePersistInput,
   type ProviderRequestFilter,
   type QuotesStore,
@@ -318,6 +323,74 @@ export class MysqlQuotesStore implements QuotesStore {
       const created = await this.getQuoteById(String(quoteId));
       if (!created) throw new Error('Quote creation failed: row not found after insert.');
       return created;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async acceptQuote(input: AcceptQuotePersistInput): Promise<AcceptQuoteResult> {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [jobRows] = await conn.query<JobRow[]>(
+        'SELECT `id`, `source`, `status` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        [input.jobId],
+      );
+      const job = (jobRows as JobRow[])[0] as JobRow | undefined;
+      // Authorization (customer ownership, quote↔job match) is enforced
+      // by the service before this call; the store re-validates state
+      // under lock so concurrent accepts cannot double-transition.
+      if (!job || job.source !== 'MARKETPLACE') {
+        throw new JobNotAcceptableError('Quote not found.');
+      }
+      const [quoteRows] = await conn.query<QuoteRow[]>(
+        'SELECT `id`, `job_id`, `status`, `total`, `currency` FROM `quotes` WHERE `id` = ? FOR UPDATE',
+        [input.quoteId],
+      );
+      const target = (quoteRows as QuoteRow[])[0] as QuoteRow | undefined;
+      if (!target || String(target.job_id) !== String(job.id)) {
+        throw new JobNotAcceptableError('Quote not found.');
+      }
+      if (target.status === 'ACCEPTED') throw new QuoteAlreadyAcceptedError();
+      if (target.status !== 'SUBMITTED') throw new QuoteNotEligibleError();
+      if (job.status !== 'QUOTED') throw new JobNotAcceptableError();
+
+      const [accepted] = await conn.query<ResultSetHeader>(
+        "UPDATE `quotes` SET `status` = 'ACCEPTED', `accepted_at` = NOW() WHERE `id` = ? AND `status` = 'SUBMITTED'",
+        [input.quoteId],
+      );
+      if (accepted.affectedRows !== 1) throw new QuoteNotEligibleError();
+      // Competing quotes are retired, never deleted: they stay visible
+      // as DECLINED so neither side can re-select them.
+      const [retired] = await conn.query<ResultSetHeader>(
+        `UPDATE \`quotes\` SET \`status\` = 'DECLINED', \`declined_at\` = NOW()
+          WHERE \`job_id\` = ? AND \`id\` <> ? AND \`status\` IN ('DRAFT', 'SUBMITTED')`,
+        [input.jobId, input.quoteId],
+      );
+      void retired;
+      const [jobUpdated] = await conn.query<ResultSetHeader>(
+        "UPDATE `jobs` SET `status` = 'ACCEPTED', `agreed_amount` = ?, `currency` = ? WHERE `id` = ? AND `status` = 'QUOTED'",
+        [toNumber(target.total), target.currency, input.jobId],
+      );
+      if (jobUpdated.affectedRows !== 1) throw new JobNotAcceptableError();
+      await conn.query(
+        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+        [input.jobId, 'QUOTED', 'ACCEPTED', input.acceptedBy, 'Customer accepted provider quote'],
+      );
+      await conn.commit();
+      const [retiredRows] = await this.pool.query<QuoteRow[]>(
+        `${QUOTE_DETAIL_SELECT} WHERE q.\`job_id\` = ? AND q.\`status\` = 'DECLINED'`,
+        [input.jobId],
+      );
+      const created = await this.getQuoteById(input.quoteId);
+      if (!created) throw new Error('Quote acceptance failed: row not found after update.');
+      return {
+        quote: created,
+        retiredQuoteIds: (retiredRows as QuoteRow[]).map((row) => toStringId(row.id)),
+      };
     } catch (err) {
       await conn.rollback();
       throw err;

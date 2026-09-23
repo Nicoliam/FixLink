@@ -65,8 +65,56 @@ Frontend (`apps/web`, run with `npx ng test --watch=false`):
 - `job.service.spec.ts`: provider inbox params, quote body mapping
   (trim + ZAR uppercase), job-quotes list and single-quote fetch.
 - `job-detail.spec.ts`: received-quote display (amount, message,
-  items) with no accept action.
+  items). Customer acceptance arrived in Stage 6D (see below) —
+  this 6C-era assertion covers the read-only display only.
 
 Note: rate limiters are instantiated per app (inside the route
 factories) so each test app has an isolated store; production runs
 one app per process, so runtime behaviour is unchanged.
+
+## Stage 6D — Customer Quote Acceptance
+
+Backend (`backend/tests/quote-acceptance.test.ts`, in-memory stores,
+no MySQL required — run with `npm test` from `backend/`):
+
+- Customer retrieves own quotes, then accepts an eligible quote →
+  `200` with `{ job, quote }`: quote `SUBMITTED → ACCEPTED`, job
+  `QUOTED → ACCEPTED` with `agreedAmount`/`currency` recorded, the
+  accepted provider still the addressed provider, and a `QUOTED →
+  ACCEPTED` status-history entry.
+- `404` for another customer's job, cross-job quote ids and unknown
+  quotes; `403` for provider-only, technician-only, manager-only and
+  admin-only actors (exact-role users are provisioned directly
+  because `setRoles` is additive); a dual-role owner-manager accepts
+  their own job.
+- `409 CONFLICT` for repeat acceptance (single history entry);
+  `422` for withdrawn/declined quotes and `REQUESTED`/`COMPLETED`/
+  `CANCELLED`/`DISPUTED` jobs; `404` for `INTERNAL` jobs; `400` for
+  malformed ids; `401` unauthenticated.
+- Failed acceptance leaves job `QUOTED`, quote untouched,
+  `agreedAmount` null and no `ACCEPTED` history (rollback).
+- Multiple quotes: one acceptance wins, the other retires to
+  `DECLINED` (never deleted) and can no longer be accepted; provider
+  request detail reflects `ACCEPTED`.
+- All asserted responses preserve the standard success/error
+  envelopes.
+
+Frontend (`apps/web`, run with `npx ng test --watch=false`):
+
+- `job.service.spec.ts`: accept call posts `{}` to
+  `/jobs/:id/quotes/:quoteId/accept` and resolves `{ job, quote }`.
+- `job-detail.spec.ts`: QUOTED job shows per-quote `Accept Quote`
+  actions; hidden for `REQUESTED`/`ACCEPTED` and ineligible quotes;
+  confirmation step with the quoted amount and direct-payment
+  wording; in-flight `Accepting…` disabled state; success → `Quote
+  accepted` banner with agreed price and payment wording, no further
+  actions; server errors surfaced with the quote intact;
+  multi-quote selection and retired (`No longer available`) display.
+- `request-detail.spec.ts`: `ACCEPTED` jobs show the provider-side
+  `Accepted` state with the agreed amount and no quote form.
+
+No database migration was required in Stage 6D (existing
+`quotes.status`, `jobs.agreed_amount`/`currency`,
+`job_status_history` and `job_assignments` reused); the
+`database/tests/schema.test.js` suite still requires a live MySQL
+instance and is unchanged.

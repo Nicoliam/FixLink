@@ -5,8 +5,9 @@
  * quotes live in the existing `quotes` / `quote_items` tables (see
  * database/migrations/006_quotes_parts_approvals.sql). Stage 6C only
  * submits quotes (`status = SUBMITTED`) and transitions the job
- * REQUESTED → QUOTED. Acceptance, decline and withdrawal belong to a
- * later stage.
+ * REQUESTED → QUOTED. Stage 6D adds customer acceptance
+ * (`status = ACCEPTED`, job QUOTED → ACCEPTED). Decline and
+ * withdrawal belong to a later stage.
  */
 import type { JobDto } from '../jobs/jobs.types';
 

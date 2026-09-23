@@ -1,8 +1,11 @@
 /**
  * FixLink Stage 6C — provider request + quote service.
+ * Stage 6D adds customer quote acceptance.
  *
  * Owns the provider side of the marketplace flow: inbox, request detail
- * and quote submission. Provider identity is always derived server-side —
+ * and quote submission — plus the customer side of acceptance (the
+ * owning CUSTOMER accepting a SUBMITTED quote on a QUOTED job).
+ * Provider identity is always derived server-side —
  * the professional profile (`professional_profiles.user_id`) or the
  * businesses the user owns / manages (`business_profiles.owner_user_id`,
  * `business_members`) — never from request parameters. TECHNICIANS are
@@ -13,7 +16,13 @@ import type { UserRepository } from '../users/user.repository';
 import type { JobsStore } from '../jobs/jobs.store';
 import type { JobDto } from '../jobs/jobs.types';
 import type { QuotesStore } from './quotes.store';
-import { JobNotQuoteableError, QuoteConflictError } from './quotes.store';
+import {
+  JobNotAcceptableError,
+  JobNotQuoteableError,
+  QuoteAlreadyAcceptedError,
+  QuoteConflictError,
+  QuoteNotEligibleError,
+} from './quotes.store';
 import type { JobWithQuotes, ProviderRequestDto, QuoteDto } from './quotes.types';
 import { validateCreateQuote } from './quotes.validation';
 
@@ -185,6 +194,80 @@ export class QuotesService {
     const authz = await this.authorizeJobQuotes(authUserId, quote.jobId);
     if (!authz.job) return fail(authz.status, authz.code, authz.message);
     return { status: 200, data: quote };
+  }
+
+  /**
+   * Stage 6D — customer quote acceptance (QUOTED → ACCEPTED).
+   *
+   * Ownership is derived server-side from the session user id — a
+   * `customer_id` in the body would be ignored (no such field is read).
+   * Only the CUSTOMER who owns the MARKETPLACE job may accept, and only
+   * a SUBMITTED quote on a QUOTED job. Providers, technicians, managers
+   * and admins acting outside customer ownership receive 403; other
+   * customers' jobs/quotes read as 404 so ids cannot be probed.
+   */
+  async acceptQuote(
+    authUserId: string,
+    jobId: string,
+    quoteId: string,
+  ): Promise<ServiceResult<{ job: JobWithQuotes; quote: QuoteDto }>> {
+    if (!/^[1-9][0-9]*$/.test(jobId.trim())) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    if (!/^[1-9][0-9]*$/.test(quoteId.trim())) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid quote id.');
+    }
+    const roles = await this.users.getRoles(authUserId);
+    if (!roles.includes('CUSTOMER')) {
+      if (roles.some((role) => PROVIDER_ROLES.includes(role))) {
+        return fail(403, 'FORBIDDEN_ROLE', 'Only the customer who owns the job can accept a quote.');
+      }
+      if (roles.includes('TECHNICIAN')) {
+        return fail(403, 'FORBIDDEN_ROLE', 'Technicians cannot accept quotes.');
+      }
+      return fail(403, 'FORBIDDEN_ROLE', 'Your account cannot accept quotes.');
+    }
+    const customer = await this.jobs.findCustomerProfileByUserId(authUserId);
+    const job = customer ? await this.jobs.getJobById(jobId.trim()) : null;
+    // Ownership and MARKETPLACE source are part of existence: another
+    // customer's job — or an internal business job — reads as 404.
+    if (!job || job.source !== 'MARKETPLACE' || job.customerId !== customer?.id) {
+      return fail(404, 'NOT_FOUND', 'Job not found.');
+    }
+    const quote = await this.quotes.getQuoteById(quoteId.trim());
+    // Quote↔job mismatch is part of existence as well: a quote from
+    // another job (or another customer) reads as 404, never 403, so
+    // quote ids cannot be probed across accounts.
+    if (!quote || quote.jobId !== job.id) {
+      return fail(404, 'NOT_FOUND', 'Quote not found.');
+    }
+    try {
+      const accepted = await this.quotes.acceptQuote({
+        jobId: job.id,
+        quoteId: quote.id,
+        acceptedBy: authUserId,
+      });
+      const refreshed = await this.jobs.getJobById(job.id);
+      if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      return {
+        status: 200,
+        data: { job: await this.getCustomerJobWithQuotes(authUserId, refreshed), quote: accepted.quote },
+      };
+    } catch (err) {
+      if (err instanceof QuoteAlreadyAcceptedError) {
+        return fail(409, 'CONFLICT', err.message);
+      }
+      if (err instanceof QuoteNotEligibleError) {
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      if (err instanceof JobNotAcceptableError) {
+        // Defensive store-level existence re-check (a lost race after
+        // the service checks above); everything else is a state error.
+        if (err.message === 'Quote not found.') return fail(404, 'NOT_FOUND', err.message);
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
   }
 
   /** Quotes embedded in the owning customer's job detail. */

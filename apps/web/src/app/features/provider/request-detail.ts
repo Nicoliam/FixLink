@@ -1,20 +1,23 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JobService } from '../../core/services/job.service';
 import { getApiErrorCode, getApiErrorMessage } from '../../core/models/api.model';
-import { formatZar, jobStatusLabel } from '../../core/models/job.model';
+import { formatZar, jobStatusLabel, quoteStatusLabel } from '../../core/models/job.model';
 import type { ProviderRequest, Quote } from '../../core/models/job.model';
 
 type RequestDetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
 
 /**
- * FixLink provider request detail — Stage 6C (`/requests/:id`).
+ * FixLink provider request detail — Stage 6C (`/requests/:id`) + Stage
+ * 6D (accepted-quote display).
  *
  * Shows the request context needed to quote, the submitted quote when one
- * exists, and the quote form for REQUESTED jobs. Quote acceptance,
- * payment and scheduling belong to later stages.
+ * exists, and the quote form for REQUESTED jobs. When the customer
+ * accepts the quote (QUOTED → ACCEPTED) the provider sees the Accepted
+ * state with the agreed amount — the provider never accepts or changes
+ * that state (scheduling belongs to a later stage).
  */
 @Component({
   selector: 'app-request-detail',
@@ -38,7 +41,14 @@ export class RequestDetailComponent implements OnInit {
   protected readonly createdQuote = signal<Quote | null>(null);
 
   protected readonly statusLabel = jobStatusLabel;
+  protected readonly quoteLabel = quoteStatusLabel;
   protected readonly formatAmount = formatZar;
+
+  /** The customer-accepted quote, when acceptance has happened. */
+  protected readonly acceptedQuote = computed<Quote | null>(() => {
+    const quotes = this.request()?.quotes ?? [];
+    return quotes.find((quote) => quote.status === 'ACCEPTED') ?? null;
+  });
 
   readonly form = this.fb.group({
     total: [null as number | null, [Validators.required, Validators.min(0), Validators.max(9999999999.99)]],

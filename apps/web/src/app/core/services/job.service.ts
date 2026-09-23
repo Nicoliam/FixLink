@@ -4,6 +4,7 @@ import { map, Observable } from 'rxjs';
 import { API_BASE_URL } from '../config/api-config';
 import type { ApiSuccess } from '../models/api.model';
 import type {
+  AcceptQuoteResult,
   CreateJobRequest,
   CreateQuoteRequest,
   Job,
@@ -15,7 +16,7 @@ import type {
 
 /**
  * FixLink jobs API client — Stage 6B (customer requests) + Stage 6C
- * (provider requests and quotes).
+ * (provider requests and quotes) + Stage 6D (customer quote acceptance).
  *
  * Single owner of job/quote calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); customer ownership and
@@ -83,6 +84,20 @@ export class JobService {
     if (payload.items) body['items'] = payload.items;
     return this.http
       .post<ApiSuccess<Quote>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/quotes`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Accept an eligible quote on an owned QUOTED job (→ ACCEPTED).
+   * The backend validates ownership, role and state server-side and
+   * performs the transition — the client never sends a status.
+   */
+  acceptQuote(jobId: string, quoteId: string): Observable<AcceptQuoteResult> {
+    return this.http
+      .post<ApiSuccess<AcceptQuoteResult>>(
+        `${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/quotes/${encodeURIComponent(quoteId)}/accept`,
+        {},
+      )
       .pipe(map((res) => res.data));
   }
 

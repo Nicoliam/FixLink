@@ -15,8 +15,13 @@
 import type { JobDto } from '../jobs/jobs.types';
 import type { MemoryJobsStore } from '../jobs/memory-jobs.store';
 import {
+  JobNotAcceptableError,
   JobNotQuoteableError,
+  QuoteAlreadyAcceptedError,
   QuoteConflictError,
+  QuoteNotEligibleError,
+  type AcceptQuotePersistInput,
+  type AcceptQuoteResult,
   type CreateQuotePersistInput,
   type ProviderRequestFilter,
   type QuotesStore,
@@ -153,6 +158,39 @@ export class MemoryQuotesStore implements QuotesStore {
     return quote;
   }
 
+  async acceptQuote(input: AcceptQuotePersistInput): Promise<AcceptQuoteResult> {
+    const live = await this.jobs.getJobById(input.jobId);
+    const quote = this.quotes.get(input.quoteId) ?? null;
+    // Defensive re-checks: the service owns authorization (role, customer
+    // ownership, quote↔job match); the store owns state validity.
+    if (!live || live.source !== 'MARKETPLACE' || !quote || quote.jobId !== live.id) {
+      throw new JobNotAcceptableError('Quote not found.');
+    }
+    if (quote.status === 'ACCEPTED') throw new QuoteAlreadyAcceptedError();
+    if (quote.status !== 'SUBMITTED') throw new QuoteNotEligibleError();
+    if (live.status !== 'QUOTED') throw new JobNotAcceptableError();
+    // All checks passed before any mutation: a failed acceptance cannot
+    // leave the job ACCEPTED without an accepted quote (or vice versa).
+    const now = nowIso();
+    this.quotes.set(quote.id, { ...quote, status: 'ACCEPTED', submittedAt: quote.submittedAt ?? now });
+    const retiredQuoteIds: string[] = [];
+    for (const competing of this.quotes.values()) {
+      if (
+        competing.jobId === live.id &&
+        competing.id !== quote.id &&
+        (competing.status === 'DRAFT' || competing.status === 'SUBMITTED')
+      ) {
+        this.quotes.set(competing.id, { ...competing, status: 'DECLINED' });
+        retiredQuoteIds.push(competing.id);
+      }
+    }
+    this.jobs.debugSetJobAccepted(live.id, quote.total, quote.currency);
+    this.history.push({ jobId: live.id, previous: 'QUOTED', next: 'ACCEPTED' });
+    const accepted = this.quotes.get(quote.id);
+    if (!accepted) throw new Error('Quote acceptance failed: row not found after update.');
+    return { quote: accepted, retiredQuoteIds };
+  }
+
   async listQuotesByJobId(jobId: string): Promise<QuoteDto[]> {
     return [...this.quotes.values()]
       .filter((quote) => quote.jobId === jobId)
@@ -166,6 +204,38 @@ export class MemoryQuotesStore implements QuotesStore {
   /** Test helper: status-history entries written by createQuote. */
   debugHistory(): Array<{ jobId: string; previous: string | null; next: string }> {
     return [...this.history];
+  }
+
+  /** Stage 6D test helper: force a quote into a given status. */
+  debugSetQuoteStatus(quoteId: string, status: QuoteDto['status']): void {
+    const quote = this.quotes.get(quoteId);
+    if (quote) this.quotes.set(quoteId, { ...quote, status });
+  }
+
+  /**
+   * Stage 6D test helper: insert a SUBMITTED quote directly, bypassing
+   * the single-provider duplicate guard, to simulate competing quotes
+   * from a future multi-provider flow. Competing quotes must retire to
+   * DECLINED when one quote is accepted.
+   */
+  debugAddQuote(jobId: string, overrides: Partial<QuoteDto> = {}): QuoteDto {
+    this.quoteSeq += 1;
+    const now = nowIso();
+    const quote: QuoteDto = {
+      provider: { id: 'professional-99', providerType: 'professional', name: 'Test Competitor' },
+      total: 999,
+      currency: 'ZAR',
+      message: null,
+      status: 'SUBMITTED',
+      items: [],
+      submittedAt: now,
+      createdAt: now,
+      ...overrides,
+      id: String(this.quoteSeq),
+      jobId,
+    };
+    this.quotes.set(quote.id, quote);
+    return quote;
   }
 
   private async toProviderRequest(job: JobDto): Promise<ProviderRequestDto> {

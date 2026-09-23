@@ -49,7 +49,27 @@
       <p class="fl-card-text">{{ detail.createdAt }}</p>
     </section>
 
-    @if (createdQuote(); as quote) {
+    @if (acceptedQuote(); as accepted) {
+      <section class="fl-card" aria-label="Quote accepted">
+        <p class="fl-card-label">Accepted</p>
+        <p class="fl-card-title">{{ formatAmount(accepted.total) }} {{ accepted.currency }}</p>
+        <p class="fl-card-text">The customer has accepted your quote. Job status: {{ statusLabel(detail.status) }}.</p>
+        @if (accepted.message) {
+          <p class="fl-card-text">{{ accepted.message }}</p>
+        }
+        @if (accepted.items.length > 0) {
+          <ul>
+            @for (item of accepted.items; track item.id) {
+              <li class="fl-card-text">
+                {{ item.description }} — {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
+              </li>
+            }
+          </ul>
+        }
+        <p class="fl-card-text">Agreed amount: {{ formatAmount(accepted.total) }} — payment is arranged directly with the customer.</p>
+        <a class="fl-btn fl-btn-secondary" routerLink="/requests">Back to Requests</a>
+      </section>
+    } @else if (createdQuote(); as quote) {
       <section class="fl-card" aria-label="Submitted quote">
         <p class="fl-card-label">Quote submitted</p>
         <p class="fl-card-title">{{ formatAmount(quote.total) }} {{ quote.currency }}</p>
