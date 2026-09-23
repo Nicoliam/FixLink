@@ -739,3 +739,83 @@ The database should support the approved FixLink product without unnecessary
 complexity.
 
 Prefer a clear relational model over premature optimization.
+
+
+## 40. Stage 4 Implementation Notes
+
+Decisions taken while implementing the database foundation (2026-09-22).
+No product functionality was added or changed; these clarify the approved
+model above.
+
+### 40.1 Business service associations
+
+`business_services` (`business_id`, `service_id`) stores which catalogue
+services a business offers, mirroring `professional_services`. This uses the
+"stored separately where needed" option from sections 9 and 13.
+
+### 40.2 Business-managed customers
+
+`customer_profiles.user_id` is NULLABLE and a `business_id` column references
+`business_profiles`. Marketplace customers have `user_id` set;
+business-created customers without a login have `user_id` NULL and
+`business_id` set. Backend services must enforce that at least one is set
+(see 40.5).
+
+### 40.3 Exactly-one-owner rules live in backend services
+
+Portfolio projects, certificates, quotes, reviews and saved-provider rows
+each belong to exactly one owner (professional XOR business). These rules
+are enforced by backend validation, NOT database CHECK constraints, because
+MySQL 8 rejects CHECK constraints on columns governed by foreign-key
+referential actions (ERROR 3822 class). The migration files record this per
+table.
+
+### 40.4 `users.status` values
+
+`PENDING` (registered, not yet verified), `ACTIVE`, `SUSPENDED`, `DELETED`
+(soft-deleted; row retained with `deleted_at` for history preservation).
+
+### 40.5 `jobs.confirmed_at`
+
+Added alongside the documented `completed_at`/`closed_at`: CONFIRMED is a
+distinct lifecycle state (customer confirmation after COMPLETED), so it gets
+its own timestamp like the other terminal states.
+
+### 40.6 Quote item totals are generated columns
+
+`quote_items.total` is a STORED GENERATED column (`quantity * unit_price`).
+The backend must still compute and return totals, but the database never
+stores client-supplied line math.
+
+### 40.7 Messaging read model (MVP)
+
+`messages.read_at` records first read. Per-participant read receipts are a
+future addition that must not break this column (additive table, e.g.
+`message_reads`).
+
+### 40.8 Seed password hashes are placeholders
+
+Development seeds use scrypt hashes of the fictional password
+`FixLink-dev-001`. They exist only to prove "no plaintext" handling.
+Production authentication (later stage) standardises on bcrypt and its own
+hashing/verification service.
+
+### 40.9 Migration and seed conventions
+
+- Migrations: `database/migrations/NNN_name.sql`, each with
+  `-- +migrate Up` / `-- +migrate Down` sections. Runners:
+  `node database/migrate.js up|status|down [n]|reset`
+  (from `database/`: `npm run db:migrate`, `db:migrate:status`,
+  `db:migrate:down`, `db:migrate:reset`, `db:rebuild`).
+- Applied versions tracked in `schema_migrations`; applied seed files in
+  `schema_seeds` (`migrate reset` clears seed tracking because data tables
+  are empty again).
+- Reference snapshot: `database/schema/schema.sql` (mysqldump --no-data).
+  Migrations remain the source of truth; the snapshot is regenerated, never
+  hand-edited.
+- Tests: `database/tests/schema.test.js` (`npm test` from `database/`),
+  Node built-in test runner, no extra framework.
+
+### 40.10 `audit_logs` is immutable by design
+
+No `updated_at` column; rows are insert-only. Corrections are new rows.

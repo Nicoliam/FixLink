@@ -1,0 +1,23 @@
+{
+  "name": "fixlink-database",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FixLink Stage 4 — MySQL migrations, seeders and database foundation tests",
+  "type": "commonjs",
+  "scripts": {
+    "db:migrate": "node migrate.js up",
+    "db:migrate:status": "node migrate.js status",
+    "db:migrate:down": "node migrate.js down",
+    "db:migrate:reset": "node migrate.js reset",
+    "db:seed": "node seed.js",
+    "db:seed:status": "node seed.js status",
+    "db:rebuild": "node migrate.js reset && node seed.js",
+    "test": "node --test tests/schema.test.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
