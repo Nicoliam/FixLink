@@ -64,6 +64,111 @@ POST /api/v1/auth/verify-phone
 GET /api/v1/auth/me
 
 
+## 4.1 Authentication — Stage 5A Implementation Notes
+
+Stage 5A implements the authentication foundation only
+(`backend/src/modules/auth/`). Behaviour below is implemented and tested;
+`forgot-password`, `reset-password`, `verify-email` and `verify-phone` remain
+specified but not yet implemented.
+
+### Registration
+
+POST /api/v1/auth/register
+
+Request:
+
+{
+  "email": "user@example.co.za",
+  "password": "at least 8 characters",
+  "phone": "+27825550101 (optional)",
+  "role": "CUSTOMER (optional, default)"
+}
+
+Rules:
+
+- Email is required, validated for format and normalised with trim +
+  lowercase before storage and uniqueness checks.
+- Password is required (8–128 characters) and stored only as a bcrypt hash
+  (cost 12). Plaintext passwords are never stored or returned.
+- Self-registration is allowed for `CUSTOMER`, `PROFESSIONAL` and
+  `BUSINESS_OWNER` only. `BUSINESS_MANAGER` and `TECHNICIAN` are provisioned
+  through the business invite flow (later stage); `ADMIN` is granted
+  explicitly by the platform. Other roles return `403 FORBIDDEN_ROLE`.
+- Duplicate email returns `409 EMAIL_EXISTS`. Validation failures return
+  `422 VALIDATION_ERROR`. Success returns `201` with the safe user
+  (no password or hash fields).
+- Registration creates the `users` row and the `user_roles` assignment only.
+  Customer/professional/business profile creation belongs to a later stage.
+
+### Login
+
+POST /api/v1/auth/login
+
+Request:
+
+{
+  "email": "user@example.co.za",
+  "password": "..."
+}
+
+- Credentials are verified against the stored bcrypt hash.
+- Unknown emails and wrong passwords return the same generic
+  `401 INVALID_CREDENTIALS` (`"Invalid email or password."`) so accounts
+  cannot be enumerated. Suspended/deleted accounts receive the same response.
+- Success returns `200` with `{ user, accessToken, refreshToken }`.
+  `last_login_at` is updated.
+
+### Tokens
+
+- Access token: signed JWT (Bearer), 15-minute expiry by default
+  (`JWT_ACCESS_TTL_SECONDS`). Claims: `sub` (user id), `email`, `roles`.
+- Refresh token: opaque random value (hex), 30-day expiry by default
+  (`REFRESH_TOKEN_TTL_SECONDS`). Only its SHA-256 hash is stored
+  server-side — never the raw token.
+- Refresh sessions are kept in a server-side in-memory store in Stage 5A,
+  so no database schema change was required. Known limitation: sessions do
+  not survive restarts and are per-process. A persistent `refresh_tokens`
+  table is the planned hardening for multi-instance production use.
+
+### Refresh
+
+POST /api/v1/auth/refresh
+
+Request:
+
+{
+  "refreshToken": "..."
+}
+
+- Valid tokens are rotated: the presented token is revoked and a new token
+  pair is returned (`200`). Replaying an old token returns
+  `401 INVALID_REFRESH_TOKEN`.
+
+### Logout
+
+POST /api/v1/auth/logout
+
+Request:
+
+{
+  "refreshToken": "... (optional if an access token is supplied)"
+}
+
+- Revokes the supplied refresh session; when called with a valid Bearer
+  access token it additionally revokes all sessions for that user.
+- Idempotent for unknown tokens (still `200`); with neither credential it
+  returns `401 UNAUTHORIZED`. A logged-out refresh token can no longer be
+  used (`401 INVALID_REFRESH_TOKEN`).
+
+### Current user
+
+GET /api/v1/auth/me (requires `Authorization: Bearer <accessToken>`)
+
+- Returns `200` with the safe user (`id`, `email`, `phone`, `status`,
+  `roles`, timestamps). Missing, invalid or expired tokens return
+  `401 UNAUTHORIZED`. Suspended/deleted accounts are rejected.
+
+
 # 5. Users
 
 GET /api/v1/users/me
