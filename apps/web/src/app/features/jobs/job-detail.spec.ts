@@ -214,4 +214,54 @@ describe('JobDetailComponent', () => {
     await setup('7', { getJob: vi.fn().mockReturnValue(throwError(() => new Error('down'))), acceptQuote: vi.fn() });
     expect((fixture.nativeElement.textContent as string)).toContain('Something went wrong');
   });
+
+  describe('Stage 6E — scheduled and in-progress states (read-only)', () => {
+    const scheduledJob: Job = {
+      ...acceptedJob,
+      status: 'SCHEDULED',
+      preferredDate: '2026-10-05',
+      scheduledAt: '2026-10-05T08:00:00.000Z',
+    };
+    const activeJob: Job = { ...scheduledJob, status: 'IN_PROGRESS' };
+
+    it('tells the customer the provider will schedule an ACCEPTED job', async () => {
+      await setup('7', apiWith(acceptedJob));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Accepted');
+      expect(text).toContain('will schedule the job');
+      expect(text).toContain('Agreed price: R1,250');
+      expect(text).toContain('Payment is arranged directly with the professional.');
+    });
+
+    it('shows the scheduled slot, provider and agreed price for SCHEDULED jobs', async () => {
+      await setup('7', apiWith(scheduledJob));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Scheduled');
+      // The stored instant renders as the SAST wall time the provider picked.
+      expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+      expect(text).toContain('Sipho Ndlovu — ProPlumb');
+      expect(text).toContain('Agreed price: R1,250');
+      expect(text).toContain('Payment is arranged directly with the professional.');
+    });
+
+    it('shows the in-progress state with schedule and price', async () => {
+      await setup('7', apiWith(activeJob));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('In progress');
+      expect(text).toContain('has started the job');
+      expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+      expect(text).toContain('Sipho Ndlovu — ProPlumb');
+      expect(text).toContain('Agreed price: R1,250');
+    });
+
+    it('gives the customer no controls that change the job status', async () => {
+      for (const current of [acceptedJob, scheduledJob, activeJob]) {
+        await setup('7', apiWith(current));
+        expect(buttonWithText('Schedule Job')).toBeNull();
+        expect(buttonWithText('Start Job')).toBeNull();
+        expect(buttonWithText('Accept Quote')).toBeNull();
+        TestBed.resetTestingModule();
+      }
+    });
+  });
 });

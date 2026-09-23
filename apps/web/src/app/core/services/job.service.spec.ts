@@ -153,4 +153,32 @@ describe('JobService', () => {
     expect(oneReq.request.method).toBe('GET');
     oneReq.flush({ success: true, data: { id: '11' }, message: 'ok' });
   });
+
+  it('schedules an accepted job and resolves the scheduled job', () => {
+    let result: unknown = null;
+    service.scheduleJob('7', '2026-10-05T10:00:00+02:00').subscribe((job) => (result = job));
+    const req = httpMock.expectOne(`${API}/jobs/7/schedule`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ scheduledAt: '2026-10-05T10:00:00+02:00' });
+    req.flush({
+      success: true,
+      data: { job: { id: '7', status: 'SCHEDULED', scheduledAt: '2026-10-05T08:00:00.000Z' } },
+      message: 'Job scheduled successfully.',
+    });
+    expect(result).toEqual({ id: '7', status: 'SCHEDULED', scheduledAt: '2026-10-05T08:00:00.000Z' });
+  });
+
+  it('starts a scheduled job and resolves the in-progress job', () => {
+    let result: unknown = null;
+    service.startJob('7').subscribe((job) => (result = job));
+    const req = httpMock.expectOne(`${API}/jobs/7/start`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({
+      success: true,
+      data: { job: { id: '7', status: 'IN_PROGRESS' } },
+      message: 'Job started successfully.',
+    });
+    expect(result).toEqual({ id: '7', status: 'IN_PROGRESS' });
+  });
 });

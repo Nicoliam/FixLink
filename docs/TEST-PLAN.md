@@ -118,3 +118,62 @@ No database migration was required in Stage 6D (existing
 `job_status_history` and `job_assignments` reused); the
 `database/tests/schema.test.js` suite still requires a live MySQL
 instance and is unchanged.
+
+## Stage 6E — Scheduling & Job Execution Start
+
+Backend (`backend/tests/job-scheduling.test.ts`, in-memory stores, no
+MySQL required — run with `npm test` from `backend/`):
+
+- Scheduling authorization: addressed provider/owner/manager schedule
+  an `ACCEPTED` job → `200` with the `SCHEDULED` job (agreed amount
+  preserved); another provider's job → `404`; customer/technician →
+  `403`; unauthenticated → `401`; business owner and manager schedule
+  applicable business-owned marketplace jobs.
+- Scheduling validation: missing, malformed (`not-a-date`,
+  `2026-13-40`, impossible `2026-02-30`, non-string) and past
+  `scheduledAt` → `422`; scheduling without an accepted quote → `422`.
+- Scheduling state transition: `REQUESTED`/`QUOTED` jobs cannot be
+  scheduled (`422`); success writes `jobs.scheduled_at` plus an
+  `ACCEPTED → SCHEDULED` history entry; failure leaves the job
+  `ACCEPTED` with no history entry.
+- Start authorization and transition: `SCHEDULED → IN_PROGRESS`
+  (`200`) for the addressed provider; `ACCEPTED`/`REQUESTED`/`QUOTED`
+  jobs cannot be started (`422`); repeat start → `422` (single
+  history entry); another provider → `404`; customer/technician →
+  `403`; failure leaves the job `SCHEDULED`.
+- Status display and date/time: customer retrieves `SCHEDULED` and
+  `IN_PROGRESS` jobs with the exact scheduled instant; the `+02:00`
+  SAST slot round-trips to the same instant (no timezone shift);
+  accepted quote stays `ACCEPTED` and cannot be replaced (a second
+  submission after scheduling → `422`).
+- Provider inbox surfaces `ACCEPTED`/`SCHEDULED`/`IN_PROGRESS`
+  (filterable; terminal states still → `422`); malformed ids → `400`.
+- All asserted responses preserve the standard success/error
+  envelopes.
+
+Frontend (`apps/web`, run with `npx ng test --watch=false`):
+
+- `job.service.spec.ts`: schedule posts `{ scheduledAt }` to
+  `/jobs/:id/schedule` and resolves the job; start posts `{}` to
+  `/jobs/:id/start` and resolves the job.
+- `request-detail.spec.ts`: schedule form visible only for `ACCEPTED`
+  jobs with an accepted quote; invalid date/time blocked; success →
+  `Scheduled: 5 October 2026 at 10:00` with a Start action;
+  `Scheduling…` disabled state; server errors surfaced with the
+  `ACCEPTED` state intact; Start visible only when `SCHEDULED`;
+  `Start this job?` confirmation with the in-progress wording;
+  `Starting…` disabled state; success → active `In progress` state;
+  start errors surfaced with the `SCHEDULED` state intact.
+- `job-detail.spec.ts`: `ACCEPTED` shows the schedule-next-step text;
+  `SCHEDULED` shows the SAST slot, provider and agreed price;
+  `IN_PROGRESS` shows the active state with schedule and price; no
+  Schedule/Start/Accept controls in any of these states (read-only).
+- `my-jobs.spec.ts` / `requests.spec.ts`: `Scheduled` / `In
+  progress` badges with the SAST slot.
+- `formatScheduledAt` (SAST rendering of the stored instant) is
+  covered through the component assertions above.
+
+No database migration was required in Stage 6E (existing
+`jobs.status` ENUM, `jobs.scheduled_at` and `job_status_history`
+reused); the `database/tests/schema.test.js` suite still requires a
+live MySQL instance and is unchanged.

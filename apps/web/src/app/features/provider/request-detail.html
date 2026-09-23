@@ -67,6 +67,84 @@
           </ul>
         }
         <p class="fl-card-text">Agreed amount: {{ formatAmount(accepted.total) }} — payment is arranged directly with the customer.</p>
+
+        @if (canSchedule()) {
+          <div aria-label="Schedule job">
+            <p class="fl-card-label">Schedule job</p>
+            <form class="fl-form" [formGroup]="scheduleForm" (ngSubmit)="onSchedule()" novalidate>
+              <div class="fl-field">
+                <label class="fl-label" for="schedule-date">Date</label>
+                <input
+                  id="schedule-date"
+                  class="fl-input"
+                  type="date"
+                  formControlName="date"
+                  [attr.aria-invalid]="scheduleFieldInvalid(scheduleForm.controls.date) ? 'true' : null"
+                />
+                @if (scheduleFieldInvalid(scheduleForm.controls.date)) {
+                  <p class="fl-field-error" role="alert">Choose a valid date.</p>
+                }
+              </div>
+              <div class="fl-field">
+                <label class="fl-label" for="schedule-time">Time</label>
+                <input
+                  id="schedule-time"
+                  class="fl-input"
+                  type="time"
+                  formControlName="time"
+                  [attr.aria-invalid]="scheduleFieldInvalid(scheduleForm.controls.time) ? 'true' : null"
+                />
+                @if (scheduleFieldInvalid(scheduleForm.controls.time)) {
+                  <p class="fl-field-error" role="alert">Choose a valid time.</p>
+                }
+              </div>
+              @if (scheduleError()) {
+                <p class="fl-alert-error" role="alert">{{ scheduleError() }}</p>
+              }
+              <button type="submit" class="fl-btn fl-btn-primary fl-btn-block" [disabled]="scheduling()">
+                {{ scheduling() ? 'Scheduling…' : 'Schedule Job' }}
+              </button>
+              <p class="fl-form-note">The customer will see the scheduled date and time.</p>
+            </form>
+          </div>
+        }
+
+        @if (detail.status === 'SCHEDULED') {
+          <div aria-label="Scheduled job">
+            <p class="fl-card-label">Scheduled</p>
+            <p class="fl-card-text">Scheduled: {{ scheduledDisplay() }}</p>
+            @if (canStart() && !showStartConfirm()) {
+              <button type="button" class="fl-btn fl-btn-primary fl-btn-block" (click)="startStart()">
+                Start Job
+              </button>
+            }
+            @if (showStartConfirm()) {
+              <div role="group" aria-label="Confirm job start">
+                <p class="fl-card-text"><strong>Start this job?</strong></p>
+                <p class="fl-card-text">Starting the job will mark it as In Progress.</p>
+                @if (startError()) {
+                  <p class="fl-alert-error" role="alert">{{ startError() }}</p>
+                }
+                <button type="button" class="fl-btn fl-btn-secondary" (click)="cancelStart()" [disabled]="starting()">
+                  Cancel
+                </button>
+                <button type="button" class="fl-btn fl-btn-primary" (click)="confirmStart()" [disabled]="starting()">
+                  {{ starting() ? 'Starting…' : 'Start Job' }}
+                </button>
+              </div>
+            } @else if (startError()) {
+              <p class="fl-alert-error" role="alert">{{ startError() }}</p>
+            }
+          </div>
+        }
+
+        @if (detail.status === 'IN_PROGRESS') {
+          <div aria-label="Job in progress">
+            <p class="fl-card-label">In progress</p>
+            <p class="fl-card-text">The job is active. Scheduled: {{ scheduledDisplay() }}</p>
+          </div>
+        }
+
         <a class="fl-btn fl-btn-secondary" routerLink="/requests">Back to Requests</a>
       </section>
     } @else if (createdQuote(); as quote) {

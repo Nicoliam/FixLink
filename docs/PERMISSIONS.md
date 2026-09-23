@@ -485,3 +485,62 @@ manager-only/admin rejection, dual-role owner-manager acceptance,
 already-accepted conflict, ineligible and wrong-state rejection,
 `INTERNAL` rejection, rollback atomicity, and multi-quote
 retirement.
+
+
+# 24. Stage 6E Implementation Notes — Scheduling & Start
+
+Implemented 2026-09-23 (`backend/src/modules/quotes/`,
+`POST /api/v1/jobs/:jobId/schedule`,
+`POST /api/v1/jobs/:jobId/start`).
+
+- Only the addressed provider may schedule or start: the
+  `PROFESSIONAL` owning the job's professional profile, or a
+  `BUSINESS_OWNER` / `BUSINESS_MANAGER` of the job's business
+  (ownership derived server-side from `professional_profiles.user_id`,
+  `business_profiles.owner_user_id` and active `business_members`
+  rows — never from the request). Another provider's job reads as
+  `404 NOT_FOUND`, never `403`, so job ids cannot be probed across
+  providers.
+- `CUSTOMER` actors (schedule/start would be a status change the
+  customer must never make), `TECHNICIAN`-only actors and `ADMIN`
+  actors receive `403 FORBIDDEN_ROLE` — technicians cannot perform
+  these marketplace transitions in Stage 6E.
+- State is enforced server-side: scheduling requires an `ACCEPTED`
+  job with an `ACCEPTED` quote; starting requires a `SCHEDULED` job.
+  Every other transition (`REQUESTED`/`QUOTED` → `SCHEDULED`,
+  `ACCEPTED` → `IN_PROGRESS`, re-start, …) returns `422
+  VALIDATION_ERROR`. `scheduledAt` is required, must be a valid
+  calendar date/time and must be in the future (`422` otherwise).
+- Scheduling writes `jobs.scheduled_at` and transitions
+  `ACCEPTED → SCHEDULED` (`Provider scheduled job`); starting
+  transitions `SCHEDULED → IN_PROGRESS` (`Provider started job`) —
+  both atomically with their `job_status_history` entries.
+
+Role summary for marketplace schedule/start in Stage 6E:
+
+PROFESSIONAL:
+- schedule own accepted marketplace jobs
+- start own scheduled marketplace jobs
+
+BUSINESS_OWNER:
+- schedule applicable business marketplace jobs
+- start applicable scheduled marketplace jobs
+
+BUSINESS_MANAGER:
+- schedule applicable business marketplace jobs
+- start applicable scheduled marketplace jobs
+
+CUSTOMER:
+- view schedule/status (read-only)
+- cannot schedule
+- cannot start
+
+TECHNICIAN:
+- cannot perform these marketplace status transitions in Stage 6E
+
+Permission tests added (`backend/tests/job-scheduling.test.ts`):
+own/other-provider scheduling and start, customer/technician
+rejection, business owner/manager scheduling, missing/malformed/past
+`scheduledAt`, no-accepted-quote rejection, state guards, history,
+rollback atomicity, customer visibility of `SCHEDULED`/`IN_PROGRESS`,
+accepted-quote integrity, and envelope consistency.

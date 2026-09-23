@@ -17,6 +17,8 @@ import type { MemoryJobsStore } from '../jobs/memory-jobs.store';
 import {
   JobNotAcceptableError,
   JobNotQuoteableError,
+  JobNotSchedulableError,
+  JobNotStartableError,
   QuoteAlreadyAcceptedError,
   QuoteConflictError,
   QuoteNotEligibleError,
@@ -25,6 +27,8 @@ import {
   type CreateQuotePersistInput,
   type ProviderRequestFilter,
   type QuotesStore,
+  type ScheduleJobPersistInput,
+  type StartJobPersistInput,
 } from './quotes.store';
 import type {
   BusinessIdentity,
@@ -79,7 +83,10 @@ export class MemoryQuotesStore implements QuotesStore {
   }
 
   async listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }> {
-    const statuses = filter.statuses.length > 0 ? filter.statuses : ['REQUESTED', 'QUOTED'];
+    const statuses =
+      filter.statuses.length > 0
+        ? filter.statuses
+        : (['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS'] as ProviderRequestFilter['statuses']);
     const owned = (await this.jobs.debugAllJobs()).filter(
       (job) =>
         job.source === 'MARKETPLACE' &&
@@ -195,6 +202,47 @@ export class MemoryQuotesStore implements QuotesStore {
     return [...this.quotes.values()]
       .filter((quote) => quote.jobId === jobId)
       .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  }
+
+  /**
+   * Stage 6E — schedule an ACCEPTED job with an accepted quote.
+   * All checks run before any mutation: a failed scheduling cannot leave
+   * the job SCHEDULED without an accepted quote (or vice versa).
+   */
+  async scheduleJob(input: ScheduleJobPersistInput): Promise<void> {
+    const live = await this.jobs.getJobById(input.jobId);
+    // Defensive re-checks: the service owns authorization (role, provider
+    // association); the store owns state validity.
+    if (!live || live.source !== 'MARKETPLACE') {
+      throw new JobNotSchedulableError('Job not found.');
+    }
+    const accepted = [...this.quotes.values()].some(
+      (quote) => quote.jobId === live.id && quote.status === 'ACCEPTED',
+    );
+    if (!accepted) {
+      throw new JobNotSchedulableError('This job cannot be scheduled without an accepted quote.');
+    }
+    if (live.status !== 'ACCEPTED') {
+      throw new JobNotSchedulableError();
+    }
+    this.jobs.debugSetJobScheduled(live.id, input.scheduledAtIso);
+    this.history.push({ jobId: live.id, previous: 'ACCEPTED', next: 'SCHEDULED' });
+  }
+
+  /**
+   * Stage 6E — start a SCHEDULED job. A failed start leaves the job
+   * SCHEDULED with no history entry.
+   */
+  async startJob(input: StartJobPersistInput): Promise<void> {
+    const live = await this.jobs.getJobById(input.jobId);
+    if (!live || live.source !== 'MARKETPLACE') {
+      throw new JobNotStartableError('Job not found.');
+    }
+    if (live.status !== 'SCHEDULED') {
+      throw new JobNotStartableError();
+    }
+    this.jobs.debugSetJobInProgress(live.id);
+    this.history.push({ jobId: live.id, previous: 'SCHEDULED', next: 'IN_PROGRESS' });
   }
 
   async getQuoteById(quoteId: string): Promise<QuoteDto | null> {

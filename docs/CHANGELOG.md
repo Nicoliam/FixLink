@@ -1,6 +1,43 @@
 # FixLink — Changelog
 
-## Stage 6D — Customer Quote Acceptance (2026-09-23)
+## Stage 6E — Scheduling & Job Execution Start (2026-09-23)
+
+- Providers can now schedule accepted marketplace jobs and start
+  scheduled ones: `POST /api/v1/jobs/:jobId/schedule`
+  (`{ scheduledAt }` → `ACCEPTED → SCHEDULED`, `jobs.scheduled_at`
+  recorded, `Provider scheduled job` history) and
+  `POST /api/v1/jobs/:jobId/start` (`SCHEDULED → IN_PROGRESS`,
+  `Provider started job` history). Both run atomically in a single
+  transaction per store (memory and MySQL); failures leave the job
+  and history untouched. No new tables or columns — the existing
+  `jobs.status` ENUM, `jobs.scheduled_at` and `job_status_history`
+  rows are reused; no payment, technician, completion or review
+  functionality was added.
+- Authorization: only the addressed `PROFESSIONAL` / `BUSINESS_OWNER`
+  / `BUSINESS_MANAGER` may schedule or start; other providers'
+  jobs read as `404`, customers/technicians/admins receive `403`.
+  State is server-enforced (`REQUESTED`/`QUOTED` cannot be scheduled,
+  `ACCEPTED` cannot be started, no jumps to `COMPLETED`); an accepted
+  quote is required to schedule. `scheduledAt` must be a valid future
+  ISO date/time (missing/malformed/past/impossible dates → `422`)
+  and is normalized to UTC ISO so the provider's SAST wall time
+  round-trips exactly.
+- Provider inbox now covers `ACCEPTED`/`SCHEDULED`/`IN_PROGRESS`
+  (filterable, default all actionable states). Angular: `/requests/:id`
+  shows a Schedule section (date + time) on `ACCEPTED` jobs, the
+  `Scheduled: 5 October 2026 at 10:00` state with a confirmed Start
+  action on `SCHEDULED` jobs, and the active state on `IN_PROGRESS`
+  jobs; `/my-jobs/:id` shows the read-only scheduled/in-progress
+  states (slot in SAST, provider, agreed price, direct-payment
+  wording) with no status-changing controls; both lists show the new
+  badges with the SAST slot.
+- Tests: `backend/tests/job-scheduling.test.ts` (31 cases:
+  authorization incl. owner/manager, validation incl. timezone
+  round-trip, transitions, history, rollback, customer visibility,
+  quote integrity, envelopes, inbox) plus customer/provider frontend
+  specs. Full suites green: backend 148/148, web 113/113;
+  `tsc --noEmit` (backend, web app + spec) and the production Angular
+  build pass.
 
 - Customers can now accept marketplace quotes:
   `POST /api/v1/jobs/:jobId/quotes/:quoteId/accept` (owning

@@ -3,16 +3,17 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { JobService } from '../../core/services/job.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
-import { jobStatusLabel } from '../../core/models/job.model';
+import { formatScheduledAt, jobStatusLabel } from '../../core/models/job.model';
 import type { Job } from '../../core/models/job.model';
 
 type JobsStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 /**
- * FixLink My Jobs — Stage 6B (`/my-jobs`, authenticated CUSTOMER).
+ * FixLink My Jobs — Stage 6B (`/my-jobs`, authenticated CUSTOMER) +
+ * Stage 6E (SCHEDULED / IN_PROGRESS badges with the scheduled slot).
  *
  * Lists the marketplace jobs the authenticated customer requested,
- * newest first. Quotes, execution and payment arrive in later stages.
+ * newest first. Quotes, completion and payment arrive in later stages.
  */
 @Component({
   selector: 'app-my-jobs',
@@ -30,6 +31,7 @@ export class MyJobsComponent implements OnInit {
   protected readonly total = signal(0);
 
   protected readonly statusLabel = jobStatusLabel;
+  protected readonly formatScheduled = formatScheduledAt;
 
   ngOnInit(): void {
     this.api

@@ -16,7 +16,8 @@ import type {
 
 /**
  * FixLink jobs API client — Stage 6B (customer requests) + Stage 6C
- * (provider requests and quotes) + Stage 6D (customer quote acceptance).
+ * (provider requests and quotes) + Stage 6D (customer quote acceptance)
+ * + Stage 6E (provider scheduling and start).
  *
  * Single owner of job/quote calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); customer ownership and
@@ -108,6 +109,31 @@ export class JobService {
         `${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/quotes`,
       )
       .pipe(map((res) => res.data.items));
+  }
+
+  /**
+   * Schedule an ACCEPTED job (→ SCHEDULED). The provider picks a local
+   * date and time; the instant is sent as an ISO string with the SAST
+   * (UTC+2) offset so the backend stores exactly the chosen wall time.
+   * The backend validates the provider, the ACCEPTED state and the
+   * accepted quote server-side.
+   */
+  scheduleJob(jobId: string, scheduledAt: string): Observable<Job> {
+    return this.http
+      .post<ApiSuccess<{ job: Job }>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/schedule`, {
+        scheduledAt,
+      })
+      .pipe(map((res) => res.data.job));
+  }
+
+  /**
+   * Start a SCHEDULED job (→ IN_PROGRESS). The backend validates the
+   * provider and the SCHEDULED state server-side.
+   */
+  startJob(jobId: string): Observable<Job> {
+    return this.http
+      .post<ApiSuccess<{ job: Job }>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/start`, {})
+      .pipe(map((res) => res.data.job));
   }
 
   /** Retrieve one authorized quote. */

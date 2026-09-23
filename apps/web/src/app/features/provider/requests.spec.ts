@@ -49,6 +49,20 @@ describe('ProviderRequestsComponent', () => {
     expect(text).toContain('Requested');
   });
 
+  it('distinguishes accepted, scheduled and in-progress requests', async () => {
+    const accepted: ProviderRequest = { ...item, id: '4', status: 'ACCEPTED' };
+    const scheduled: ProviderRequest = { ...item, id: '5', status: 'SCHEDULED', scheduledAt: '2026-10-05T08:00:00.000Z' };
+    const active: ProviderRequest = { ...scheduled, id: '6', status: 'IN_PROGRESS' };
+    await setup(
+      vi.fn().mockReturnValue(of({ items: [accepted, scheduled, active], total: 3, page: 1, pageSize: 20 })),
+    );
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Accepted');
+    expect(text).toContain('Scheduled');
+    expect(text).toContain('In progress');
+    expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+  });
+
   it('shows the empty state when there are no requests', async () => {
     await setup(vi.fn().mockReturnValue(of({ items: [], total: 0, page: 1, pageSize: 20 })));
     expect((fixture.nativeElement.textContent as string)).toContain('No requests yet');

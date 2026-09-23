@@ -12,6 +12,11 @@
  * quotes declined, history entry). No schema change was required — the
  * existing `quotes.status` ENUM, `jobs.agreed_amount`/`currency` and
  * `job_status_history` columns already support it.
+ *
+ * Stage 6E adds `scheduleJob` (ACCEPTED → SCHEDULED with `scheduled_at`)
+ * and `startJob` (SCHEDULED → IN_PROGRESS). Again no schema change: the
+ * existing `jobs.status` ENUM, `jobs.scheduled_at` and
+ * `job_status_history` columns already support both transitions.
  */
 import type { JobDto } from '../jobs/jobs.types';
 import type {
@@ -62,11 +67,29 @@ export class QuoteAlreadyAcceptedError extends QuoteConflictError {
   }
 }
 
+/** The job is not in a state that allows scheduling (must be ACCEPTED with an accepted quote). */
+export class JobNotSchedulableError extends Error {
+  constructor(message = 'This job cannot be scheduled in its current state.') {
+    super(message);
+    this.name = 'JobNotSchedulableError';
+  }
+}
+
+/** The job is not in a state that allows starting (must be SCHEDULED). */
+export class JobNotStartableError extends Error {
+  constructor(message = 'This job cannot be started in its current state.') {
+    super(message);
+    this.name = 'JobNotStartableError';
+  }
+}
+
+export type ProviderInboxStatus = 'REQUESTED' | 'QUOTED' | 'ACCEPTED' | 'SCHEDULED' | 'IN_PROGRESS';
+
 export interface ProviderRequestFilter {
   professionalIds: string[];
   businessIds: string[];
-  /** Defaults to REQUESTED + QUOTED when empty. */
-  statuses: Array<'REQUESTED' | 'QUOTED'>;
+  /** Defaults to the actionable inbox set when empty (see INBOX_STATUSES in the service). */
+  statuses: ProviderInboxStatus[];
   page: number;
   pageSize: number;
 }
@@ -93,6 +116,22 @@ export interface AcceptQuoteResult {
   quote: QuoteDto;
   /** Competing quotes on the job that were retired (now DECLINED). */
   retiredQuoteIds: string[];
+}
+
+export interface ScheduleJobPersistInput {
+  /** Live job row (re-read under lock by the store); ownership checked by the service. */
+  jobId: string;
+  /** Normalized future instant (UTC ISO) for `jobs.scheduled_at`. */
+  scheduledAtIso: string;
+  /** Authenticated provider user id — recorded in `job_status_history.changed_by`. */
+  scheduledBy: string;
+}
+
+export interface StartJobPersistInput {
+  /** Live job row (re-read under lock by the store); ownership checked by the service. */
+  jobId: string;
+  /** Authenticated provider user id — recorded in `job_status_history.changed_by`. */
+  startedBy: string;
 }
 
 export interface QuotesStore {
@@ -124,6 +163,22 @@ export interface QuotesStore {
    * assignment belongs to the later business workflow.
    */
   acceptQuote(input: AcceptQuotePersistInput): Promise<AcceptQuoteResult>;
+  /**
+   * Schedule an ACCEPTED job that has an accepted quote, atomically: the
+   * job becomes SCHEDULED with `scheduled_at` recorded and a
+   * `job_status_history` entry (`ACCEPTED → SCHEDULED`, reason
+   * `Provider scheduled job`) is written. Throws JobNotSchedulableError
+   * on rule violations (wrong state, no accepted quote); a failed
+   * scheduling leaves the job ACCEPTED with no history entry.
+   */
+  scheduleJob(input: ScheduleJobPersistInput): Promise<void>;
+  /**
+   * Start a SCHEDULED job, atomically: the job becomes IN_PROGRESS with a
+   * `job_status_history` entry (`SCHEDULED → IN_PROGRESS`, reason
+   * `Provider started job`). Throws JobNotStartableError on rule
+   * violations; a failed start leaves the job SCHEDULED.
+   */
+  startJob(input: StartJobPersistInput): Promise<void>;
   listQuotesByJobId(jobId: string): Promise<QuoteDto[]>;
   getQuoteById(quoteId: string): Promise<QuoteDto | null>;
 }

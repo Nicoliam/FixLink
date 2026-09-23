@@ -13,6 +13,8 @@ import type { JobDto, JobStatus } from '../jobs/jobs.types';
 import {
   JobNotAcceptableError,
   JobNotQuoteableError,
+  JobNotSchedulableError,
+  JobNotStartableError,
   QuoteAlreadyAcceptedError,
   QuoteConflictError,
   QuoteNotEligibleError,
@@ -21,6 +23,8 @@ import {
   type CreateQuotePersistInput,
   type ProviderRequestFilter,
   type QuotesStore,
+  type ScheduleJobPersistInput,
+  type StartJobPersistInput,
 } from './quotes.store';
 import type {
   BusinessIdentity,
@@ -201,7 +205,10 @@ export class MysqlQuotesStore implements QuotesStore {
   }
 
   async listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }> {
-    const statuses = filter.statuses.length > 0 ? filter.statuses : ['REQUESTED', 'QUOTED'];
+    const statuses =
+      filter.statuses.length > 0
+        ? filter.statuses
+        : (['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS'] as ProviderRequestFilter['statuses']);
     const clauses: string[] = ['j.`source` = \'MARKETPLACE\'', 'j.`deleted_at` IS NULL'];
     const params: Array<string | number> = [];
     const ownership: string[] = [];
@@ -405,6 +412,94 @@ export class MysqlQuotesStore implements QuotesStore {
       jobId,
     ]);
     return this.withItems(rows as QuoteRow[]);
+  }
+
+  /**
+   * Stage 6E — schedule an ACCEPTED marketplace job with an accepted
+   * quote. The status update is guarded by `AND status = 'ACCEPTED'` so a
+   * concurrent transition cannot double-schedule the job. `scheduled_at`
+   * is stored as a UTC DATETIME; readers convert it back to the same
+   * instant with `toIso`, so the provider's chosen time is preserved.
+   */
+  async scheduleJob(input: ScheduleJobPersistInput): Promise<void> {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [jobRows] = await conn.query<JobRow[]>(
+        'SELECT `id`, `source`, `status` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        [input.jobId],
+      );
+      const job = (jobRows as JobRow[])[0] as JobRow | undefined;
+      // Authorization (provider association) is enforced by the service
+      // before this call; the store re-validates state under lock.
+      if (!job || job.source !== 'MARKETPLACE') {
+        throw new JobNotSchedulableError('Job not found.');
+      }
+      const [acceptedRows] = await conn.query<RowDataPacket[]>(
+        "SELECT `id` FROM `quotes` WHERE `job_id` = ? AND `status` = 'ACCEPTED' LIMIT 1 FOR UPDATE",
+        [input.jobId],
+      );
+      if ((acceptedRows as RowDataPacket[]).length === 0) {
+        throw new JobNotSchedulableError('This job cannot be scheduled without an accepted quote.');
+      }
+      if (job.status !== 'ACCEPTED') {
+        throw new JobNotSchedulableError();
+      }
+      const scheduledAt = new Date(input.scheduledAtIso).toISOString().slice(0, 19).replace('T', ' ');
+      const [updated] = await conn.query<ResultSetHeader>(
+        "UPDATE `jobs` SET `status` = 'SCHEDULED', `scheduled_at` = ? WHERE `id` = ? AND `status` = 'ACCEPTED'",
+        [scheduledAt, input.jobId],
+      );
+      if (updated.affectedRows !== 1) throw new JobNotSchedulableError();
+      await conn.query(
+        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+        [input.jobId, 'ACCEPTED', 'SCHEDULED', input.scheduledBy, 'Provider scheduled job'],
+      );
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  /**
+   * Stage 6E — start a SCHEDULED marketplace job. Guarded by
+   * `AND status = 'SCHEDULED'` so a concurrent start cannot
+   * double-transition the job.
+   */
+  async startJob(input: StartJobPersistInput): Promise<void> {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [jobRows] = await conn.query<JobRow[]>(
+        'SELECT `id`, `source`, `status` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        [input.jobId],
+      );
+      const job = (jobRows as JobRow[])[0] as JobRow | undefined;
+      if (!job || job.source !== 'MARKETPLACE') {
+        throw new JobNotStartableError('Job not found.');
+      }
+      if (job.status !== 'SCHEDULED') {
+        throw new JobNotStartableError();
+      }
+      const [updated] = await conn.query<ResultSetHeader>(
+        "UPDATE `jobs` SET `status` = 'IN_PROGRESS' WHERE `id` = ? AND `status` = 'SCHEDULED'",
+        [input.jobId],
+      );
+      if (updated.affectedRows !== 1) throw new JobNotStartableError();
+      await conn.query(
+        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+        [input.jobId, 'SCHEDULED', 'IN_PROGRESS', input.startedBy, 'Provider started job'],
+      );
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
   }
 
   async getQuoteById(quoteId: string): Promise<QuoteDto | null> {

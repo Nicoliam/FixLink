@@ -994,3 +994,30 @@ Explicitly out of scope for Stage 6D: payment processing of any kind
 the agreed price only), technician assignment, the full scheduling
 workflow, Before/During/After execution, quote decline/withdrawal,
 and notifications.
+
+# 19. STAGE 6E IMPLEMENTATION NOTES — SCHEDULING & JOB EXECUTION START
+
+Implemented 2026-09-23. Covers the ACCEPTED → SCHEDULED → IN_PROGRESS
+segment of flow §12 (the standard job lifecycle) for marketplace jobs:
+the provider side of §6.2 ("Schedule") and §3.1 (Professional Starts
+Job), and the matching customer visibility.
+
+Customer:
+
+Accept Quote (ACCEPTED — "Next step: the provider will schedule the
+job") → Provider Schedules → Customer sees Scheduled (date/time in
+SAST, provider, agreed price, direct-payment wording) → Provider
+Starts → Customer sees In Progress (provider, scheduled date/time,
+agreed price). The customer has no controls that change the job
+status — every customer view in this segment is read-only.
+
+Provider:
+
+Accepted Job → Schedule Job (date + time inputs, SAST wall time sent
+with its UTC+2 offset) → Job Scheduled ("Scheduled: 5 October 2026
+at 10:00") → Start Job (confirmation: "Starting the job will mark it
+as In Progress") → Job In Progress (active state).
+
+Explicitly out of scope for Stage 6E: payment processing of any kind,
+technician marketplace transitions, Before/During/After execution
+media, completion/confirmation/reviews, and notifications.

@@ -59,6 +59,39 @@
       </section>
     }
 
+    @if (detail.status === 'SCHEDULED') {
+      <section class="fl-card" aria-label="Scheduled job">
+        <p class="fl-card-label">Scheduled</p>
+        <p class="fl-card-text">Scheduled: {{ formatScheduled(detail.scheduledAt) }}</p>
+        <p class="fl-card-text">Provider: {{ detail.provider.name }}</p>
+        @if (acceptedQuote(); as scheduledAccepted) {
+          <p class="fl-card-text">
+            Agreed price: {{ formatAmount(detail.agreedAmount ?? scheduledAccepted.total) }}
+            {{ scheduledAccepted.currency }}
+          </p>
+        }
+        <p class="fl-card-text">Payment is arranged directly with the professional.</p>
+      </section>
+    }
+
+    @if (detail.status === 'IN_PROGRESS') {
+      <section class="fl-card" aria-label="Job in progress">
+        <p class="fl-card-label">In progress</p>
+        <p class="fl-card-text">Your provider has started the job.</p>
+        <p class="fl-card-text">Provider: {{ detail.provider.name }}</p>
+        @if (detail.scheduledAt) {
+          <p class="fl-card-text">Scheduled: {{ formatScheduled(detail.scheduledAt) }}</p>
+        }
+        @if (acceptedQuote(); as activeAccepted) {
+          <p class="fl-card-text">
+            Agreed price: {{ formatAmount(detail.agreedAmount ?? activeAccepted.total) }}
+            {{ activeAccepted.currency }}
+          </p>
+        }
+        <p class="fl-card-text">Payment is arranged directly with the professional.</p>
+      </section>
+    }
+
     @if (detail.quotes && detail.quotes.length > 0) {
       <section class="fl-card" aria-label="Quotes">
         @if (!acceptedQuote()) {
@@ -118,8 +151,18 @@
       <p class="fl-card-label">What happens next</p>
       @if (detail.status === 'ACCEPTED') {
         <p class="fl-card-text">
-          Your quote has been accepted. {{ detail.provider.name }} will be in touch about the next
-          step — payment is arranged directly with them.
+          Your quote has been accepted. Next step: {{ detail.provider.name }} will schedule the job —
+          payment is arranged directly with them.
+        </p>
+      } @else if (detail.status === 'SCHEDULED') {
+        <p class="fl-card-text">
+          Your job is scheduled. {{ detail.provider.name }} will arrive at the scheduled time —
+          payment is arranged directly with them.
+        </p>
+      } @else if (detail.status === 'IN_PROGRESS') {
+        <p class="fl-card-text">
+          Work is in progress. {{ detail.provider.name }} will keep the job updated —
+          payment is arranged directly with them.
         </p>
       } @else {
         <p class="fl-card-text">

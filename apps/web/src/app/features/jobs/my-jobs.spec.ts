@@ -56,6 +56,16 @@ describe('MyJobsComponent', () => {
     expect(text).toContain('Requested');
   });
 
+  it('shows scheduled and in-progress badges with the SAST slot', async () => {
+    const scheduled: Job = { ...job, status: 'SCHEDULED', scheduledAt: '2026-10-05T08:00:00.000Z' };
+    const active: Job = { ...job, id: '8', status: 'IN_PROGRESS', scheduledAt: '2026-10-05T08:00:00.000Z' };
+    await setup(vi.fn().mockReturnValue(of({ items: [scheduled, active], total: 2, page: 1, pageSize: 20 })));
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Scheduled');
+    expect(text).toContain('In progress');
+    expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+  });
+
   it('shows the empty state when no jobs exist', async () => {
     await setup(vi.fn().mockReturnValue(of({ items: [], total: 0, page: 1, pageSize: 20 })));
     expect((fixture.nativeElement.textContent as string)).toContain('No job requests yet');

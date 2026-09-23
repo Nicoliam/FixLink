@@ -36,6 +36,9 @@
           @if (job.preferredDate) {
             <p class="fl-card-text">Preferred date: {{ job.preferredDate }}</p>
           }
+          @if ((job.status === 'SCHEDULED' || job.status === 'IN_PROGRESS') && job.scheduledAt) {
+            <p class="fl-card-text">Scheduled: {{ formatScheduled(job.scheduledAt) }}</p>
+          }
         </article>
       }
     </div>

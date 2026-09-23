@@ -3,14 +3,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { JobService } from '../../core/services/job.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
-import { jobStatusLabel } from '../../core/models/job.model';
+import { formatScheduledAt, jobStatusLabel } from '../../core/models/job.model';
 import type { ProviderRequest } from '../../core/models/job.model';
 
 type RequestsStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 /**
  * FixLink provider requests — Stage 6C (`/requests`, authenticated
- * PROFESSIONAL / BUSINESS_OWNER / BUSINESS_MANAGER).
+ * PROFESSIONAL / BUSINESS_OWNER / BUSINESS_MANAGER) + Stage 6E
+ * (ACCEPTED / SCHEDULED / IN_PROGRESS badges with the scheduled slot).
  *
  * Lists marketplace job requests addressed to the authenticated provider
  * or their business. Technicians never see this surface: the backend
@@ -32,6 +33,7 @@ export class ProviderRequestsComponent implements OnInit {
   protected readonly total = signal(0);
 
   protected readonly statusLabel = jobStatusLabel;
+  protected readonly formatScheduled = formatScheduledAt;
 
   ngOnInit(): void {
     this.api

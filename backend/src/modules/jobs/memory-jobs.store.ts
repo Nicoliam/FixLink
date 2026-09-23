@@ -137,6 +137,30 @@ export class MemoryJobsStore implements JobsStore {
     if (job) this.jobs.set(jobId, { ...job, status: 'ACCEPTED', agreedAmount, currency, updatedAt: nowIso() });
   }
 
+  /**
+   * Stage 6E helper used by the memory quotes store: record scheduling
+   * (status SCHEDULED + normalized UTC ISO instant). Production updates
+   * these columns in the same scheduling transaction.
+   */
+  debugSetJobScheduled(jobId: string, scheduledAtIso: string): void {
+    const job = this.jobs.get(jobId);
+    if (job) {
+      this.jobs.set(jobId, {
+        ...job,
+        status: 'SCHEDULED',
+        scheduledAt: scheduledAtIso,
+        preferredDate: scheduledAtIso.slice(0, 10),
+        updatedAt: nowIso(),
+      });
+    }
+  }
+
+  /** Stage 6E helper used by the memory quotes store: record a job start. */
+  debugSetJobInProgress(jobId: string): void {
+    const job = this.jobs.get(jobId);
+    if (job) this.jobs.set(jobId, { ...job, status: 'IN_PROGRESS', updatedAt: nowIso() });
+  }
+
   /** Stage 6D test helper: simulate a non-marketplace job row. */
   debugSetJobSource(jobId: string, source: JobDto['source']): void {
     const job = this.jobs.get(jobId);

@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JobService } from '../../core/services/job.service';
 import { getApiErrorCode, getApiErrorMessage } from '../../core/models/api.model';
-import { formatZar, jobStatusLabel, quoteStatusLabel } from '../../core/models/job.model';
+import { formatScheduledAt, formatZar, jobStatusLabel, quoteStatusLabel } from '../../core/models/job.model';
 import type { Job, Quote } from '../../core/models/job.model';
 
 type JobDetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
@@ -11,13 +11,17 @@ type JobDetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
 /**
  * FixLink job detail — Stage 6B (`/my-jobs/:id`, authenticated CUSTOMER)
  * + Stage 6C (read-only received quotes) + Stage 6D (customer quote
- * acceptance: QUOTED → ACCEPTED).
+ * acceptance: QUOTED → ACCEPTED) + Stage 6E (read-only schedule and
+ * in-progress states: ACCEPTED → SCHEDULED → IN_PROGRESS).
  *
  * Shows the request, its quotes, and — for QUOTED jobs — an Accept Quote
- * action per eligible (SUBMITTED) quote with a confirmation step. The
- * backend performs the transition and validates ownership server-side;
- * acceptance only records the agreed price (MVP: payment is arranged
- * directly with the professional, never processed by FixLink).
+ * action per eligible (SUBMITTED) quote with a confirmation step. Once
+ * accepted, the customer sees the agreed price, the provider-scheduled
+ * date and time, and the in-progress state. All provider status changes
+ * are read-only here: the customer has no controls that change the job
+ * status. The backend performs every transition and validates ownership
+ * server-side; acceptance only records the agreed price (MVP: payment is
+ * arranged directly with the professional, never processed by FixLink).
  */
 @Component({
   selector: 'app-job-detail',
@@ -41,6 +45,7 @@ export class JobDetailComponent implements OnInit {
   protected readonly statusLabel = jobStatusLabel;
   protected readonly quoteLabel = quoteStatusLabel;
   protected readonly formatAmount = formatZar;
+  protected readonly formatScheduled = formatScheduledAt;
 
   /** The accepted quote, once the job is ACCEPTED. */
   protected readonly acceptedQuote = computed<Quote | null>(() => {

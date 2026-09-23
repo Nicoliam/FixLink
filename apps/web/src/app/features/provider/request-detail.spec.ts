@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { RequestDetailComponent } from './request-detail';
 import { JobService } from '../../core/services/job.service';
-import type { ProviderRequest, Quote } from '../../core/models/job.model';
+import type { Job, ProviderRequest, Quote } from '../../core/models/job.model';
 
 const detail: ProviderRequest = {
   id: '3',
@@ -155,5 +155,212 @@ describe('RequestDetailComponent', () => {
     component.onSubmit();
     fixture.detectChanges();
     expect(component.submitError()).toContain('A quote has already been submitted.');
+  });
+
+  describe('Stage 6E — scheduling and start', () => {
+    const accepted: Quote = { ...submittedQuote, status: 'ACCEPTED' };
+    const acceptedDetail: ProviderRequest = { ...detail, status: 'ACCEPTED', quotes: [accepted] };
+    const scheduledDetail: ProviderRequest = {
+      ...acceptedDetail,
+      status: 'SCHEDULED',
+      scheduledAt: '2026-10-05T08:00:00.000Z',
+    };
+    const activeDetail: ProviderRequest = { ...scheduledDetail, status: 'IN_PROGRESS' };
+
+    const scheduledJob: Job = {
+      id: '3',
+      reference: 'FL-2026-000003',
+      source: 'MARKETPLACE',
+      status: 'SCHEDULED',
+      customerId: '1',
+      provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
+      service: { id: '1', name: 'Leak Repair & Pipe Fixes', slug: 'leak-repair' },
+      description: 'Kitchen mixer tap leaking at the base and the cupboard floor is damp.',
+      location: 'Fourways, Johannesburg',
+      city: null,
+      province: null,
+      preferredDate: '2026-10-05',
+      scheduledAt: '2026-10-05T08:00:00.000Z',
+      createdAt: '2026-09-23T10:00:00.000Z',
+      updatedAt: '2026-09-23T12:00:00.000Z',
+      agreedAmount: 1250,
+      currency: 'ZAR',
+      quotes: [accepted],
+    };
+
+    function scheduleApi(request: ProviderRequest, schedule: ReturnType<typeof vi.fn>, start: ReturnType<typeof vi.fn>): Record<string, ReturnType<typeof vi.fn>> {
+      return {
+        getProviderRequest: vi.fn().mockReturnValue(of(request)),
+        createQuote: vi.fn(),
+        scheduleJob: schedule,
+        startJob: start,
+      };
+    }
+
+    function buttonWithText(text: string): HTMLButtonElement | null {
+      const buttons = [...(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)];
+      return buttons.find((button) => button.textContent?.trim() === text) ?? null;
+    }
+
+    it('shows the schedule form only for ACCEPTED jobs with an accepted quote', async () => {
+      await setup('3', scheduleApi(acceptedDetail, vi.fn(), vi.fn()));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Schedule job');
+      expect(fixture.nativeElement.querySelector('#schedule-date')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('#schedule-time')).not.toBeNull();
+      expect(buttonWithText('Schedule Job')).not.toBeNull();
+      // No Start action before scheduling.
+      expect(buttonWithText('Start Job')).toBeNull();
+    });
+
+    it('hides the schedule form for REQUESTED, QUOTED, SCHEDULED and IN_PROGRESS jobs', async () => {
+      await setup('3', scheduleApi(detail, vi.fn(), vi.fn()));
+      expect(buttonWithText('Schedule Job')).toBeNull();
+      TestBed.resetTestingModule();
+      await setup('3', scheduleApi({ ...detail, status: 'QUOTED', quotes: [submittedQuote] }, vi.fn(), vi.fn()));
+      expect(buttonWithText('Schedule Job')).toBeNull();
+      TestBed.resetTestingModule();
+      await setup('3', scheduleApi(scheduledDetail, vi.fn(), vi.fn()));
+      expect(buttonWithText('Schedule Job')).toBeNull();
+      TestBed.resetTestingModule();
+      await setup('3', scheduleApi(activeDetail, vi.fn(), vi.fn()));
+      expect(buttonWithText('Schedule Job')).toBeNull();
+    });
+
+    it('blocks scheduling when the date or time is missing', async () => {
+      const schedule = vi.fn();
+      await setup('3', scheduleApi(acceptedDetail, schedule, vi.fn()));
+      const component = fixture.componentInstance as unknown as {
+        onSchedule: () => void;
+        scheduleError: () => string | null;
+      };
+      component.onSchedule();
+      fixture.detectChanges();
+      expect(schedule).not.toHaveBeenCalled();
+      expect(component.scheduleError()).toContain('valid date and time');
+    });
+
+    it('schedules the job and shows the SAST slot with a Start action', async () => {
+      const schedule = vi.fn().mockReturnValue(of(scheduledJob));
+      await setup('3', scheduleApi(acceptedDetail, schedule, vi.fn()));
+      const component = fixture.componentInstance as unknown as {
+        scheduleForm: { patchValue: (v: unknown) => void };
+        onSchedule: () => void;
+      };
+      component.scheduleForm.patchValue({ date: '2026-10-05', time: '10:00' });
+      component.onSchedule();
+      fixture.detectChanges();
+      // The SAST wall time travels with its offset so the instant is exact.
+      expect(schedule).toHaveBeenCalledWith('3', '2026-10-05T10:00:00+02:00');
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+      expect(buttonWithText('Start Job')).not.toBeNull();
+      expect(buttonWithText('Schedule Job')).toBeNull();
+    });
+
+    it('shows the scheduling state while the request is in flight', async () => {
+      const pending = new Subject<Job>();
+      const schedule = vi.fn().mockReturnValue(pending.asObservable());
+      await setup('3', scheduleApi(acceptedDetail, schedule, vi.fn()));
+      const component = fixture.componentInstance as unknown as {
+        scheduleForm: { patchValue: (v: unknown) => void };
+        onSchedule: () => void;
+      };
+      component.scheduleForm.patchValue({ date: '2026-10-05', time: '10:00' });
+      component.onSchedule();
+      fixture.detectChanges();
+      expect((fixture.nativeElement.textContent as string)).toContain('Scheduling…');
+      expect(buttonWithText('Scheduling…')?.disabled).toBe(true);
+      pending.next(scheduledJob);
+      fixture.detectChanges();
+      expect((fixture.nativeElement.textContent as string)).toContain('Scheduled: 5 October 2026 at 10:00');
+    });
+
+    it('surfaces scheduling errors without losing the ACCEPTED state', async () => {
+      const schedule = vi
+        .fn()
+        .mockReturnValue(throwError(() => ({ error: { error: { code: 'VALIDATION_ERROR', message: 'Scheduled time must be in the future.' } } })));
+      await setup('3', scheduleApi(acceptedDetail, schedule, vi.fn()));
+      const component = fixture.componentInstance as unknown as {
+        scheduleForm: { patchValue: (v: unknown) => void };
+        onSchedule: () => void;
+      };
+      component.scheduleForm.patchValue({ date: '2020-01-01', time: '10:00' });
+      component.onSchedule();
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Scheduled time must be in the future.');
+      // The job is still ACCEPTED with the schedule form intact.
+      expect(text).toContain('Accepted');
+      expect(buttonWithText('Schedule Job')).not.toBeNull();
+    });
+
+    it('shows the Start action only for SCHEDULED jobs', async () => {
+      await setup('3', scheduleApi(scheduledDetail, vi.fn(), vi.fn()));
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+      expect(buttonWithText('Start Job')).not.toBeNull();
+      TestBed.resetTestingModule();
+      await setup('3', scheduleApi(acceptedDetail, vi.fn(), vi.fn()));
+      expect(buttonWithText('Start Job')).toBeNull();
+      TestBed.resetTestingModule();
+      await setup('3', scheduleApi(activeDetail, vi.fn(), vi.fn()));
+      expect(buttonWithText('Start Job')).toBeNull();
+    });
+
+    it('asks for confirmation before starting', async () => {
+      await setup('3', scheduleApi(scheduledDetail, vi.fn(), vi.fn()));
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Start this job?');
+      expect(text).toContain('Starting the job will mark it as In Progress.');
+      expect(buttonWithText('Cancel')).not.toBeNull();
+    });
+
+    it('starts the job and shows the active state', async () => {
+      const started: Job = { ...scheduledJob, status: 'IN_PROGRESS' };
+      const start = vi.fn().mockReturnValue(of(started));
+      await setup('3', scheduleApi(scheduledDetail, vi.fn(), start));
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      // Confirm step: the second Start Job button confirms.
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      expect(start).toHaveBeenCalledWith('3');
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('In progress');
+      expect(text).toContain('The job is active.');
+      expect(buttonWithText('Start Job')).toBeNull();
+    });
+
+    it('shows the starting state while the request is in flight', async () => {
+      const pending = new Subject<Job>();
+      const start = vi.fn().mockReturnValue(pending.asObservable());
+      await setup('3', scheduleApi(scheduledDetail, vi.fn(), start));
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      expect((fixture.nativeElement.textContent as string)).toContain('Starting…');
+      expect(buttonWithText('Starting…')?.disabled).toBe(true);
+      pending.next({ ...scheduledJob, status: 'IN_PROGRESS' });
+      fixture.detectChanges();
+      expect((fixture.nativeElement.textContent as string)).toContain('The job is active.');
+    });
+
+    it('surfaces start errors without losing the SCHEDULED state', async () => {
+      const start = vi
+        .fn()
+        .mockReturnValue(throwError(() => ({ error: { error: { code: 'VALIDATION_ERROR', message: 'This job cannot be started in its current state.' } } })));
+      await setup('3', scheduleApi(scheduledDetail, vi.fn(), start));
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      buttonWithText('Start Job')?.click();
+      fixture.detectChanges();
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('This job cannot be started in its current state.');
+      expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
+    });
   });
 });

@@ -387,6 +387,59 @@ transaction (§13.2) — never by the client. No new job tables or
 columns were created.
 
 
+## 10.4 Jobs — Stage 6E Implementation Notes (Scheduling & Start)
+
+Stage 6E implements provider scheduling and start
+(`backend/src/modules/quotes/` — the provider-identity service, plus
+`schedule.validation.ts`): the transitions
+
+ACCEPTED → SCHEDULED → IN_PROGRESS
+
+performed entirely server-side. The frontend never sends a status.
+
+- `POST /api/v1/jobs/:jobId/schedule` (requires
+  `Authorization: Bearer <accessToken>`, `PROFESSIONAL` /
+  `BUSINESS_OWNER` / `BUSINESS_MANAGER` roles) schedules an `ACCEPTED`
+  `MARKETPLACE` job addressed to the authenticated provider/business.
+  Request: `{ "scheduledAt": "2026-10-05T10:00:00+02:00" }` (ISO
+  date/time; the `scheduled_at`/`scheduledAt` alias is also read).
+  `scheduledAt` is required, must parse to a valid calendar date/time
+  (impossible dates such as `2026-02-30` are rejected) and must be in
+  the future — missing, malformed or past values return `422
+  VALIDATION_ERROR`. The instant is normalized to UTC ISO and stored
+  in `jobs.scheduled_at`, so the wall time the provider picked
+  (e.g. 10:00 SAST) is the instant every consumer reads — no silent
+  timezone shift.
+- On success (`200` with `{ job }`, message `Job scheduled
+  successfully`): the job becomes `SCHEDULED` and a
+  `job_status_history` entry (`ACCEPTED → SCHEDULED`, reason
+  `Provider scheduled job`) is written — atomically, in a single
+  transaction (a failure leaves the job `ACCEPTED` with no history
+  entry). The accepted quote is required: scheduling without an
+  `ACCEPTED` quote returns `422`.
+- `POST /api/v1/jobs/:jobId/start` (same provider roles, empty body)
+  starts a `SCHEDULED` job addressed to the authenticated
+  provider/business. On success (`200` with `{ job }`, message `Job
+  started successfully`): the job becomes `IN_PROGRESS` with a
+  `job_status_history` entry (`SCHEDULED → IN_PROGRESS`, reason
+  `Provider started job`), atomically.
+- State is enforced server-side: scheduling a `REQUESTED`/`QUOTED`
+  job, starting an `ACCEPTED` job, re-starting an `IN_PROGRESS` job,
+  or jumping straight to `COMPLETED` all return `422
+  VALIDATION_ERROR`. The frontend never sends a status.
+- Errors: malformed job ids → `400 VALIDATION_ERROR`; unknown jobs,
+  another provider's jobs and `INTERNAL` jobs → `404 NOT_FOUND` (no
+  cross-provider probing); `CUSTOMER`, `TECHNICIAN`-only and `ADMIN`
+  actors → `403 FORBIDDEN_ROLE`; unauthenticated → `401
+  UNAUTHORIZED`.
+- No new tables or columns were created — the existing `jobs.status`
+  ENUM, `jobs.scheduled_at` and `job_status_history` rows are reused.
+
+MVP payment position (unchanged): scheduling and starting never
+charge the customer; the agreed quote remains the recorded price the
+customer pays the professional directly outside the platform.
+
+
 # 11. Job Requests
 
 GET /api/v1/jobs/requests
@@ -440,8 +493,10 @@ Provider requests (inbox):
   `Authorization: Bearer <accessToken>`, `PROFESSIONAL` /
   `BUSINESS_OWNER` / `BUSINESS_MANAGER` roles) returns marketplace jobs
   addressed to the authenticated provider/business, newest first.
-  `status` optionally filters to `REQUESTED` and/or `QUOTED` (comma
-  separated, default both); anything else → `422 VALIDATION_ERROR`.
+  `status` optionally filters to `REQUESTED`, `QUOTED`, `ACCEPTED`,
+  `SCHEDULED` and/or `IN_PROGRESS` (comma separated; default all five
+  — Stages 6C–6E; terminal states such as `COMPLETED` are never inbox
+  states); anything else → `422 VALIDATION_ERROR`.
   `CUSTOMER`, `TECHNICIAN` and role-less accounts → `403
   FORBIDDEN_ROLE`.
 - `GET /api/v1/provider/requests/:id` returns one addressed request

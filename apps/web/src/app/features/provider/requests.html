@@ -28,6 +28,9 @@
           </h2>
           <p class="fl-card-text">{{ item.customer.displayName }} · {{ item.location }}</p>
           <p class="fl-card-text">{{ statusLabel(item.status) }} · Requested {{ item.createdAt }}</p>
+          @if ((item.status === 'SCHEDULED' || item.status === 'IN_PROGRESS') && item.scheduledAt) {
+            <p class="fl-card-text">Scheduled: {{ formatScheduled(item.scheduledAt) }}</p>
+          }
         </article>
       }
     </div>

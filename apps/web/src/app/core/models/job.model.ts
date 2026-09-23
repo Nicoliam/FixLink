@@ -1,12 +1,14 @@
 /**
- * FixLink job models — Stage 6B + 6C + 6D.
+ * FixLink job models — Stage 6B + 6C + 6D + 6E.
  *
  * Client-side projections of the customer job-request API
  * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id), the
  * Stage 6C provider request + quote API (GET /api/v1/provider/requests,
- * POST /api/v1/jobs/:id/quotes) and the Stage 6D customer acceptance
- * API (POST /api/v1/jobs/:id/quotes/:quoteId/accept). Execution and
- * payment arrive in later stages.
+ * POST /api/v1/jobs/:id/quotes), the Stage 6D customer acceptance API
+ * (POST /api/v1/jobs/:id/quotes/:quoteId/accept) and the Stage 6E
+ * provider scheduling/start API (POST /api/v1/jobs/:id/schedule,
+ * POST /api/v1/jobs/:id/start). Completion and payment arrive in later
+ * stages.
  */
 
 export type JobSource = 'MARKETPLACE' | 'INTERNAL';
@@ -201,4 +203,36 @@ export function jobStatusLabel(status: JobStatus): string {
     case 'DISPUTED':
       return 'Disputed';
   }
+}
+
+/**
+ * FixLink schedule display — Stage 6E.
+ *
+ * Formats a stored `scheduledAt` instant for South African viewers
+ * (Africa/Johannesburg, SAST = UTC+2 year-round, no daylight saving), so
+ * a provider slot of 10:00 SAST reads as 10:00 for the customer no matter
+ * which timezone the browser runs in. Returns '' for missing values and
+ * echoes unparseable values unchanged.
+ *
+ * Example: '2026-10-05T08:00:00.000Z' → '5 October 2026 at 10:00'.
+ */
+const SCHEDULE_TIME_ZONE = 'Africa/Johannesburg';
+
+export function formatScheduledAt(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime())) return iso;
+  const date = new Intl.DateTimeFormat('en-ZA', {
+    timeZone: SCHEDULE_TIME_ZONE,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(instant);
+  const time = new Intl.DateTimeFormat('en-ZA', {
+    timeZone: SCHEDULE_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(instant);
+  return `${date} at ${time}`;
 }

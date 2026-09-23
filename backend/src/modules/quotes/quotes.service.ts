@@ -19,12 +19,15 @@ import type { QuotesStore } from './quotes.store';
 import {
   JobNotAcceptableError,
   JobNotQuoteableError,
+  JobNotSchedulableError,
+  JobNotStartableError,
   QuoteAlreadyAcceptedError,
   QuoteConflictError,
   QuoteNotEligibleError,
 } from './quotes.store';
 import type { JobWithQuotes, ProviderRequestDto, QuoteDto } from './quotes.types';
 import { validateCreateQuote } from './quotes.validation';
+import { validateSchedule } from './schedule.validation';
 
 export interface ServiceResult<T> {
   status: number;
@@ -38,7 +41,13 @@ function fail<T>(status: number, code: string, message: string): ServiceResult<T
 }
 
 const PROVIDER_ROLES = ['PROFESSIONAL', 'BUSINESS_OWNER', 'BUSINESS_MANAGER'];
-const INBOX_STATUSES = ['REQUESTED', 'QUOTED'] as const;
+/**
+ * Stage 6E — the inbox covers every status a provider can act on or
+ * monitor: quoting (REQUESTED/QUOTED), scheduling (ACCEPTED), starting
+ * (SCHEDULED) and active work (IN_PROGRESS). Terminal states (COMPLETED,
+ * CONFIRMED, CLOSED, CANCELLED, DISPUTED) are never inbox states.
+ */
+const INBOX_STATUSES = ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS'] as const;
 type InboxStatus = (typeof INBOX_STATUSES)[number];
 
 interface ProviderIdentity {
@@ -111,7 +120,11 @@ export class QuotesService {
     const pageSize = readPage(query['pageSize'] ?? query['page_size'], 20, 50);
     const statuses = parseStatusFilter(query['status']);
     if (page === null || pageSize === null || statuses === null) {
-      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination or status. Use page 1–1000, pageSize 1–50, status REQUESTED or QUOTED.');
+      return fail(
+        422,
+        'VALIDATION_ERROR',
+        'Invalid pagination or status. Use page 1–1000, pageSize 1–50, status REQUESTED, QUOTED, ACCEPTED, SCHEDULED or IN_PROGRESS.',
+      );
     }
     const result = await this.quotes.listProviderRequests({
       professionalIds: resolved.identity.professionalIds,
@@ -275,6 +288,99 @@ export class QuotesService {
     void authUserId;
     const quotes = await this.quotes.listQuotesByJobId(job.id);
     return { ...job, quotes };
+  }
+
+  /**
+   * Stage 6E — provider scheduling (ACCEPTED → SCHEDULED).
+   *
+   * Only the addressed provider (PROFESSIONAL owner, BUSINESS_OWNER or
+   * BUSINESS_MANAGER of the job's business) may schedule, and only an
+   * ACCEPTED MARKETPLACE job with an accepted quote. The frontend never
+   * sends a status — the backend performs the transition. TECHNICIANS and
+   * CUSTOMERs have no scheduling identity; another provider's job reads
+   * as 404 so ids cannot be probed across providers.
+   */
+  async scheduleJob(
+    authUserId: string,
+    jobId: string,
+    body: unknown,
+  ): Promise<ServiceResult<{ job: JobWithQuotes }>> {
+    if (!/^[1-9][0-9]*$/.test(jobId.trim())) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const resolved = await this.resolveIdentity(authUserId);
+    if ('forbidden' in resolved) {
+      const roles = await this.users.getRoles(authUserId);
+      if (roles.includes('CUSTOMER')) {
+        return fail(403, 'FORBIDDEN_ROLE', 'Only service providers can schedule jobs.');
+      }
+      if (roles.includes('TECHNICIAN')) {
+        return fail(403, 'FORBIDDEN_ROLE', 'Technicians cannot schedule marketplace jobs.');
+      }
+      return fail(403, 'FORBIDDEN_ROLE', resolved.forbidden);
+    }
+    const job = await this.jobs.getJobById(jobId.trim());
+    // Addressed-to is part of existence: another provider's job reads as
+    // 404 so job ids cannot be probed across providers.
+    if (!job || job.source !== 'MARKETPLACE' || !this.isAddressedTo(job, resolved.identity)) {
+      return fail(404, 'NOT_FOUND', 'Job not found.');
+    }
+    const { scheduledAtIso, error } = validateSchedule(body);
+    if (!scheduledAtIso || error) {
+      const failure = error ?? { status: 422, code: 'VALIDATION_ERROR', message: 'Invalid schedule.' };
+      return fail(failure.status, failure.code, failure.message);
+    }
+    try {
+      await this.quotes.scheduleJob({ jobId: job.id, scheduledAtIso, scheduledBy: authUserId });
+      const refreshed = await this.jobs.getJobById(job.id);
+      if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      return { status: 200, data: { job: await this.getCustomerJobWithQuotes(authUserId, refreshed) } };
+    } catch (err) {
+      if (err instanceof JobNotSchedulableError) {
+        // Defensive store-level existence re-check (a lost race after
+        // the service checks above); everything else is a state error.
+        if (err.message === 'Job not found.') return fail(404, 'NOT_FOUND', err.message);
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Stage 6E — provider start (SCHEDULED → IN_PROGRESS). Same provider
+   * authorization as scheduling; TECHNICIANS are excluded in this stage.
+   */
+  async startJob(authUserId: string, jobId: string): Promise<ServiceResult<{ job: JobWithQuotes }>> {
+    if (!/^[1-9][0-9]*$/.test(jobId.trim())) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const resolved = await this.resolveIdentity(authUserId);
+    if ('forbidden' in resolved) {
+      const roles = await this.users.getRoles(authUserId);
+      if (roles.includes('CUSTOMER')) {
+        return fail(403, 'FORBIDDEN_ROLE', 'Only service providers can start jobs.');
+      }
+      if (roles.includes('TECHNICIAN')) {
+        return fail(403, 'FORBIDDEN_ROLE', 'Technicians cannot start marketplace jobs.');
+      }
+      return fail(403, 'FORBIDDEN_ROLE', resolved.forbidden);
+    }
+    const job = await this.jobs.getJobById(jobId.trim());
+    if (!job || job.source !== 'MARKETPLACE' || !this.isAddressedTo(job, resolved.identity)) {
+      return fail(404, 'NOT_FOUND', 'Job not found.');
+    }
+    try {
+      await this.quotes.startJob({ jobId: job.id, startedBy: authUserId });
+      const refreshed = await this.jobs.getJobById(job.id);
+      if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      return { status: 200, data: { job: await this.getCustomerJobWithQuotes(authUserId, refreshed) } };
+    } catch (err) {
+      if (err instanceof JobNotStartableError) {
+        if (err.message === 'Job not found.') return fail(404, 'NOT_FOUND', err.message);
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
   }
 
   private async authorizeJobQuotes(
