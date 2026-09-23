@@ -1,0 +1,158 @@
+@if (status() === 'loading') {
+  <div class="fl-page">
+    <div class="fl-state" role="status">
+      <p>Loading provider profile…</p>
+    </div>
+  </div>
+} @else if (status() === 'not-found') {
+  <div class="fl-page">
+    <div class="fl-state" role="status">
+      <h1 class="fl-state-title">Provider not found</h1>
+      <p class="fl-state-text">This profile may have been removed or the link is incorrect.</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="goToMarketplace()">Back to marketplace</button>
+    </div>
+  </div>
+} @else if (status() === 'error') {
+  <div class="fl-page">
+    <div class="fl-state fl-state-error" role="alert">
+      <h1 class="fl-state-title">Something went wrong</h1>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  </div>
+} @else if (profile(); as provider) {
+  <div class="fl-page">
+    <nav aria-label="Breadcrumb">
+      <a class="fl-link" routerLink="/marketplace">← Back to marketplace</a>
+    </nav>
+
+    <header class="fl-profile-hero">
+      <span class="fl-profile-avatar" aria-hidden="true">{{ provider.name.trim().charAt(0).toUpperCase() }}</span>
+      <div>
+        <p class="fl-eyebrow">{{ provider.providerType === 'business' ? 'Service business' : 'Professional' }}</p>
+        <h1 class="fl-page-title">{{ provider.name }}</h1>
+        <p class="fl-page-subtitle">{{ areaLabel(provider) }}</p>
+        <div class="fl-provider-badges">
+          @if (provider.isVerified) {
+            <span class="fl-pill fl-pill-verified">✓ Identity verified</span>
+          }
+          @if (provider.approvedCertificateCount > 0) {
+            <span class="fl-pill fl-pill-info">Trade certified</span>
+          }
+          @if (provider.ratingCount > 0) {
+            <span class="fl-provider-rating" aria-label="Rated {{ provider.ratingAvg }} out of 5">
+              ★ {{ provider.ratingAvg.toFixed(1) }} · {{ provider.ratingCount }} {{ provider.ratingCount === 1 ? 'review' : 'reviews' }}
+            </span>
+          } @else {
+            <span class="fl-provider-rating fl-provider-rating-new">New on FixLink</span>
+          }
+        </div>
+      </div>
+      <a class="fl-btn fl-btn-primary" [routerLink]="['/request-job']" [queryParams]="{ provider: provider.id }">
+        Request a job
+      </a>
+    </header>
+
+    @if (provider.bio) {
+      <section class="fl-card" aria-labelledby="fl-about-heading">
+        <h2 id="fl-about-heading" class="fl-card-title">About</h2>
+        <p class="fl-card-text">{{ provider.bio }}</p>
+        @if (provider.experienceYears !== null) {
+          <p class="fl-card-text"><strong>{{ provider.experienceYears }} years</strong> experience</p>
+        }
+      </section>
+    }
+
+    @if (provider.services.length > 0) {
+      <section class="fl-card" aria-labelledby="fl-services-heading">
+        <h2 id="fl-services-heading" class="fl-card-title">Services</h2>
+        <ul class="fl-tag-list">
+          @for (service of provider.services; track service.id) {
+            <li class="fl-pill fl-pill-info">{{ service.name }}</li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (provider.serviceAreas.length > 0) {
+      <section class="fl-card" aria-labelledby="fl-areas-heading">
+        <h2 id="fl-areas-heading" class="fl-card-title">Service area</h2>
+        <ul class="fl-area-list">
+          @for (area of provider.serviceAreas; track area.areaName) {
+            <li>{{ area.areaName }}@if (area.city) { · {{ area.city }} }@if (area.province) {, {{ area.province }}}</li>
+          }
+        </ul>
+      </section>
+    }
+
+    <section class="fl-card" aria-labelledby="fl-portfolio-heading">
+      <h2 id="fl-portfolio-heading" class="fl-card-title">Previous work</h2>
+      @if (portfolio().length === 0) {
+        <p class="fl-card-text" role="status">No published portfolio projects yet.</p>
+      } @else {
+        <div class="fl-portfolio-grid">
+          @for (project of portfolio(); track project.id) {
+            <article class="fl-portfolio-item">
+              <h3 class="fl-portfolio-title">{{ project.title }}</h3>
+              @if (project.service) {
+                <p class="fl-portfolio-service">{{ project.service.name }}</p>
+              }
+              @if (project.description) {
+                <p class="fl-card-text">{{ project.description }}</p>
+              }
+              @if (project.images.length > 0) {
+                <ul class="fl-portfolio-kinds" aria-label="Project photos for {{ project.title }}">
+                  @for (image of project.images; track image.id) {
+                    <li>
+                      <span class="fl-pill fl-pill-info">{{ image.kind === 'BEFORE' ? 'Before' : image.kind === 'AFTER' ? 'After' : 'Photo' }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="fl-card" aria-labelledby="fl-certs-heading">
+      <h2 id="fl-certs-heading" class="fl-card-title">Certificates</h2>
+      @if (certificates().length === 0) {
+        <p class="fl-card-text" role="status">No verified certificates yet.</p>
+      } @else {
+        <ul class="fl-cert-list">
+          @for (cert of certificates(); track cert.id) {
+            <li class="fl-cert-item">
+              <strong>{{ cert.title }}</strong>
+              @if (cert.issuingOrganisation) {
+                <span class="fl-cert-org"> · {{ cert.issuingOrganisation }}</span>
+              }
+              <span class="fl-pill fl-pill-verified">Approved</span>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="fl-card" aria-labelledby="fl-reviews-heading">
+      <h2 id="fl-reviews-heading" class="fl-card-title">Reviews ({{ reviewTotal() }})</h2>
+      @if (reviews().length === 0) {
+        <p class="fl-card-text" role="status">No reviews yet.</p>
+      } @else {
+        <ul class="fl-review-list">
+          @for (review of reviews(); track review.id) {
+            <li class="fl-review-item">
+              <p class="fl-review-meta">
+                <strong>{{ review.reviewerName }}</strong>
+                <span aria-label="Rated {{ review.rating }} out of 5">★ {{ review.rating }}/5</span>
+              </p>
+              @if (review.comment) {
+                <p class="fl-card-text">{{ review.comment }}</p>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+}

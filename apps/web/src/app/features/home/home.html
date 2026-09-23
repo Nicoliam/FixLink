@@ -1,40 +1,97 @@
-<div class="fl-landing">
-  <div class="fl-landing-card">
-    <img
-      ngSrc="brand/fixlink-logo.png"
-      width="178"
-      height="60"
-      priority
-      alt="FixLink — Connect. Quote. Fix."
-      class="fl-landing-logo"
-    />
-    <p class="fl-eyebrow">Connect. Quote. Fix.</p>
-    <h1 class="fl-landing-title">Trusted home services, across South Africa</h1>
-    <p class="fl-landing-text">
-      FixLink connects customers with verified professionals and service businesses —
-      from plumbing and electrical to painting, building and more.
-    </p>
-
-    @if (auth.isRestoring()) {
-      <p class="fl-landing-text" role="status">Checking your session…</p>
-    } @else if (auth.isAuthenticated() && auth.currentUser()) {
-      <p class="fl-landing-text" role="status">
-        Signed in as <strong>{{ auth.currentUser()?.email }}</strong>
+<div class="fl-home">
+  <section class="fl-hero" aria-labelledby="fl-hero-title">
+    <div class="fl-hero-inner">
+      <img
+        ngSrc="brand/fixlink-logo.png"
+        width="178"
+        height="60"
+        priority
+        alt="FixLink — Connect. Quote. Fix."
+        class="fl-landing-logo"
+      />
+      <p class="fl-eyebrow">Connect. Quote. Fix.</p>
+      <h1 id="fl-hero-title" class="fl-landing-title">Trusted home services, across South Africa</h1>
+      <p class="fl-landing-text">
+        Find verified professionals and service businesses — from plumbing and electrical
+        to painting, building and more.
       </p>
-      <div class="fl-landing-actions">
-        <a class="fl-btn fl-btn-primary" routerLink="/account">Go to my account</a>
-      </div>
+
+      <app-marketplace-search (searched)="onSearch($event)" />
+
+      @if (auth.isRestoring()) {
+        <p class="fl-landing-text" role="status">Checking your session…</p>
+      } @else if (auth.isAuthenticated() && auth.currentUser()) {
+        <p class="fl-landing-text" role="status">
+          Signed in as <strong>{{ auth.currentUser()?.email }}</strong>
+        </p>
+        <div class="fl-landing-actions">
+          <a class="fl-btn fl-btn-primary" routerLink="/account">Go to my account</a>
+          <a class="fl-btn fl-btn-secondary" routerLink="/marketplace">Browse marketplace</a>
+        </div>
+      } @else {
+        <div class="fl-landing-actions">
+          <a class="fl-btn fl-btn-primary" routerLink="/marketplace">Find a professional</a>
+          <a class="fl-btn fl-btn-secondary" routerLink="/register">Create an account</a>
+          <a class="fl-btn fl-btn-secondary" routerLink="/login">Log in</a>
+        </div>
+      }
+
+      <ul class="fl-trust-list" aria-label="Why FixLink">
+        <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Verified professionals</li>
+        <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Upfront quotes in Rand</li>
+        <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Before / During / After photo proof</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="fl-home-section" aria-labelledby="fl-categories-title">
+    <h2 id="fl-categories-title" class="fl-section-title">Browse by service</h2>
+    @if (categories().length > 0) {
+      <ul class="fl-category-grid">
+        @for (category of categories(); track category.id) {
+          <li>
+            <a
+              class="fl-category-card"
+              [routerLink]="['/marketplace']"
+              [queryParams]="{ category: category.slug }"
+            >
+              <strong>{{ category.name }}</strong>
+              @if (category.description) {
+                <span>{{ category.description }}</span>
+              }
+            </a>
+          </li>
+        }
+      </ul>
+    } @else if (categoriesFailed()) {
+      <p class="fl-state-text" role="status">
+        Service categories are unavailable right now — use search above instead.
+      </p>
     } @else {
-      <div class="fl-landing-actions">
-        <a class="fl-btn fl-btn-primary" routerLink="/register">Create an account</a>
-        <a class="fl-btn fl-btn-secondary" routerLink="/login">Log in</a>
+      <p class="fl-state-text" role="status">Loading services…</p>
+    }
+  </section>
+
+  <section class="fl-home-section" aria-labelledby="fl-featured-title">
+    <div class="fl-section-row">
+      <h2 id="fl-featured-title" class="fl-section-title">Featured providers</h2>
+      <a class="fl-link" routerLink="/marketplace">View all →</a>
+    </div>
+    @if (featuredStatus() === 'loading') {
+      <p class="fl-state-text" role="status">Loading providers…</p>
+    } @else if (featuredStatus() === 'error') {
+      <p class="fl-state-text" role="alert">
+        Could not load providers right now. <a class="fl-link" routerLink="/marketplace">Open the marketplace</a>
+        to try again.
+      </p>
+    } @else if (featuredStatus() === 'empty') {
+      <p class="fl-state-text" role="status">No providers are listed yet — check back soon.</p>
+    } @else {
+      <div class="fl-provider-grid">
+        @for (provider of featured(); track provider.id) {
+          <app-provider-card [provider]="provider" />
+        }
       </div>
     }
-
-    <ul class="fl-trust-list" aria-label="Why FixLink">
-      <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Verified professionals</li>
-      <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Upfront quotes in Rand</li>
-      <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Before / During / After photo proof</li>
-    </ul>
-  </div>
+  </section>
 </div>

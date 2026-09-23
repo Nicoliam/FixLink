@@ -7,20 +7,26 @@ import { makeAuthRoutes } from './modules/auth/auth.routes';
 import { MemoryRefreshStore, type RefreshStore } from './modules/auth/refresh.store';
 import { MemoryUserRepository } from './modules/auth/memory-user.repository';
 import { MysqlUserRepository } from './modules/auth/mysql-user.repository';
+import { makeMarketplaceRoutes } from './modules/marketplace/marketplace.routes';
+import { MemoryMarketplaceStore } from './modules/marketplace/memory-marketplace.store';
+import { MysqlMarketplaceStore } from './modules/marketplace/mysql-marketplace.store';
+import type { MarketplaceStore } from './modules/marketplace/marketplace.store';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
 
 export interface AppDeps {
   users: UserRepository;
   refreshStore: RefreshStore;
+  marketplace: MarketplaceStore;
 }
 
 export function resolveDeps(): AppDeps {
   const refreshStore = new MemoryRefreshStore();
   if (env.authStore === 'memory') {
-    return { users: new MemoryUserRepository(), refreshStore };
+    return { users: new MemoryUserRepository(), refreshStore, marketplace: new MemoryMarketplaceStore() };
   }
-  return { users: new MysqlUserRepository(getPool()), refreshStore };
+  const pool = getPool();
+  return { users: new MysqlUserRepository(pool), refreshStore, marketplace: new MysqlMarketplaceStore(pool) };
 }
 
 export function createApp(deps: AppDeps = resolveDeps()): express.Express {
@@ -36,6 +42,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   });
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));
+  app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

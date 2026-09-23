@@ -11,6 +11,7 @@
       />
     </a>
     <nav class="fl-nav" aria-label="Primary">
+      <a class="fl-link fl-nav-link" routerLink="/marketplace">Marketplace</a>
       @if (auth.isRestoring()) {
         <span class="fl-nav-status" role="status">Checking session…</span>
       } @else if (auth.isAuthenticated() && auth.currentUser()) {

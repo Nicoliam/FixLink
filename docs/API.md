@@ -191,6 +191,22 @@ GET /api/v1/categories
 GET /api/v1/categories/:id
 
 
+## 6.1 Services — Stage 6A Implementation Notes
+
+Stage 6A implements the public catalogue read endpoints
+(`backend/src/modules/marketplace/`). All are public (no authentication)
+and return active catalogue rows only.
+
+- `GET /api/v1/services` → `200 { items: Service[], total }`. Each service
+  carries its category (`categoryId`, `categoryName`, `categorySlug`).
+- `GET /api/v1/services/:id` → `200` service, `400 VALIDATION_ERROR` for a
+  malformed id, `404 NOT_FOUND` for an unknown id.
+- `GET /api/v1/categories` → `200 { items: Category[], total }`.
+- `GET /api/v1/categories/:id` → `200` / `400` / `404` as above.
+- Compatibility alias: `GET /api/v1/services/categories` serves the same
+  category list as `GET /api/v1/categories`.
+
+
 # 7. Professionals
 
 GET /api/v1/providers
@@ -210,6 +226,57 @@ PATCH /api/v1/providers/me
 GET /api/v1/providers/me/jobs
 
 GET /api/v1/providers/me/requests
+
+
+## 7.1 Marketplace discovery — Stage 6A Implementation Notes
+
+Stage 6A implements the public discovery endpoints only
+(`backend/src/modules/marketplace/`). Authenticated `providers/me` routes
+belong to a later stage. All discovery endpoints are public (no
+authentication) and enforce visibility server-side.
+
+### Provider ids
+
+Marketplace ids are opaque strings: `professional-<id>` or
+`business-<id>` (e.g. `professional-1`, `business-3`). Technicians never
+appear as marketplace providers. Malformed ids return
+`400 VALIDATION_ERROR`; unknown providers return `404 NOT_FOUND`.
+
+### Search
+
+`GET /api/v1/providers` supports (all optional, combined with AND):
+
+- `service` — service id, slug or name fragment (e.g. `leak-repair`)
+- `category` — category id, slug or name fragment (e.g. `electrical`)
+- `location` — suburb/city/province fragment matched against service
+  areas and business city (e.g. `Fourways`)
+- `providerType` — `professional` (alias `individual`) or `business`
+- `verified` — `true` restricts to backend-confirmed VERIFIED providers
+- `q` — free-text match across provider name, bio and service names
+- `page` (1–1000, default 1), `pageSize` (1–50, default 20)
+
+Response: `200 { items: ProviderCard[], total, page, pageSize }`,
+sorted by rating then review count. Unknown query parameters and
+out-of-range values return `422 VALIDATION_ERROR`. LIKE wildcards in
+input are escaped so they match literally.
+
+### Profiles and sub-resources
+
+- `GET /api/v1/providers/:id` → `200` public profile (trust info,
+  services, service areas, counts).
+- `GET /api/v1/providers/:id/portfolio` → `200 { items, total }` —
+  published projects only, with Before/After/General image metadata
+  (file references only, never binaries).
+- `GET /api/v1/providers/:id/certificates` → `200 { items, total }` —
+  APPROVED certificates only (title, organisation, dates). Certificate
+  `document_reference` values are never selected or returned.
+- `GET /api/v1/providers/:id/reviews?page=&pageSize=` → `200` paginated
+  visible reviews with reviewer display names only (first name + last
+  initial, e.g. `Aisha P.`); no customer contact details.
+
+Only active, non-deleted providers are ever returned. No passwords,
+tokens, ID documents, verification files, customer contact details,
+internal notes or audit data are exposed by any marketplace endpoint.
 
 
 # 8. Businesses

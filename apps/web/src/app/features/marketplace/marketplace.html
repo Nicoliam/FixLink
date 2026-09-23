@@ -1,0 +1,129 @@
+<div class="fl-page">
+  <div class="fl-page-header">
+    <p class="fl-eyebrow">Marketplace</p>
+    <h1 class="fl-page-title">Find a trusted professional</h1>
+    <p class="fl-page-subtitle">Search by service and suburb, then compare verified providers.</p>
+  </div>
+
+  <app-marketplace-search [service]="service()" [location]="location()" (searched)="onSearch($event)" />
+
+  <div class="fl-filters" aria-label="Marketplace filters">
+    <div class="fl-filter-group" role="group" aria-label="Provider type">
+      <button
+        type="button"
+        class="fl-chip"
+        [class.fl-chip-active]="providerType() === ''"
+        (click)="onProviderTypeChange('')"
+      >
+        All
+      </button>
+      <button
+        type="button"
+        class="fl-chip"
+        [class.fl-chip-active]="providerType() === 'professional'"
+        (click)="onProviderTypeChange('professional')"
+      >
+        Professionals
+      </button>
+      <button
+        type="button"
+        class="fl-chip"
+        [class.fl-chip-active]="providerType() === 'business'"
+        (click)="onProviderTypeChange('business')"
+      >
+        Businesses
+      </button>
+    </div>
+
+    <label class="fl-check">
+      <input
+        type="checkbox"
+        [checked]="verifiedOnly()"
+        (change)="onVerifiedChange($any($event.target).checked)"
+      />
+      Verified only
+    </label>
+
+    @if (categories().length > 0) {
+      <label class="fl-filter-select">
+        <span class="fl-visually-hidden">Filter by category</span>
+        <select
+          class="fl-input fl-input-sm"
+          [value]="category()"
+          (change)="onCategoryChange($any($event.target).value)"
+        >
+          <option value="">All categories</option>
+          @for (item of categories(); track item.id) {
+            <option [value]="item.slug">{{ item.name }}</option>
+          }
+        </select>
+      </label>
+    }
+  </div>
+
+  <div class="fl-results-meta" role="status" aria-live="polite">
+    @if (status() === 'loading') {
+      <span>Searching providers…</span>
+    } @else if (status() === 'error') {
+      <span>Search failed.</span>
+    } @else {
+      <span>{{ total() }} {{ total() === 1 ? 'provider' : 'providers' }} found</span>
+      @if (hasActiveFilters()) {
+        <button type="button" class="fl-link fl-clear" (click)="clearFilters()">Clear filters</button>
+      }
+    }
+  </div>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <div class="fl-skeleton-grid" aria-hidden="true">
+        <div class="fl-skeleton-card"></div>
+        <div class="fl-skeleton-card"></div>
+        <div class="fl-skeleton-card"></div>
+      </div>
+      <p>Loading providers…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  } @else if (status() === 'empty') {
+    <div class="fl-state" role="status">
+      <h2 class="fl-state-title">No providers found</h2>
+      <p class="fl-state-text">
+        Try a different service, suburb or category — or clear your filters to browse everyone.
+      </p>
+      <button type="button" class="fl-btn fl-btn-secondary" (click)="clearFilters()">Clear filters</button>
+    </div>
+  } @else {
+    <div class="fl-provider-grid">
+      @for (provider of providers(); track provider.id) {
+        <app-provider-card [provider]="provider" />
+      }
+    </div>
+
+    @if (totalPages() > 1) {
+      <nav class="fl-pagination" aria-label="Marketplace pages">
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary fl-btn-sm"
+          [disabled]="page() <= 1"
+          (click)="goToPage(page() - 1)"
+        >
+          Previous
+        </button>
+        <span role="status">Page {{ page() }} of {{ totalPages() }}</span>
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary fl-btn-sm"
+          [disabled]="page() >= totalPages()"
+          (click)="goToPage(page() + 1)"
+        >
+          Next
+        </button>
+      </nav>
+    }
+  }
+</div>

@@ -1,0 +1,44 @@
+<article class="fl-provider-card" [attr.aria-label]="provider().name">
+  <div class="fl-provider-top">
+    <span class="fl-provider-avatar" aria-hidden="true">{{ monogram(provider()) }}</span>
+    <div class="fl-provider-heading">
+      <h3 class="fl-provider-name">
+        <a [routerLink]="['/marketplace/providers', provider().id]">{{ provider().name }}</a>
+      </h3>
+      <p class="fl-provider-meta">{{ providerTypeLabel(provider()) }} · {{ areaLabel(provider()) }}</p>
+    </div>
+  </div>
+
+  <div class="fl-provider-badges">
+    @if (provider().isVerified) {
+      <span class="fl-pill fl-pill-verified">✓ Verified</span>
+    }
+    @if (provider().ratingCount > 0) {
+      <span class="fl-provider-rating" aria-label="Rated {{ provider().ratingAvg }} out of 5 from {{ provider().ratingCount }} reviews">
+        ★ {{ provider().ratingAvg.toFixed(1) }} ({{ provider().ratingCount }})
+      </span>
+    } @else {
+      <span class="fl-provider-rating fl-provider-rating-new">New on FixLink</span>
+    }
+  </div>
+
+  @if (provider().services.length > 0) {
+    <ul class="fl-provider-services" aria-label="Services offered">
+      @for (service of provider().services.slice(0, 3); track service.id) {
+        <li class="fl-pill fl-pill-info">{{ service.name }}</li>
+      }
+    </ul>
+  }
+
+  <div class="fl-provider-foot">
+    @if (provider().portfolioCount > 0) {
+      <span class="fl-provider-proof">{{ provider().portfolioCount }} portfolio {{ provider().portfolioCount === 1 ? 'project' : 'projects' }}</span>
+    }
+    @if (provider().approvedCertificateCount > 0) {
+      <span class="fl-provider-proof">{{ provider().approvedCertificateCount }} certified</span>
+    }
+    <a class="fl-btn fl-btn-secondary fl-btn-sm" [routerLink]="['/marketplace/providers', provider().id]">
+      View profile
+    </a>
+  </div>
+</article>
