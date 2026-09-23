@@ -54,6 +54,40 @@ describe('JobDetailComponent', () => {
     expect(text).toContain('Fourways, Johannesburg');
   });
 
+  it('shows a received quote without an accept action', async () => {
+    await setup(
+      '7',
+      vi.fn().mockReturnValue(
+        of({
+          ...job,
+          status: 'QUOTED',
+          quotes: [
+            {
+              id: '11',
+              jobId: '7',
+              provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
+              total: 1250,
+              currency: 'ZAR',
+              message: 'Supply and install replacement kitchen mixer tap.',
+              status: 'SUBMITTED',
+              items: [
+                { id: '1', description: 'Labour', quantity: 1, unitPrice: 950, total: 950, sortOrder: 0 },
+              ],
+              submittedAt: '2026-09-23T11:00:00.000Z',
+              createdAt: '2026-09-23T11:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+    );
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Quote received');
+    expect(text).toContain('R1,250');
+    expect(text).toContain('Supply and install replacement kitchen mixer tap.');
+    expect(text).toContain('Labour');
+    expect(text).not.toContain('Accept');
+  });
+
   it('shows the not-found state for unknown jobs', async () => {
     await setup(
       '9999',

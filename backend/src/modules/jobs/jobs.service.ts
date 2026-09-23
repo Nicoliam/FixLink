@@ -6,9 +6,14 @@
  * `status`, `source` or timestamp supplied by the browser is ignored.
  * Customer profiles are auto-provisioned on first request because Stage 5A
  * registration creates only `users` + `user_roles` rows.
+ *
+ * Stage 6C: the owned-job detail embeds the job's quotes (read-only here;
+ * quoting itself lives in the quotes module).
  */
 import type { MarketplaceStore } from '../marketplace/marketplace.store';
 import type { UserRepository } from '../users/user.repository';
+import type { JobQuotesReader } from '../quotes/quotes.store';
+import type { JobWithQuotes } from '../quotes/quotes.types';
 import type { JobsStore } from './jobs.store';
 import type { JobDto } from './jobs.types';
 import { validateCreateJob } from './jobs.validation';
@@ -55,6 +60,7 @@ export class JobsService {
     private readonly jobs: JobsStore,
     private readonly marketplace: MarketplaceStore,
     private readonly users: UserRepository,
+    private readonly quotes?: JobQuotesReader,
   ) {}
 
   async createMarketplaceJob(authUserId: string, authEmail: string, body: unknown): Promise<ServiceResult<JobDto>> {
@@ -131,7 +137,7 @@ export class JobsService {
     return { status: 200, data: { ...result, page, pageSize } };
   }
 
-  async getMyJobById(authUserId: string, jobId: string): Promise<ServiceResult<JobDto>> {
+  async getMyJobById(authUserId: string, jobId: string): Promise<ServiceResult<JobWithQuotes>> {
     const roles = await this.users.getRoles(authUserId);
     if (!roles.includes('CUSTOMER')) {
       return fail(403, 'FORBIDDEN_ROLE', 'Only customers can view their jobs.');
@@ -146,7 +152,8 @@ export class JobsService {
     if (!job || job.customerId !== customer?.id) {
       return fail(404, 'NOT_FOUND', 'Job not found.');
     }
-    return { status: 200, data: job };
+    const quotes = this.quotes ? await this.quotes.listQuotesByJobId(job.id) : [];
+    return { status: 200, data: { ...job, quotes } };
   }
 }
 

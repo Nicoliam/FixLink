@@ -34,17 +34,19 @@ export class MemoryJobsStore implements JobsStore {
   private customerSeq = 0;
   private readonly jobs = new Map<string, JobDto>();
   private readonly customerByUserId = new Map<string, CustomerProfileRef>();
+  private readonly customerNames = new Map<string, { firstName: string; lastName: string }>();
 
   async findCustomerProfileByUserId(userId: string): Promise<CustomerProfileRef | null> {
     return this.customerByUserId.get(userId) ?? null;
   }
 
-  async createCustomerProfile(userId: string, _provision: CustomerProvision): Promise<CustomerProfileRef> {
+  async createCustomerProfile(userId: string, provision: CustomerProvision): Promise<CustomerProfileRef> {
     const existing = this.customerByUserId.get(userId);
     if (existing) return existing;
     this.customerSeq += 1;
     const profile: CustomerProfileRef = { id: String(this.customerSeq) };
     this.customerByUserId.set(userId, profile);
+    this.customerNames.set(profile.id, { firstName: provision.firstName, lastName: provision.lastName });
     return profile;
   }
 
@@ -102,6 +104,24 @@ export class MemoryJobsStore implements JobsStore {
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     const start = (page - 1) * pageSize;
     return { items: owned.slice(start, start + pageSize), total: owned.length };
+  }
+
+  /**
+   * Stage 6C test helpers (mirror the `debug*` convention): the quotes
+   * store reads shared job rows so customer creation and provider quoting
+   * stay consistent in tests. Production uses SQL joins instead.
+   */
+  async debugAllJobs(): Promise<JobDto[]> {
+    return [...this.jobs.values()];
+  }
+
+  debugCustomerNames(customerId: string): { firstName: string; lastName: string } | null {
+    return this.customerNames.get(customerId) ?? null;
+  }
+
+  debugSetJobStatus(jobId: string, status: JobDto['status']): void {
+    const job = this.jobs.get(jobId);
+    if (job) this.jobs.set(jobId, { ...job, status, updatedAt: nowIso() });
   }
 }
 

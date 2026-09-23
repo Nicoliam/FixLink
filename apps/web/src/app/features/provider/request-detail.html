@@ -1,0 +1,125 @@
+@if (status() === 'loading') {
+  <div class="fl-page">
+    <div class="fl-state" role="status">
+      <p>Loading request…</p>
+    </div>
+  </div>
+} @else if (status() === 'not-found') {
+  <div class="fl-page">
+    <div class="fl-state" role="status">
+      <h1 class="fl-state-title">Request not found</h1>
+      <p class="fl-state-text">This request may have been removed or the link is incorrect.</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="goToRequests()">Back to Requests</button>
+    </div>
+  </div>
+} @else if (status() === 'error') {
+  <div class="fl-page">
+    <div class="fl-state fl-state-error" role="alert">
+      <h1 class="fl-state-title">Something went wrong</h1>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  </div>
+} @else if (request(); as detail) {
+  <div class="fl-page fl-page-narrow">
+    <nav aria-label="Breadcrumb">
+      <a class="fl-link" routerLink="/requests">← Back to Requests</a>
+    </nav>
+
+    <p class="fl-eyebrow">{{ detail.reference }}</p>
+    <h1 class="fl-page-title">{{ detail.service.name }}</h1>
+    <p class="fl-page-subtitle">
+      <span class="fl-pill">{{ statusLabel(detail.status) }}</span>
+    </p>
+
+    <section class="fl-card" aria-label="Request summary">
+      <p class="fl-card-label">Customer</p>
+      <p class="fl-card-title">{{ detail.customer.displayName }}</p>
+      <p class="fl-card-text">{{ detail.description }}</p>
+    </section>
+
+    <section class="fl-card" aria-label="Location and schedule">
+      <p class="fl-card-label">Location</p>
+      <p class="fl-card-text">{{ detail.location }}</p>
+      @if (detail.preferredDate) {
+        <p class="fl-card-label">Preferred date</p>
+        <p class="fl-card-text">{{ detail.preferredDate }}</p>
+      }
+      <p class="fl-card-label">Requested on</p>
+      <p class="fl-card-text">{{ detail.createdAt }}</p>
+    </section>
+
+    @if (createdQuote(); as quote) {
+      <section class="fl-card" aria-label="Submitted quote">
+        <p class="fl-card-label">Quote submitted</p>
+        <p class="fl-card-title">{{ formatAmount(quote.total) }} {{ quote.currency }}</p>
+        @if (quote.message) {
+          <p class="fl-card-text">{{ quote.message }}</p>
+        }
+        @if (quote.items.length > 0) {
+          <ul>
+            @for (item of quote.items; track item.id) {
+              <li class="fl-card-text">
+                {{ item.description }} — {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
+              </li>
+            }
+          </ul>
+        }
+        <p class="fl-card-text">The customer will review the details. Payment is arranged directly.</p>
+        <a class="fl-btn fl-btn-secondary" routerLink="/requests">Back to Requests</a>
+      </section>
+    } @else if (detail.status === 'REQUESTED') {
+      <section class="fl-card" aria-label="Submit a quote">
+        <p class="fl-card-label">Submit a quote (ZAR)</p>
+        <form class="fl-form" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <div class="fl-field">
+            <label class="fl-label" for="quote-total">Quote amount</label>
+            <input
+              id="quote-total"
+              class="fl-input"
+              type="number"
+              min="0"
+              step="0.01"
+              formControlName="total"
+              [attr.aria-invalid]="fieldInvalid(form.controls.total) ? 'true' : null"
+            />
+            @if (fieldInvalid(form.controls.total)) {
+              <p class="fl-field-error" role="alert">Enter a quote amount of 0 or more.</p>
+            }
+          </div>
+
+          <div class="fl-field">
+            <label class="fl-label" for="quote-message">Message (optional)</label>
+            <textarea id="quote-message" class="fl-input" rows="3" formControlName="message"></textarea>
+            @if (fieldInvalid(form.controls.message)) {
+              <p class="fl-field-error" role="alert">The message must be 2000 characters or fewer.</p>
+            }
+          </div>
+
+          <div class="fl-field">
+            <p class="fl-label">Line items (optional)</p>
+            @for (group of items.controls; track $index) {
+              <div [formGroup]="group">
+                <input class="fl-input fl-input-sm" formControlName="description" placeholder="Description" [attr.aria-label]="'Item ' + ($index + 1) + ' description'" />
+                <input class="fl-input fl-input-sm" type="number" min="0.01" step="0.01" formControlName="quantity" placeholder="Qty" [attr.aria-label]="'Item ' + ($index + 1) + ' quantity'" />
+                <input class="fl-input fl-input-sm" type="number" min="0" step="0.01" formControlName="unitPrice" placeholder="Unit price (R)" [attr.aria-label]="'Item ' + ($index + 1) + ' unit price'" />
+                <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="removeItem($index)">
+                  Remove
+                </button>
+              </div>
+            }
+            <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="addItem()">Add line item</button>
+          </div>
+
+          @if (submitError()) {
+            <p class="fl-alert-error" role="alert">{{ submitError() }}</p>
+          }
+          <button type="submit" class="fl-btn fl-btn-primary fl-btn-block" [disabled]="submitting()">
+            {{ submitting() ? 'Submitting…' : 'Submit quote' }}
+          </button>
+          <p class="fl-form-note">Submitting a quote does not charge the customer.</p>
+        </form>
+      </section>
+    }
+  </div>
+}

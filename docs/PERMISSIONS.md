@@ -420,3 +420,38 @@ Tests must verify that:
 
 If a user should not be allowed to perform an action, the backend must
 reject the request even if the frontend sends it manually.
+
+
+# 22. Stage 6C Implementation Notes — Provider Requests & Quotes
+
+Implemented 2026-09-23 (`backend/src/modules/quotes/`).
+
+- Provider identity is resolved server-side per request from
+  `professional_profiles.user_id` (individual professionals) and
+  `business_profiles.owner_user_id` plus active `business_members`
+  rows with role `BUSINESS_OWNER`/`BUSINESS_MANAGER` (businesses).
+  `TECHNICIAN` members, `CUSTOMER`s and role-less accounts have no
+  quoting identity and receive `403 FORBIDDEN_ROLE` on provider
+  endpoints.
+- A provider sees only marketplace jobs addressed to their own
+  professional profile or business (`GET /api/v1/provider/requests`,
+  `GET /api/v1/provider/requests/:id`). Another provider's request —
+  or quoting an unaddressed job — reads as `404 NOT_FOUND`, never
+  `403`, so request/job ids cannot be probed across providers.
+- Quote submission is restricted to the addressed provider while the
+  job is `REQUESTED`; the backend performs the `REQUESTED → QUOTED`
+  transition. A second active quote from the same provider is rejected
+  with `409 CONFLICT` — quotes are never silently overwritten.
+- Customer quote visibility is limited to the owning customer
+  (`GET /api/v1/jobs/:id` embeds `quotes`; `GET
+  /api/v1/jobs/:id/quotes`, `GET /api/v1/quotes/:id`). Provider
+  request detail exposes only a privacy-limited customer display name
+  (first name + last initial); no email, phone, ID documents or
+  admin-only information.
+- Admin platform quote management belongs to the later admin surface
+  (`/api/v1/admin/*`); ADMIN is not a quoting provider in this stage.
+
+Permission tests added (`backend/tests/quotes.test.ts`): unrelated
+providers/businesses isolated, technician/customer/admin rejection,
+malformed/unknown ids, duplicate-quote conflict, and failure
+atomicity (failed quote leaves the job `REQUESTED`).

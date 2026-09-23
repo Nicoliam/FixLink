@@ -1,0 +1,35 @@
+<div class="fl-page">
+  <p class="fl-eyebrow">Requests</p>
+  <h1 class="fl-page-title">Job requests</h1>
+  <p class="fl-page-subtitle">Review marketplace requests sent to you and respond with a quote.</p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading requests…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h1 class="fl-state-title">Something went wrong</h1>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  } @else if (status() === 'empty') {
+    <div class="fl-state" role="status">
+      <h1 class="fl-state-title">No requests yet</h1>
+      <p class="fl-state-text">New marketplace requests addressed to you will appear here.</p>
+    </div>
+  } @else {
+    <div class="fl-provider-grid">
+      @for (item of requests(); track item.id) {
+        <article class="fl-card">
+          <p class="fl-card-label">{{ item.reference }}</p>
+          <h2 class="fl-card-title">
+            <a class="fl-link" [routerLink]="['/requests', item.id]">{{ item.service.name }}</a>
+          </h2>
+          <p class="fl-card-text">{{ item.customer.displayName }} · {{ item.location }}</p>
+          <p class="fl-card-text">{{ statusLabel(item.status) }} · Requested {{ item.createdAt }}</p>
+        </article>
+      }
+    </div>
+  }
+</div>

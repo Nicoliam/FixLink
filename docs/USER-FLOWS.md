@@ -937,3 +937,29 @@ A flow is not considered complete until:
 - Empty state exists
 - Tests exist
 - Documentation matches implementation
+
+
+# 17. STAGE 6C IMPLEMENTATION NOTES — PROVIDER REQUESTS & QUOTES
+
+Implemented 2026-09-23. Covers flows §2.6 (Professional Receives
+Request, up to quote submission) and the read side of §2.7 (Customer
+Receives Quote, view only).
+
+Customer:
+
+REQUESTED → Quote received → QUOTED (read-only; the detail page shows
+"Quote received — review the details." No accept/decline actions yet —
+§2.8 and §2.9 belong to a later stage).
+
+Provider:
+
+View request (`/requests`) → Review job (`/requests/:id`) → Submit
+quote (ZAR amount, optional message, optional line items) → QUOTED.
+After submission the provider sees the submitted quote and the QUOTED
+status; the form is replaced so accidental duplicate submission is
+impossible (a repeated POST is rejected with `409 CONFLICT` anyway).
+
+Explicitly out of scope for Stage 6C: quote acceptance/decline/
+withdrawal, payment processing (the customer pays the professional
+directly outside the platform in MVP), scheduling beyond the existing
+preferred date/time, technician assignment, and notifications.

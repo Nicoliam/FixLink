@@ -12,19 +12,20 @@ import type { MarketplaceStore } from './marketplace.store';
 import { makeServicesController } from './services.controller';
 import { makeProvidersController } from './providers.controller';
 
-const marketplaceLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 300,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' } },
-});
-
 export function makeMarketplaceRoutes(store: MarketplaceStore): Router {
   const router = Router();
   const services = makeServicesController(store);
   const providers = makeProvidersController(store);
 
+  // Per-app limiter (created in the factory, not at module level) so each
+  // app instance — including every test app — gets an isolated store.
+  const marketplaceLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 300,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' } },
+  });
   router.use(marketplaceLimiter);
 
   router.get('/services', services.listServices);

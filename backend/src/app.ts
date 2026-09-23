@@ -15,6 +15,10 @@ import { makeJobsRoutes } from './modules/jobs/jobs.routes';
 import { MemoryJobsStore } from './modules/jobs/memory-jobs.store';
 import { MysqlJobsStore } from './modules/jobs/mysql-jobs.store';
 import type { JobsStore } from './modules/jobs/jobs.store';
+import { makeQuotesRoutes } from './modules/quotes/quotes.routes';
+import { MemoryQuotesStore } from './modules/quotes/memory-quotes.store';
+import { MysqlQuotesStore } from './modules/quotes/mysql-quotes.store';
+import type { QuotesStore } from './modules/quotes/quotes.store';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
 
@@ -24,24 +28,30 @@ export interface AppDeps {
   marketplace: MarketplaceStore;
   /** Optional so Stage 6A-era tests keep compiling; defaults to memory. */
   jobs?: JobsStore;
+  /** Optional so Stage 6B-era tests keep compiling; defaults to memory. */
+  quotes?: QuotesStore;
 }
 
 export function resolveDeps(): AppDeps {
   const refreshStore = new MemoryRefreshStore();
   if (env.authStore === 'memory') {
+    const jobs = new MemoryJobsStore();
     return {
       users: new MemoryUserRepository(),
       refreshStore,
       marketplace: new MemoryMarketplaceStore(),
-      jobs: new MemoryJobsStore(),
+      jobs,
+      quotes: new MemoryQuotesStore(jobs),
     };
   }
   const pool = getPool();
+  const jobs = new MysqlJobsStore(pool);
   return {
     users: new MysqlUserRepository(pool),
     refreshStore,
     marketplace: new MysqlMarketplaceStore(pool),
-    jobs: new MysqlJobsStore(pool),
+    jobs,
+    quotes: new MysqlQuotesStore(pool),
   };
 }
 
@@ -57,9 +67,17 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
     res.status(200).json({ success: true, data: { status: 'ok' }, message: 'OK' });
   });
 
+  const jobs = deps.jobs ?? new MemoryJobsStore();
+  // The quotes store must share job rows: reuse the resolved jobs store
+  // when it is the memory implementation, so tests stay consistent.
+  const quotes = deps.quotes ?? (jobs instanceof MemoryJobsStore ? new MemoryQuotesStore(jobs) : undefined);
+
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));
   app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
-  app.use('/api/v1', makeJobsRoutes(deps.users, deps.jobs ?? new MemoryJobsStore(), deps.marketplace));
+  app.use('/api/v1', makeJobsRoutes(deps.users, jobs, deps.marketplace, quotes));
+  if (quotes) {
+    app.use('/api/v1', makeQuotesRoutes(deps.users, jobs, quotes));
+  }
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

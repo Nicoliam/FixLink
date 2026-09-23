@@ -1,10 +1,11 @@
 /**
- * FixLink job models — Stage 6B.
+ * FixLink job models — Stage 6B + 6C.
  *
  * Client-side projections of the customer job-request API
- * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id).
- * Stage 6B covers creation only; quotes, execution and payment
- * arrive in later stages.
+ * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id) and the
+ * Stage 6C provider request + quote API (GET /api/v1/provider/requests,
+ * POST /api/v1/jobs/:id/quotes). Execution and payment arrive in later
+ * stages.
  */
 
 export type JobSource = 'MARKETPLACE' | 'INTERNAL';
@@ -50,6 +51,8 @@ export interface Job {
   scheduledAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Quotes submitted on this job (embedded in detail responses). */
+  quotes?: Quote[];
 }
 
 /** Body sent to POST /api/v1/jobs. Ownership is established server-side. */
@@ -68,6 +71,74 @@ export interface JobList {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** A line item on a submitted quote. Totals are derived server-side. */
+export interface QuoteItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  sortOrder: number;
+}
+
+export type QuoteStatus = 'DRAFT' | 'SUBMITTED' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN' | 'EXPIRED';
+
+/** A provider-submitted marketplace quote (Stage 6C: SUBMITTED only). */
+export interface Quote {
+  id: string;
+  jobId: string;
+  provider: JobProviderSummary;
+  total: number;
+  currency: string;
+  message: string | null;
+  status: QuoteStatus;
+  items: QuoteItem[];
+  submittedAt: string | null;
+  createdAt: string;
+}
+
+/** Body sent to POST /api/v1/jobs/:id/quotes. Ownership is server-side. */
+export interface CreateQuoteRequest {
+  total: number;
+  currency?: string;
+  message?: string;
+  items?: Array<{ description: string; quantity: number; unitPrice: number }>;
+}
+
+/** Provider-facing projection of a marketplace request. */
+export interface ProviderRequest {
+  id: string;
+  reference: string;
+  source: JobSource;
+  status: JobStatus;
+  provider: JobProviderSummary;
+  service: JobServiceSummary;
+  description: string;
+  location: string;
+  city: string | null;
+  province: string | null;
+  preferredDate: string | null;
+  scheduledAt: string | null;
+  createdAt: string;
+  customer: { displayName: string };
+  quotes: Quote[];
+}
+
+export interface ProviderRequestList {
+  items: ProviderRequest[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Format a quote amount in rand, e.g. 1250 → "R1,250". */
+export function formatZar(amount: number): string {
+  const rounded = Math.round(amount * 100) / 100;
+  const [whole, fraction] = rounded.toFixed(2).split('.') as [string, string];
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return fraction === '00' ? `R${grouped}` : `R${grouped}.${fraction}`;
 }
 
 /** Human-friendly label for the REQUESTED-family statuses shown to customers. */

@@ -369,6 +369,14 @@ execution, messaging, reviews and payment belong to later stages.
   cross-account probing). Non-customer roles → `403`.
 
 
+## 10.2 Jobs — Stage 6C Implementation Notes
+
+Stage 6C embeds the job's quotes in the owning customer's detail
+response: `GET /api/v1/jobs/:id` returns the job with a `quotes` array
+(`[]` when none). Quote submission itself lives in the quotes module
+(§13.1). No new job tables were created.
+
+
 # 11. Job Requests
 
 GET /api/v1/jobs/requests
@@ -408,6 +416,64 @@ POST /api/v1/quotes/:id/accept
 POST /api/v1/quotes/:id/decline
 
 POST /api/v1/quotes/:id/withdraw
+
+
+## 13.1 Quotes — Stage 6C Implementation Notes
+
+Stage 6C implements provider quote submission and retrieval only
+(`backend/src/modules/quotes/`). Acceptance, decline, withdrawal and
+quote editing belong to a later stage.
+
+Provider requests (inbox):
+
+- `GET /api/v1/provider/requests?page=&pageSize=&status=` (requires
+  `Authorization: Bearer <accessToken>`, `PROFESSIONAL` /
+  `BUSINESS_OWNER` / `BUSINESS_MANAGER` roles) returns marketplace jobs
+  addressed to the authenticated provider/business, newest first.
+  `status` optionally filters to `REQUESTED` and/or `QUOTED` (comma
+  separated, default both); anything else → `422 VALIDATION_ERROR`.
+  `CUSTOMER`, `TECHNICIAN` and role-less accounts → `403
+  FORBIDDEN_ROLE`.
+- `GET /api/v1/provider/requests/:id` returns one addressed request
+  with privacy-limited customer display info (`customer.displayName`,
+  e.g. `Thandi K.` — no email/phone) plus its quotes. Another
+  provider's request reads as `404 NOT_FOUND` (no cross-provider
+  probing); malformed ids → `400`.
+- Provider identity is derived server-side: the professional profile
+  owned via `professional_profiles.user_id`, or businesses owned via
+  `business_profiles.owner_user_id` / active `business_members` rows
+  (`BUSINESS_OWNER`/`BUSINESS_MANAGER`; `TECHNICIAN` members are never
+  marketplace providers). A provider-role user with no linked profile
+  sees an empty inbox (`200`, not an error).
+
+Quote submission:
+
+- `POST /api/v1/jobs/:id/quotes` (same provider roles) accepts
+  `{ total (≥ 0), currency? (default ZAR), message?, items? }` where
+  each item carries `{ description (1–255), quantity (> 0), unitPrice
+  (≥ 0) }`. Item totals are derived by the database, never trusted
+  from the client.
+- On success the quote is stored with `status = SUBMITTED` and the job
+  transitions `REQUESTED → QUOTED` with a `job_status_history` entry,
+  atomically (single transaction; the status update is guarded so a
+  failed creation can never leave the job `QUOTED`).
+- Errors: malformed job id → `400`; unknown/unaddressed job → `404`;
+  invalid amounts/items/message → `422`; second active quote from the
+  same provider → `409 CONFLICT` (existing quotes are never silently
+  overwritten); wrong role → `403`.
+- Success → `201` with the quote. The frontend must never send
+  `status = QUOTED` — the backend performs the transition.
+
+Quote retrieval:
+
+- `GET /api/v1/jobs/:id/quotes` → `200 { items, total }` for the
+  owning customer or the addressed provider (others → `404`).
+- `GET /api/v1/quotes/:id` → `200` quote under the same authorization.
+
+MVP payment position (unchanged): FixLink does not process customer
+payment. Quote submission does not charge the customer; the customer
+pays the professional directly outside the platform. Quote acceptance
+is NOT part of Stage 6C.
 
 
 # 14. Job Media

@@ -81,4 +81,59 @@ describe('JobService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({ success: true, data: { id: '7' }, message: 'ok' });
   });
+
+  it('lists provider requests with pagination', () => {
+    let result: unknown = null;
+    service.listProviderRequests(1, 20).subscribe((list) => (result = list));
+    const req = httpMock.expectOne((r) => r.url === `${API}/provider/requests`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('1');
+    expect(req.request.params.get('pageSize')).toBe('20');
+    expect(req.request.params.get('status')).toBeNull();
+    req.flush({ success: true, data: { items: [], total: 0, page: 1, pageSize: 20 }, message: 'ok' });
+    expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 20 });
+  });
+
+  it('fetches a single provider request by id', () => {
+    service.getProviderRequest('3').subscribe();
+    const req = httpMock.expectOne(`${API}/provider/requests/3`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: { id: '3' }, message: 'ok' });
+  });
+
+  it('posts a quote with trimmed fields and ZAR currency', () => {
+    let result: unknown = null;
+    service
+      .createQuote('3', {
+        total: 1250,
+        currency: 'zar',
+        message: '  Supply and install replacement kitchen mixer tap.  ',
+        items: [{ description: '  Labour  ', quantity: 1, unitPrice: 950 }],
+      })
+      .subscribe((quote) => (result = quote));
+    const req = httpMock.expectOne(`${API}/jobs/3/quotes`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      total: 1250,
+      currency: 'ZAR',
+      message: 'Supply and install replacement kitchen mixer tap.',
+      items: [{ description: '  Labour  ', quantity: 1, unitPrice: 950 }],
+    });
+    req.flush({ success: true, data: { id: '11', total: 1250 }, message: 'ok' });
+    expect(result).toEqual({ id: '11', total: 1250 });
+  });
+
+  it('lists quotes for a job and fetches a single quote', () => {
+    let items: unknown = null;
+    service.listJobQuotes('3').subscribe((quotes) => (items = quotes));
+    const listReq = httpMock.expectOne(`${API}/jobs/3/quotes`);
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush({ success: true, data: { items: [{ id: '11' }], total: 1 }, message: 'ok' });
+    expect(items).toEqual([{ id: '11' }]);
+
+    service.getQuote('11').subscribe();
+    const oneReq = httpMock.expectOne(`${API}/quotes/11`);
+    expect(oneReq.request.method).toBe('GET');
+    oneReq.flush({ success: true, data: { id: '11' }, message: 'ok' });
+  });
 });
