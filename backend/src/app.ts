@@ -11,6 +11,10 @@ import { makeMarketplaceRoutes } from './modules/marketplace/marketplace.routes'
 import { MemoryMarketplaceStore } from './modules/marketplace/memory-marketplace.store';
 import { MysqlMarketplaceStore } from './modules/marketplace/mysql-marketplace.store';
 import type { MarketplaceStore } from './modules/marketplace/marketplace.store';
+import { makeJobsRoutes } from './modules/jobs/jobs.routes';
+import { MemoryJobsStore } from './modules/jobs/memory-jobs.store';
+import { MysqlJobsStore } from './modules/jobs/mysql-jobs.store';
+import type { JobsStore } from './modules/jobs/jobs.store';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
 
@@ -18,15 +22,27 @@ export interface AppDeps {
   users: UserRepository;
   refreshStore: RefreshStore;
   marketplace: MarketplaceStore;
+  /** Optional so Stage 6A-era tests keep compiling; defaults to memory. */
+  jobs?: JobsStore;
 }
 
 export function resolveDeps(): AppDeps {
   const refreshStore = new MemoryRefreshStore();
   if (env.authStore === 'memory') {
-    return { users: new MemoryUserRepository(), refreshStore, marketplace: new MemoryMarketplaceStore() };
+    return {
+      users: new MemoryUserRepository(),
+      refreshStore,
+      marketplace: new MemoryMarketplaceStore(),
+      jobs: new MemoryJobsStore(),
+    };
   }
   const pool = getPool();
-  return { users: new MysqlUserRepository(pool), refreshStore, marketplace: new MysqlMarketplaceStore(pool) };
+  return {
+    users: new MysqlUserRepository(pool),
+    refreshStore,
+    marketplace: new MysqlMarketplaceStore(pool),
+    jobs: new MysqlJobsStore(pool),
+  };
 }
 
 export function createApp(deps: AppDeps = resolveDeps()): express.Express {
@@ -43,6 +59,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));
   app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
+  app.use('/api/v1', makeJobsRoutes(deps.users, deps.jobs ?? new MemoryJobsStore(), deps.marketplace));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

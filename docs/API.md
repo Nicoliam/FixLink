@@ -336,6 +336,39 @@ POST /api/v1/jobs/:id/updates
 POST /api/v1/jobs/:id/complete
 
 
+## 10.1 Jobs — Stage 6B Implementation Notes
+
+Stage 6B implements customer job-request creation and retrieval only
+(`backend/src/modules/jobs/`). Status changes, quotes, assignment,
+execution, messaging, reviews and payment belong to later stages.
+
+- `POST /api/v1/jobs` (requires `Authorization: Bearer <accessToken>`,
+  `CUSTOMER` role) creates a job in the ONE shared `jobs` table with
+  `source = MARKETPLACE` and `status = REQUESTED` → `201` with the job.
+  Request: `{ providerId, serviceId, description, location,
+  preferredDate? (YYYY-MM-DD), preferredTime? (HH:MM 24h), notes? }`.
+  The customer is derived from the session — any `customer_id`,
+  `status`, `source` or timestamp in the body is ignored. The initial
+  `job_status_history` entry (`NULL → REQUESTED`) and the provider
+  `job_assignments` row are written in the same operation. The free-text
+  `location` is stored in `jobs.address_line1` (no separate suburb
+  column exists); `preferredDate`/`preferredTime` combine into
+  `jobs.scheduled_at` (09:00 default when no time is given). Optional
+  `notes` are validated but not persisted — file/photo infrastructure
+  arrives in a later stage.
+- Customer profiles are auto-provisioned on first request (Stage 5A
+  registration creates `users` + `user_roles` only).
+- Validation: malformed provider/service ids → `400 VALIDATION_ERROR`;
+  unknown provider or service → `404 NOT_FOUND`; provider does not offer
+  the service → `422 VALIDATION_ERROR`; description/location/date/time
+  problems → `422 VALIDATION_ERROR`. Non-customer roles → `403
+  FORBIDDEN_ROLE`; missing/invalid tokens → `401 UNAUTHORIZED`.
+- `GET /api/v1/jobs?page=&pageSize=` → `200` paginated owned jobs
+  (newest first). `GET /api/v1/jobs/:id` → `200` owned job, `400` for a
+  malformed id. Another customer's job reads as `404 NOT_FOUND` (no
+  cross-account probing). Non-customer roles → `403`.
+
+
 # 11. Job Requests
 
 GET /api/v1/jobs/requests

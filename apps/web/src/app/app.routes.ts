@@ -3,7 +3,9 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 /**
  * Stage 6A routes — authentication foundation + marketplace discovery.
- * Role dashboards and the job lifecycle arrive in later stages.
+ * Stage 6B adds the customer job request (`/request-job` submission)
+ * and My Jobs (`/my-jobs`) retrieval.
+ * Role dashboards and the quote lifecycle arrive in later stages.
  */
 export const routes: Routes = [
   {
@@ -27,6 +29,16 @@ export const routes: Routes = [
   {
     path: 'request-job',
     loadComponent: () => import('./features/marketplace/request-job').then((m) => m.RequestJobComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'my-jobs',
+    loadComponent: () => import('./features/jobs/my-jobs').then((m) => m.MyJobsComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'my-jobs/:id',
+    loadComponent: () => import('./features/jobs/job-detail').then((m) => m.JobDetailComponent),
     canActivate: [authGuard],
   },
   {

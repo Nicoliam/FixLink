@@ -7,104 +7,127 @@
   <h1 class="fl-page-title">Tell us what needs fixing</h1>
   <p class="fl-page-subtitle">Payment is arranged directly with your professional — FixLink never charges you here.</p>
 
-  @if (providerLoading()) {
-    <div class="fl-card" role="status"><p class="fl-card-text">Loading provider…</p></div>
-  } @else if (provider(); as selected) {
-    <div class="fl-card fl-provider-summary">
-      <div>
-        <p class="fl-card-label">Requesting</p>
-        <p class="fl-card-title">
-          <a class="fl-link" [routerLink]="['/marketplace/providers', selected.id]">{{ selected.name }}</a>
-        </p>
-        @if (selected.isVerified) {
-          <span class="fl-pill fl-pill-verified">✓ Verified</span>
+  @if (createdJob(); as job) {
+    <div class="fl-success" role="status">
+      <span class="fl-success-badge" aria-hidden="true">✓</span>
+      <p class="fl-success-title">Job request submitted</p>
+      <p class="fl-success-text">
+        Your request has been sent to {{ job.provider.name }}.
+        Reference {{ job.reference }} · {{ serviceName(job.service.id) }} · Status: Requested.
+        @if (job.preferredDate) {
+          Preferred date: {{ job.preferredDate }}.
         }
-      </div>
-    </div>
-  } @else if (providerMissing()) {
-    <div class="fl-card" role="status">
-      <p class="fl-card-text">
-        No provider selected yet. <a class="fl-link" routerLink="/marketplace">Browse the marketplace</a>
-        and choose “Request a job” on a profile — or continue with a general request below.
+      </p>
+      <p>
+        <a class="fl-link" [routerLink]="['/my-jobs', job.id]">View this request</a>
+        ·
+        <a class="fl-link" routerLink="/my-jobs">Go to My Jobs</a>
       </p>
     </div>
   } @else {
-    <div class="fl-card" role="status">
-      <p class="fl-card-text">
-        We could not load that provider, but you can still describe your job below.
-        <a class="fl-link" routerLink="/marketplace">Choose a different provider</a>
-      </p>
-    </div>
-  }
-
-  <form class="fl-card fl-form" [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Request a job">
-    <div class="fl-field">
-      <label class="fl-label" for="rj-service">Service</label>
-      <select id="rj-service" class="fl-input" formControlName="serviceId" [attr.aria-invalid]="fieldInvalid('serviceId')">
-        <option value="">Select a service…</option>
-        @for (option of services(); track option.id) {
-          <option [value]="option.id">{{ option.name }} ({{ option.categoryName }})</option>
-        }
-      </select>
-      @if (fieldInvalid('serviceId')) {
-        <p class="fl-field-error" role="alert">Please choose a service.</p>
-      }
-    </div>
-
-    <div class="fl-field">
-      <label class="fl-label" for="rj-description">Describe the work</label>
-      <textarea
-        id="rj-description"
-        class="fl-input"
-        rows="4"
-        formControlName="description"
-        placeholder="What needs fixing, where is it, and anything the professional should know…"
-        [attr.aria-invalid]="fieldInvalid('description')"
-      ></textarea>
-      @if (fieldInvalid('description')) {
-        <p class="fl-field-error" role="alert">Please describe the work (at least 20 characters).</p>
-      }
-    </div>
-
-    <div class="fl-field">
-      <label class="fl-label" for="rj-location">Suburb / Location</label>
-      <input
-        id="rj-location"
-        class="fl-input"
-        type="text"
-        formControlName="location"
-        placeholder="Fourways, Johannesburg"
-        autocomplete="off"
-        [attr.aria-invalid]="fieldInvalid('location')"
-      />
-      @if (fieldInvalid('location')) {
-        <p class="fl-field-error" role="alert">Please add the job location.</p>
-      }
-    </div>
-
-    <div class="fl-field">
-      <label class="fl-label" for="rj-date">Preferred date <span class="fl-optional">(optional)</span></label>
-      <input id="rj-date" class="fl-input" type="date" formControlName="preferredDate" />
-    </div>
-
-    <div class="fl-field">
-      <label class="fl-label" for="rj-photo">Photos <span class="fl-optional">(optional)</span></label>
-      <input id="rj-photo" class="fl-input" type="file" accept="image/*" multiple disabled aria-describedby="rj-photo-help" />
-      <p id="rj-photo-help" class="fl-form-note">Photo uploads connect in the next stage — describe anything visual above for now.</p>
-    </div>
-
-    @if (submitted() && form.valid) {
-      <div class="fl-success" role="status">
-        <span class="fl-success-badge" aria-hidden="true">✓</span>
-        <p class="fl-success-title">Your request is ready</p>
-        <p class="fl-success-text">
-          Job submission connects in the next stage. Your details above are kept on this page —
-          nothing has been sent yet.
+    @if (providerLoading()) {
+      <div class="fl-card" role="status"><p class="fl-card-text">Loading provider…</p></div>
+    } @else if (provider(); as selected) {
+      <div class="fl-card fl-provider-summary">
+        <div>
+          <p class="fl-card-label">Requesting</p>
+          <p class="fl-card-title">
+            <a class="fl-link" [routerLink]="['/marketplace/providers', selected.id]">{{ selected.name }}</a>
+          </p>
+          @if (selected.isVerified) {
+            <span class="fl-pill fl-pill-verified">✓ Verified</span>
+          }
+        </div>
+      </div>
+    } @else if (providerMissing()) {
+      <div class="fl-card" role="status">
+        <p class="fl-card-text">
+          No provider selected yet. <a class="fl-link" routerLink="/marketplace">Browse the marketplace</a>
+          and choose “Request a job” on a profile.
+        </p>
+      </div>
+    } @else {
+      <div class="fl-card" role="status">
+        <p class="fl-card-text">
+          We could not load that provider.
+          <a class="fl-link" routerLink="/marketplace">Choose a different provider</a>
         </p>
       </div>
     }
 
-    <button class="fl-btn fl-btn-primary fl-btn-block" type="submit">Review request</button>
-    <p class="fl-form-note">You will confirm everything before anything is sent.</p>
-  </form>
+    <form class="fl-card fl-form" [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Request a job">
+      <div class="fl-field">
+        <label class="fl-label" for="rj-service">Service</label>
+        <select id="rj-service" class="fl-input" formControlName="serviceId" [attr.aria-invalid]="fieldInvalid('serviceId')">
+          <option value="">Select a service…</option>
+          @for (option of services(); track option.id) {
+            <option [value]="option.id">{{ option.name }} ({{ option.categoryName }})</option>
+          }
+        </select>
+        @if (fieldInvalid('serviceId')) {
+          <p class="fl-field-error" role="alert">Please choose a service.</p>
+        }
+      </div>
+
+      <div class="fl-field">
+        <label class="fl-label" for="rj-description">Describe the work</label>
+        <textarea
+          id="rj-description"
+          class="fl-input"
+          rows="4"
+          formControlName="description"
+          placeholder="What needs fixing, where is it, and anything the professional should know…"
+          [attr.aria-invalid]="fieldInvalid('description')"
+        ></textarea>
+        @if (fieldInvalid('description')) {
+          <p class="fl-field-error" role="alert">Please describe the work (at least 20 characters).</p>
+        }
+      </div>
+
+      <div class="fl-field">
+        <label class="fl-label" for="rj-location">Suburb / Location</label>
+        <input
+          id="rj-location"
+          class="fl-input"
+          type="text"
+          formControlName="location"
+          placeholder="Fourways, Johannesburg"
+          autocomplete="off"
+          [attr.aria-invalid]="fieldInvalid('location')"
+        />
+        @if (fieldInvalid('location')) {
+          <p class="fl-field-error" role="alert">Please add the job location.</p>
+        }
+      </div>
+
+      <div class="fl-field">
+        <label class="fl-label" for="rj-date">Preferred date <span class="fl-optional">(optional)</span></label>
+        <input id="rj-date" class="fl-input" type="date" formControlName="preferredDate" />
+      </div>
+
+      <div class="fl-field">
+        <label class="fl-label" for="rj-time">Preferred time <span class="fl-optional">(optional)</span></label>
+        <input id="rj-time" class="fl-input" type="time" formControlName="preferredTime" />
+      </div>
+
+      <div class="fl-field">
+        <label class="fl-label" for="rj-photo">Photos <span class="fl-optional">(optional)</span></label>
+        <input id="rj-photo" class="fl-input" type="file" accept="image/*" multiple disabled aria-describedby="rj-photo-help" />
+        <p id="rj-photo-help" class="fl-form-note">Photo uploads arrive in a later stage — describe anything visual above for now.</p>
+      </div>
+
+      @if (submitError()) {
+        <p class="fl-field-error" role="alert">{{ submitError() }}</p>
+      }
+
+      <button class="fl-btn fl-btn-primary fl-btn-block" type="submit" [disabled]="submitting()">
+        @if (submitting()) {
+          Submitting…
+        } @else {
+          Submit request
+        }
+      </button>
+      <p class="fl-form-note">Your request is sent to the professional as soon as you submit.</p>
+    </form>
+  }
 </div>

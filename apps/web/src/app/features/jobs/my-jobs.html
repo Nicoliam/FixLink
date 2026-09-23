@@ -1,0 +1,43 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/marketplace">← Back to marketplace</a>
+  </nav>
+
+  <p class="fl-eyebrow">My jobs</p>
+  <h1 class="fl-page-title">Your job requests</h1>
+  <p class="fl-page-subtitle">Track the requests you have sent to professionals.</p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading your jobs…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h1 class="fl-state-title">Something went wrong</h1>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  } @else if (status() === 'empty') {
+    <div class="fl-state" role="status">
+      <h1 class="fl-state-title">No job requests yet</h1>
+      <p class="fl-state-text">Find a professional in the marketplace and send your first request.</p>
+      <a class="fl-btn fl-btn-primary" routerLink="/marketplace">Browse the marketplace</a>
+    </div>
+  } @else {
+    <div class="fl-provider-grid">
+      @for (job of jobs(); track job.id) {
+        <article class="fl-card">
+          <p class="fl-card-label">{{ job.reference }}</p>
+          <h2 class="fl-card-title">
+            <a class="fl-link" [routerLink]="['/my-jobs', job.id]">{{ job.service.name }}</a>
+          </h2>
+          <p class="fl-card-text">{{ job.provider.name }} · {{ statusLabel(job.status) }}</p>
+          <p class="fl-card-text">{{ job.location }}</p>
+          @if (job.preferredDate) {
+            <p class="fl-card-text">Preferred date: {{ job.preferredDate }}</p>
+          }
+        </article>
+      }
+    </div>
+  }
+</div>

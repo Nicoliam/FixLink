@@ -1,0 +1,60 @@
+@if (status() === 'loading') {
+  <div class="fl-page">
+    <div class="fl-state" role="status">
+      <p>Loading job…</p>
+    </div>
+  </div>
+} @else if (status() === 'not-found') {
+  <div class="fl-page">
+    <div class="fl-state" role="status">
+      <h1 class="fl-state-title">Job not found</h1>
+      <p class="fl-state-text">This request may have been removed or the link is incorrect.</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="goToMyJobs()">Back to My Jobs</button>
+    </div>
+  </div>
+} @else if (status() === 'error') {
+  <div class="fl-page">
+    <div class="fl-state fl-state-error" role="alert">
+      <h1 class="fl-state-title">Something went wrong</h1>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  </div>
+} @else if (job(); as detail) {
+  <div class="fl-page fl-page-narrow">
+    <nav aria-label="Breadcrumb">
+      <a class="fl-link" routerLink="/my-jobs">← Back to My Jobs</a>
+    </nav>
+
+    <p class="fl-eyebrow">{{ detail.reference }}</p>
+    <h1 class="fl-page-title">{{ detail.service.name }}</h1>
+    <p class="fl-page-subtitle">
+      <span class="fl-pill">{{ statusLabel(detail.status) }}</span>
+    </p>
+
+    <section class="fl-card" aria-label="Request summary">
+      <p class="fl-card-label">Provider</p>
+      <p class="fl-card-title">{{ detail.provider.name }}</p>
+      <p class="fl-card-text">{{ detail.description }}</p>
+    </section>
+
+    <section class="fl-card" aria-label="Location and schedule">
+      <p class="fl-card-label">Location</p>
+      <p class="fl-card-text">{{ detail.location }}</p>
+      @if (detail.preferredDate) {
+        <p class="fl-card-label">Preferred date</p>
+        <p class="fl-card-text">{{ detail.preferredDate }}</p>
+      }
+      <p class="fl-card-label">Requested on</p>
+      <p class="fl-card-text">{{ detail.createdAt }}</p>
+    </section>
+
+    <section class="fl-card" aria-label="What happens next">
+      <p class="fl-card-label">What happens next</p>
+      <p class="fl-card-text">
+        Your request has been sent to {{ detail.provider.name }}. They will respond with a quote —
+        payment is arranged directly with them.
+      </p>
+    </section>
+  </div>
+}
