@@ -1,25 +1,37 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { map, Observable } from 'rxjs';
 import { API_BASE_URL } from '../config/api-config';
 import type { ApiSuccess } from '../models/api.model';
 import type {
   Business,
+  BusinessCustomer,
+  BusinessCustomerList,
+  BusinessJob,
+  BusinessJobDetail,
+  BusinessJobList,
+  BusinessJobListParams,
+  BusinessJobsSummary,
+  CreateBusinessCustomerRequest,
+  CreateBusinessJobRequest,
   CreateTechnicianRequest,
   Technician,
   TechnicianList,
+  UpdateBusinessCustomerRequest,
+  UpdateBusinessJobRequest,
   UpdateBusinessRequest,
   UpdateTechnicianRequest,
 } from '../models/business.model';
 
 /**
  * FixLink business API client — Stage 7A (business foundation +
- * technician management).
+ * technician management) + Stage 7B (business-managed customers and
+ * internal jobs).
  *
  * Single owner of business calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); the business is derived
  * by the backend from the session membership, never from these payloads.
- * Job assignment arrives in a later stage.
+ * Technician assignment arrives in a later stage.
  */
 @Injectable({ providedIn: 'root' })
 export class BusinessService {
@@ -83,6 +95,125 @@ export class BusinessService {
     if (payload.isActive !== undefined) body['isActive'] = payload.isActive;
     return this.http
       .patch<ApiSuccess<Technician>>(`${this.baseUrl}/business/technicians/${encodeURIComponent(id)}`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /** List customers belonging to the authenticated user's business. */
+  listBusinessCustomers(params: BusinessJobListParams = {}): Observable<BusinessCustomerList> {
+    let httpParams = new HttpParams();
+    if (params.search?.trim()) httpParams = httpParams.set('search', params.search.trim());
+    if (params.page) httpParams = httpParams.set('page', String(params.page));
+    if (params.pageSize) httpParams = httpParams.set('pageSize', String(params.pageSize));
+    return this.http
+      .get<ApiSuccess<BusinessCustomerList>>(`${this.baseUrl}/business/customers`, { params: httpParams })
+      .pipe(map((res) => res.data));
+  }
+
+  /** Retrieve one business-managed customer. */
+  getBusinessCustomer(id: string): Observable<BusinessCustomer> {
+    return this.http
+      .get<ApiSuccess<BusinessCustomer>>(`${this.baseUrl}/business/customers/${encodeURIComponent(id)}`)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Create a business-managed customer (no login — private to the business). */
+  createBusinessCustomer(payload: CreateBusinessCustomerRequest): Observable<BusinessCustomer> {
+    const body: Record<string, string> = {};
+    if (payload.firstName?.trim()) body['firstName'] = payload.firstName.trim();
+    if (payload.lastName?.trim()) body['lastName'] = payload.lastName.trim();
+    if (payload.name?.trim()) body['name'] = payload.name.trim();
+    if (payload.email?.trim()) body['email'] = payload.email.trim();
+    if (payload.phone?.trim()) body['phone'] = payload.phone.trim();
+    if (payload.preferredContact) body['preferredContact'] = payload.preferredContact;
+    return this.http
+      .post<ApiSuccess<BusinessCustomer>>(`${this.baseUrl}/business/customers`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Update a business-managed customer. */
+  updateBusinessCustomer(id: string, payload: UpdateBusinessCustomerRequest): Observable<BusinessCustomer> {
+    const body: Record<string, string | null> = {};
+    if (payload.firstName?.trim()) body['firstName'] = payload.firstName.trim();
+    if (payload.lastName?.trim()) body['lastName'] = payload.lastName.trim();
+    if (payload.email !== undefined) body['email'] = payload.email?.trim() ? (payload.email as string).trim() : null;
+    if (payload.phone !== undefined) body['phone'] = payload.phone?.trim() ? (payload.phone as string).trim() : null;
+    if (payload.preferredContact !== undefined) body['preferredContact'] = payload.preferredContact;
+    return this.http
+      .patch<ApiSuccess<BusinessCustomer>>(`${this.baseUrl}/business/customers/${encodeURIComponent(id)}`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /** List INTERNAL jobs belonging to the authenticated user's business. */
+  listBusinessJobs(params: BusinessJobListParams = {}): Observable<BusinessJobList> {
+    let httpParams = new HttpParams();
+    if (params.status?.trim()) httpParams = httpParams.set('status', params.status.trim());
+    if (params.search?.trim()) httpParams = httpParams.set('search', params.search.trim());
+    if (params.page) httpParams = httpParams.set('page', String(params.page));
+    if (params.pageSize) httpParams = httpParams.set('pageSize', String(params.pageSize));
+    return this.http
+      .get<ApiSuccess<BusinessJobList>>(`${this.baseUrl}/business/jobs`, { params: httpParams })
+      .pipe(map((res) => res.data));
+  }
+
+  /** Retrieve one INTERNAL job with its status-history timeline. */
+  getBusinessJob(id: string): Observable<BusinessJobDetail> {
+    return this.http
+      .get<ApiSuccess<BusinessJobDetail>>(`${this.baseUrl}/business/jobs/${encodeURIComponent(id)}`)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Create an INTERNAL job (the backend sets source INTERNAL, status REQUESTED). */
+  createBusinessJob(payload: CreateBusinessJobRequest): Observable<BusinessJob> {
+    const body: Record<string, string> = {
+      customerId: payload.customerId,
+      serviceId: payload.serviceId,
+      description: payload.description.trim(),
+    };
+    if (payload.title?.trim()) body['title'] = payload.title.trim();
+    const address = payload.addressLine1?.trim() || payload.address?.trim();
+    if (address) body['addressLine1'] = address;
+    if (payload.city?.trim()) body['city'] = payload.city.trim();
+    if (payload.province?.trim()) body['province'] = payload.province.trim();
+    if (payload.postalCode?.trim()) body['postalCode'] = payload.postalCode.trim();
+    if (payload.priority) body['priority'] = payload.priority;
+    if (payload.scheduledAt?.trim()) body['scheduledAt'] = payload.scheduledAt.trim();
+    return this.http
+      .post<ApiSuccess<BusinessJob>>(`${this.baseUrl}/business/jobs`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Update permitted fields of a REQUESTED internal job (no status control). */
+  updateBusinessJob(id: string, payload: UpdateBusinessJobRequest): Observable<BusinessJob> {
+    const body: Record<string, string | null> = {};
+    if (payload.title !== undefined) body['title'] = payload.title?.trim() ? (payload.title as string).trim() : null;
+    if (payload.description?.trim()) body['description'] = payload.description.trim();
+    if (payload.addressLine1?.trim()) body['addressLine1'] = payload.addressLine1.trim();
+    if (payload.city !== undefined) body['city'] = payload.city?.trim() ? (payload.city as string).trim() : null;
+    if (payload.province !== undefined)
+      body['province'] = payload.province?.trim() ? (payload.province as string).trim() : null;
+    if (payload.postalCode !== undefined)
+      body['postalCode'] = payload.postalCode?.trim() ? (payload.postalCode as string).trim() : null;
+    if (payload.priority) body['priority'] = payload.priority;
+    if (payload.scheduledAt !== undefined)
+      body['scheduledAt'] = payload.scheduledAt?.trim() ? (payload.scheduledAt as string).trim() : null;
+    return this.http
+      .patch<ApiSuccess<BusinessJob>>(`${this.baseUrl}/business/jobs/${encodeURIComponent(id)}`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Cancel an eligible (REQUESTED) internal job. */
+  cancelBusinessJob(id: string, reason?: string): Observable<BusinessJob> {
+    const body: Record<string, string> = {};
+    if (reason?.trim()) body['reason'] = reason.trim();
+    return this.http
+      .post<ApiSuccess<BusinessJob>>(`${this.baseUrl}/business/jobs/${encodeURIComponent(id)}/cancel`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Real-data INTERNAL job counts for the business dashboard. */
+  getBusinessJobsSummary(): Observable<BusinessJobsSummary> {
+    return this.http
+      .get<ApiSuccess<BusinessJobsSummary>>(`${this.baseUrl}/business/jobs-summary`)
       .pipe(map((res) => res.data));
   }
 }

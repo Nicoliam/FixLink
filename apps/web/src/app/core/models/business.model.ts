@@ -91,3 +91,227 @@ export function verificationLabel(status: string): string {
       return 'Unverified';
   }
 }
+
+/**
+ * Business-managed customer contracts for Stage 7B.
+ *
+ * Mirrors GET/POST/PATCH /api/v1/business/customers. Customers are
+ * private to the business; the owning business is derived server-side
+ * and never sent by the client.
+ */
+
+export type BusinessCustomerContact = 'EMAIL' | 'PHONE' | 'WHATSAPP';
+
+/** Business-managed customer returned by the /business/customers endpoints. */
+export interface BusinessCustomer {
+  id: string;
+  businessId: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  preferredContact: BusinessCustomerContact | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BusinessCustomerList {
+  items: BusinessCustomer[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateBusinessCustomerRequest {
+  firstName?: string;
+  lastName?: string;
+  /** Free-text fallback split server-side into first/last names. */
+  name?: string;
+  email?: string;
+  phone?: string;
+  preferredContact?: BusinessCustomerContact;
+}
+
+export interface UpdateBusinessCustomerRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
+  phone?: string | null;
+  preferredContact?: BusinessCustomerContact | null;
+}
+
+/**
+ * Internal business job contracts for Stage 7B.
+ *
+ * Mirrors /api/v1/business/jobs. Internal jobs reuse the shared jobs
+ * table with `source = INTERNAL`; status transitions stay
+ * server-controlled (the client never sends a status).
+ */
+
+export type BusinessJobPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
+export type BusinessJobStatus =
+  | 'REQUESTED'
+  | 'QUOTED'
+  | 'ACCEPTED'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'AWAITING_PARTS'
+  | 'COMPLETED'
+  | 'CONFIRMED'
+  | 'CLOSED'
+  | 'CANCELLED'
+  | 'DISPUTED';
+
+export interface BusinessJobCustomerSummary {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface BusinessJobServiceSummary {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface BusinessJobBusinessSummary {
+  id: string;
+  businessName: string;
+}
+
+export interface BusinessJobTimelineEntry {
+  previousStatus: BusinessJobStatus | null;
+  status: BusinessJobStatus;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** Internal job returned by the /business/jobs endpoints. */
+export interface BusinessJob {
+  id: string;
+  reference: string;
+  source: 'INTERNAL';
+  status: BusinessJobStatus;
+  businessId: string;
+  business: BusinessJobBusinessSummary;
+  customerId: string;
+  customer: BusinessJobCustomerSummary;
+  service: BusinessJobServiceSummary;
+  title: string | null;
+  description: string;
+  addressLine1: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  priority: BusinessJobPriority;
+  scheduledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Internal job detail: the job plus its status-history timeline. */
+export interface BusinessJobDetail {
+  job: BusinessJob;
+  timeline: BusinessJobTimelineEntry[];
+}
+
+export interface BusinessJobList {
+  items: BusinessJob[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface BusinessJobListParams {
+  status?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateBusinessJobRequest {
+  customerId: string;
+  serviceId: string;
+  title?: string;
+  description: string;
+  address?: string;
+  addressLine1?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  priority?: BusinessJobPriority;
+  /** ISO date/time for the scheduled visit. */
+  scheduledAt?: string;
+}
+
+export interface UpdateBusinessJobRequest {
+  title?: string | null;
+  description?: string;
+  addressLine1?: string;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  priority?: BusinessJobPriority;
+  scheduledAt?: string | null;
+}
+
+/** Real-data INTERNAL job counts for the business dashboard. */
+export interface BusinessJobsSummary {
+  total: number;
+  requested: number;
+  scheduled: number;
+  inProgress: number;
+  completed: number;
+  cancelled: number;
+}
+
+/** Human-readable internal job status for badges and headings. */
+export function businessJobStatusLabel(status: BusinessJobStatus): string {
+  switch (status) {
+    case 'REQUESTED':
+      return 'Requested';
+    case 'QUOTED':
+      return 'Quoted';
+    case 'ACCEPTED':
+      return 'Accepted';
+    case 'SCHEDULED':
+      return 'Scheduled';
+    case 'IN_PROGRESS':
+      return 'In progress';
+    case 'AWAITING_PARTS':
+      return 'Awaiting parts';
+    case 'COMPLETED':
+      return 'Completed';
+    case 'CONFIRMED':
+      return 'Confirmed';
+    case 'CLOSED':
+      return 'Closed';
+    case 'CANCELLED':
+      return 'Cancelled';
+    case 'DISPUTED':
+      return 'Disputed';
+    default:
+      return status;
+  }
+}
+
+/** Human-readable priority for badges. */
+export function businessJobPriorityLabel(priority: BusinessJobPriority): string {
+  switch (priority) {
+    case 'LOW':
+      return 'Low';
+    case 'NORMAL':
+      return 'Normal';
+    case 'HIGH':
+      return 'High';
+    case 'URGENT':
+      return 'Urgent';
+    default:
+      return priority;
+  }
+}

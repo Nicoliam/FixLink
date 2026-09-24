@@ -1092,3 +1092,48 @@ internal jobs, technician job assignment, technician My Jobs,
 parts requests, manager approvals, voice notes, notifications,
 the admin dashboard, payment processing, and new marketplace
 functionality.
+
+
+# 22. STAGE 7B IMPLEMENTATION NOTES — INTERNAL BUSINESS JOBS
+
+Implemented 2026-09-24. Covers the business side of
+Create (before Assign): an authenticated owner/manager manages
+the customers the business serves directly and creates internal
+jobs for them on the shared jobs table. No technician is
+assigned yet.
+
+Business owner / manager:
+
+Login → Dashboard (business name, verification state,
+membership role, real technician count, plus REAL internal-job
+counts — total, requested, scheduled, in progress, completed —
+zero when there is no data, never fake numbers) → Customers
+(private roster: first/last name, optional email/phone; add a
+customer; edit contact details inline) → Jobs (INTERNAL list
+with status/customer/service/date/priority/source, status and
+search filters, pagination) → Create internal job (select an
+existing customer — or create the customer first — select a
+catalogue service, description, address, priority, optional
+preferred date/time; success shows the job reference and
+REQUESTED status) → Job detail (customer, service, description,
+address, priority, schedule, status, status-history timeline,
+business information; field editor and Cancel while REQUESTED)
+→ Profile (business identity with the owner-only editor) →
+Settings (account page, reused in this stage).
+
+Navigation for owner/manager roles now reads Dashboard, Jobs,
+Customers, Technicians, Profile, Settings. Technician navigation
+is unchanged (no business-management links); customers and
+marketplace professionals see no business navigation at all.
+
+Technician:
+
+Login → Still no business job surface (no assignment yet).
+Technicians cannot create internal jobs, manage business
+customers, list business jobs or cancel them.
+
+Explicitly out of scope for Stage 7B (later stages):
+technician assignment, technician My Jobs, technician
+execution, voice notes, parts requests, manager parts
+approval, notifications, the admin dashboard, payment
+processing, and marketplace quote/job changes.

@@ -1,5 +1,63 @@
 # FixLink — Changelog
 
+## Stage 7B — Internal Business Jobs (2026-09-24)
+
+- Business-managed customers on the existing `customer_profiles`
+  table (`user_id = NULL`, `business_id` from the authenticated
+  membership — never the frontend): `GET /api/v1/business/customers`
+  (own customers, creation order, `search`/`page`/`pageSize`),
+  `POST /api/v1/business/customers` (first/last name with a
+  free-text `name` fallback, optional email/phone/contact),
+  `GET /api/v1/business/customers/:customerId` and `PATCH`
+  (≥1 field; explicit null clears contact fields). Customers are
+  private: cross-business reads/patches → `404` (no probing).
+- Internal jobs on the ONE shared `jobs` table (`source = INTERNAL`,
+  `status = REQUESTED`, no parallel job tables):
+  `POST /api/v1/business/jobs` (validates customer ownership and
+  the active catalogue service; writes the job plus the initial
+  `NULL → REQUESTED` history entry),
+  `GET /api/v1/business/jobs` (INTERNAL only — marketplace rows
+  never appear; `status`/`search` filters, pagination),
+  `GET /api/v1/business/jobs/:jobId` (`{ job, timeline }` with
+  embedded customer/service/business summaries),
+  `PATCH /api/v1/business/jobs/:jobId` (field edits on REQUESTED
+  jobs only — any `status` key → `422`),
+  `POST /api/v1/business/jobs/:jobId/cancel` (guarded
+  `REQUESTED → CANCELLED` with history; otherwise `422`), and
+  `GET /api/v1/business/jobs-summary` (real `{ total, requested,
+  scheduled, inProgress, completed, cancelled }` counts).
+- Authorization: unauthenticated → `401`; customer/professional/
+  technician/admin actors → `403`; cross-business customer/job
+  access and marketplace ids on the internal surface → `404`;
+  malformed ids → `400`; invalid payloads → `422`. Owner and
+  manager share the full Stage 7B surface (profile edits stay
+  owner-only).
+- Angular: `/business/jobs` (filters, pagination, loading/empty/
+  error states), `/business/jobs/new` (existing-customer select
+  with create-first link, service select, reference + REQUESTED
+  confirmation), `/business/jobs/:id` (detail + timeline, edit
+  and cancel while REQUESTED, no assignment/parts controls),
+  `/business/customers` (list, create, inline edit),
+  `/business/profile` (profile + owner editor), dashboard with
+  real job counts, and Dashboard/Jobs/Customers/Technicians/
+  Profile/Settings navigation for owner/manager only.
+- Tests: `backend/tests/business-internal-jobs.test.ts` (34
+  brief-mapped cases: gating, customer CRUD + isolation,
+  creation rules, listing/marketplace exclusion, detail +
+  history, status control, cancellation, pagination/filtering,
+  summary, plus a marketplace regression guard) and seven new/
+  updated frontend spec files (service mapping, list/new/detail/
+  customers/profile/dashboard states). Full backend suite green:
+  245/245; `tsc --noEmit` (backend, web app + spec) and both
+  builds pass. Web unit-test execution is blocked by the sandbox
+  worker-spawn limitation (pre-existing — untouched specs fail
+  identically); specs are typechecked and structurally verified.
+  No migration — all Stage 7B data reuses `customer_profiles`,
+  `jobs`, `services` and `job_status_history`.
+- Out of scope (later stages): technician assignment, technician
+  My Jobs/execution, voice notes, parts requests and approvals,
+  notifications, admin dashboard, payments, marketplace changes.
+
 ## Stage 7A — Business Foundation + Technician Management (2026-09-23)
 
 - Authenticated business surface for `BUSINESS_OWNER` /

@@ -45,9 +45,25 @@
       </article>
 
       <article class="fl-card">
+        <p class="fl-card-label">Customers</p>
+        <h2 class="fl-card-title">Business customers</h2>
+        <p class="fl-card-text">Customers your business manages directly.</p>
+        <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/business/customers">Manage customers</a>
+      </article>
+
+      <article class="fl-card">
         <p class="fl-card-label">Jobs</p>
-        <h2 class="fl-card-title">Coming soon</h2>
-        <p class="fl-card-text">Internal jobs and technician assignment arrive in a later stage.</p>
+        @if (summary(); as summary) {
+          <h2 class="fl-card-title">{{ jobLabel(summary.total) }}</h2>
+          <p class="fl-card-text">
+            Requested: {{ summary.requested }} · Scheduled: {{ summary.scheduled }} ·
+            In progress: {{ summary.inProgress }} · Completed: {{ summary.completed }}
+          </p>
+        } @else {
+          <h2 class="fl-card-title">Internal jobs</h2>
+          <p class="fl-card-text">Job statistics are loading.</p>
+        }
+        <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/business/jobs">Manage jobs</a>
       </article>
     </div>
 

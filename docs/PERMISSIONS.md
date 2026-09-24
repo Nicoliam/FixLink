@@ -663,3 +663,84 @@ invites with technician login, roster scoping, cross-business
 rejection, activation sync and access revocation, malformed/unknown
 ids, invalid payloads, duplicate handling, and role assertions
 (including technicians staying out of the provider inbox).
+
+
+# 27. Stage 7B Implementation Notes — Business Customers & Internal Jobs
+
+Implemented 2026-09-24 (`backend/src/modules/business/`,
+`GET|POST /api/v1/business/customers`,
+`GET|PATCH /api/v1/business/customers/:customerId`,
+`GET|POST /api/v1/business/jobs`,
+`GET|PATCH /api/v1/business/jobs/:jobId`,
+`POST /api/v1/business/jobs/:jobId/cancel`,
+`GET /api/v1/business/jobs-summary`).
+
+- The owning business is derived server-side per request from
+  `business_profiles.owner_user_id` and active `business_members`
+  rows — never from request parameters. No `business_id`,
+  customer-job association or job-business association is read
+  from the request; spoofed fields are ignored.
+- `BUSINESS_OWNER` and `BUSINESS_MANAGER` share the full Stage 7B
+  surface: manage own business customers (create, list, read,
+  update), create internal jobs, view own internal jobs, update
+  permitted fields on `REQUESTED` jobs, and cancel eligible
+  (`REQUESTED`) own internal jobs. Profile edits remain
+  owner-only (Stage 7A rule, unchanged).
+- `TECHNICIAN` members cannot create internal jobs, manage
+  business customers, list business jobs or cancel them (`403`
+  on every Stage 7B endpoint) — there is no assignment
+  functionality yet, so technicians have no job surface at all.
+- `CUSTOMER`s and `PROFESSIONAL`s cannot access business
+  internal jobs or business-managed customers (`403`); `ADMIN`
+  has no business identity in this stage (`403`, unchanged).
+- Business isolation: every customer and job row is re-scoped to
+  the caller's business before it is returned. Business A reading
+  Business B's customer or job (read, patch or cancel) gets `404
+  NOT_FOUND`, never `403`, so ids cannot be probed across
+  businesses. The internal job list/detail additionally filter
+  `source = INTERNAL`, so marketplace rows never leak into the
+  business surface (a marketplace id reads as `404` there).
+- Status is server-controlled: the client never sends a status.
+  `PATCH` with a `status` key is rejected (`422`), field edits
+  require `REQUESTED`, and only `REQUESTED` jobs may cancel
+  (`REQUESTED → CANCELLED` with a history entry; anything else →
+  `422`). Cancellation and job creation are atomic with their
+  `job_status_history` entries.
+
+Role summary for Stage 7B:
+
+BUSINESS_OWNER:
+- manage own business customers
+- create internal jobs
+- view own internal jobs (+ timeline)
+- update permitted fields on REQUESTED jobs
+- cancel eligible own internal jobs
+
+BUSINESS_MANAGER:
+- same operational permissions as the owner in this stage
+  (business profile edits remain owner-only)
+
+TECHNICIAN:
+- cannot create internal jobs
+- cannot manage business customers
+- cannot access business jobs
+- no assignment functionality yet
+
+CUSTOMER:
+- cannot access business internal jobs or business customers
+
+PROFESSIONAL:
+- cannot access business internal jobs or business customers
+
+Permission tests added
+(`backend/tests/business-internal-jobs.test.ts`): unauthenticated
+rejection, customer/professional/technician/admin rejection,
+owner/manager customer CRUD, roster-style customer isolation,
+invalid payloads, malformed/unknown ids, owner/manager job
+creation (`INTERNAL`/`REQUESTED`/correct business),
+customer-ownership and service validation, cross-business job
+isolation (read/patch/cancel), marketplace exclusion from the
+internal list and detail, detail contents (customer/service/
+business/timeline), creation history, status-mutation rejection,
+eligible/ineligible cancellation, pagination, filtering, and
+the business-scoped summary.

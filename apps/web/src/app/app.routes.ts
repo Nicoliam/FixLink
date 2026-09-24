@@ -9,6 +9,9 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
  * quote submission (`/requests/:id`).
  * Stage 7A adds the business dashboard (`/business`) and the technician
  * roster (`/business/technicians`, `/business/technicians/:id`).
+ * Stage 7B adds business-managed customers (`/business/customers`),
+ * internal jobs (`/business/jobs`, `/business/jobs/new`,
+ * `/business/jobs/:id`) and the business profile (`/business/profile`).
  * Role dashboards and the quote lifecycle arrive in later stages.
  */
 export const routes: Routes = [
@@ -71,6 +74,35 @@ export const routes: Routes = [
     path: 'business/technicians/:id',
     loadComponent: () =>
       import('./features/business/technician-detail').then((m) => m.TechnicianDetailComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/customers',
+    loadComponent: () =>
+      import('./features/business/business-customers').then((m) => m.BusinessCustomersComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/jobs',
+    loadComponent: () =>
+      import('./features/business/business-jobs-list').then((m) => m.BusinessJobsListComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/jobs/new',
+    loadComponent: () => import('./features/business/business-job-new').then((m) => m.BusinessJobNewComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/jobs/:id',
+    loadComponent: () =>
+      import('./features/business/business-job-detail').then((m) => m.BusinessJobDetailComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/profile',
+    loadComponent: () =>
+      import('./features/business/business-profile').then((m) => m.BusinessProfileComponent),
     canActivate: [authGuard],
   },
   {

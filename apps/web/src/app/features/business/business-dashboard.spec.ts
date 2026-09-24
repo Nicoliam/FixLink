@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { BusinessDashboardComponent } from './business-dashboard';
 import { BusinessService } from '../../core/services/business.service';
-import type { Business } from '../../core/models/business.model';
+import type { Business, BusinessJobsSummary } from '../../core/models/business.model';
 
 const business: Business = {
   id: '1',
@@ -28,12 +28,22 @@ const business: Business = {
   updatedAt: '2026-09-23T10:00:00.000Z',
 };
 
+const summary: BusinessJobsSummary = {
+  total: 3,
+  requested: 1,
+  scheduled: 1,
+  inProgress: 1,
+  completed: 0,
+  cancelled: 0,
+};
+
 describe('BusinessDashboardComponent', () => {
   let fixture: ComponentFixture<BusinessDashboardComponent>;
 
   async function setup(api: {
     getMyBusiness: ReturnType<typeof vi.fn>;
     updateBusiness?: ReturnType<typeof vi.fn>;
+    getBusinessJobsSummary?: ReturnType<typeof vi.fn>;
   }): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [BusinessDashboardComponent],
@@ -41,7 +51,11 @@ describe('BusinessDashboardComponent', () => {
         provideRouter([]),
         {
           provide: BusinessService,
-          useValue: { updateBusiness: vi.fn(), ...api },
+          useValue: {
+            updateBusiness: vi.fn(),
+            getBusinessJobsSummary: vi.fn().mockReturnValue(of(summary)),
+            ...api,
+          },
         },
       ],
     }).compileComponents();
@@ -63,11 +77,22 @@ describe('BusinessDashboardComponent', () => {
     expect(text).toContain('Manage technicians');
   });
 
-  it('shows the jobs placeholder without fake counts', async () => {
+  it('shows real internal job counts from the summary endpoint', async () => {
     await setup({ getMyBusiness: vi.fn().mockReturnValue(of(business)) });
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Coming soon');
-    expect(text).toContain('arrive in a later stage');
+    expect(text).toContain('3 internal jobs');
+    expect(text).toContain('Requested: 1');
+    expect(text).toContain('Manage jobs');
+  });
+
+  it('shows zero counts when there is no data', async () => {
+    await setup({
+      getMyBusiness: vi.fn().mockReturnValue(of(business)),
+      getBusinessJobsSummary: vi
+        .fn()
+        .mockReturnValue(of({ total: 0, requested: 0, scheduled: 0, inProgress: 0, completed: 0, cancelled: 0 })),
+    });
+    expect((fixture.nativeElement.textContent as string)).toContain('0 internal jobs');
   });
 
   it('shows the error state when loading fails', async () => {

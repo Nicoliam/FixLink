@@ -370,6 +370,79 @@ management never charge anyone; agreed quote amounts remain
 recorded prices paid directly outside the platform.
 
 
+## 8.2 Businesses — Stage 7B Implementation Notes (Business Customers + Internal Jobs)
+
+Stage 7B implements business-managed customers and internal jobs
+(`backend/src/modules/business/`, `GET|POST /api/v1/business/customers`,
+`GET|PATCH /api/v1/business/customers/:customerId`,
+`GET|POST /api/v1/business/jobs`,
+`GET|PATCH /api/v1/business/jobs/:jobId`,
+`POST /api/v1/business/jobs/:jobId/cancel`,
+`GET /api/v1/business/jobs-summary`).
+
+- Business customers reuse `customer_profiles` with `user_id = NULL`
+  and `business_id` set (migration 003) — no `business_customers`
+  table was created. `POST /business/customers`
+  (`BUSINESS_OWNER`/`BUSINESS_MANAGER`) accepts `{ firstName (1–128,
+  `first_name` alias), lastName (1–128, `last_name` alias), email?,
+  phone?, preferredContact? (EMAIL/PHONE/WHATSAPP) }`; a free-text
+  `name` is split server-side when first/last names are omitted.
+  `PATCH /business/customers/:customerId` accepts the same fields
+  (≥1 required; explicit `null`/empty clears email/phone/contact).
+  Customers are private: listing is scoped to the caller's business
+  (creation order, `page`/`pageSize`, optional `search` over
+  name/email/phone) and another business's customer reads as `404
+  NOT_FOUND`, never `403`. Malformed ids → `400`.
+- Internal jobs reuse the ONE shared `jobs` table with
+  `source = INTERNAL` — no `business_jobs` / `internal_jobs` /
+  `business_job_assignments` tables were created. `POST
+  /business/jobs` (`BUSINESS_OWNER`/`BUSINESS_MANAGER`) accepts
+  `{ customerId, serviceId, title?, description (20–2000), address
+  (`addressLine1`/`address`/`location` aliases, 1–255), city?,
+  province?, postalCode?, priority? (LOW/NORMAL/HIGH/URGENT,
+  default NORMAL), scheduledAt? (ISO) or preferredDate
+  (`YYYY-MM-DD`) + preferredTime (`HH:MM`) }` and always creates
+  `source = INTERNAL`, `status = REQUESTED` with the initial
+  `job_status_history` entry (`NULL → REQUESTED`, reason `Internal
+  job created by business`). The customer must belong to the
+  caller's business (foreign/unknown → `404`); the service must be
+  an active catalogue service (unknown → `404`); malformed
+  customer/service ids → `400`. `business_id`, `source`, `status`
+  and `reference` in the body are never honoured.
+- `GET /business/jobs?status=&search=&page=&pageSize=` returns the
+  caller's INTERNAL jobs only (newest first) — marketplace rows
+  never appear here. `status` must be a valid lifecycle value
+  (`422` otherwise); `search` matches reference/description/title/
+  customer name/service name. `GET /business/jobs/:jobId` returns
+  `{ job (with embedded customer/service/business summaries),
+  timeline }` (status history, oldest first). Another business's
+  job — or any marketplace job — reads as `404`.
+- Status stays server-controlled: `PATCH /business/jobs/:jobId`
+  accepts only field edits (title/description/address/city/
+  province/postalCode/priority/scheduledAt, ≥1 required) on
+  `REQUESTED` jobs — a `status` key of any kind returns `422
+  VALIDATION_ERROR`, as do edits to non-REQUESTED jobs. `POST
+  /business/jobs/:jobId/cancel` (optional `{ reason }` ≤500)
+  performs the guarded `REQUESTED → CANCELLED` transition with its
+  history entry (`200`); cancelling a non-REQUESTED job returns
+  `422`. No technician assignment, execution, parts or approval
+  transitions exist in this stage.
+- `GET /api/v1/business/jobs-summary` returns real INTERNAL counts
+  for the dashboard: `{ total, requested, scheduled, inProgress,
+  completed, cancelled }` (zero when there is no data).
+- Roles: `BUSINESS_OWNER` and `BUSINESS_MANAGER` share the full
+  Stage 7B surface. `TECHNICIAN`-only, `CUSTOMER`, `PROFESSIONAL`
+  and `ADMIN` actors receive `403 FORBIDDEN_ROLE`;
+  unauthenticated → `401 UNAUTHORIZED`.
+- No migration was required — `customer_profiles.business_id`,
+  `jobs.business_id`/`source`/`status`/`priority`/`scheduled_at`
+  and `job_status_history` already support this stage.
+
+MVP payment position (unchanged): internal jobs never charge
+anyone; agreed amounts remain recorded prices paid directly
+outside the platform.
+
+
 # 9. Technicians
 
 GET /api/v1/technicians/me

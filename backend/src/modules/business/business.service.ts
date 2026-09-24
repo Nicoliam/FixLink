@@ -16,13 +16,29 @@
  */
 import { hashPassword } from '../../utils/password';
 import type { UserRepository } from '../users/user.repository';
-import { TechnicianConflictError, type BusinessStore } from './business.store';
-import type { BusinessDto, BusinessIdentity, TechnicianDto } from './business.types';
+import type { JobsStore } from '../jobs/jobs.store';
+import { JobNotCancellableError, TechnicianConflictError, type BusinessStore } from './business.store';
+import type {
+  BusinessCustomerDto,
+  BusinessDto,
+  BusinessIdentity,
+  InternalJobDetailDto,
+  InternalJobDto,
+  InternalJobsSummary,
+  TechnicianDto,
+} from './business.types';
 import {
   validateBusinessPatch,
   validateTechnicianCreate,
   validateTechnicianPatch,
 } from './business.validation';
+import { validateBusinessCustomerCreate, validateBusinessCustomerPatch } from './business-customers.validation';
+import {
+  validateInternalJobCancel,
+  validateInternalJobCreate,
+  validateInternalJobListQuery,
+  validateInternalJobPatch,
+} from './business-jobs.validation';
 
 export interface ServiceResult<T> {
   status: number;
@@ -41,10 +57,24 @@ function isNumericId(value: string): boolean {
   return /^[1-9][0-9]*$/.test(value.trim());
 }
 
+function readPage(value: unknown, fallback: number, max: number): number | null {
+  if (value === undefined || value === null || String(value).trim() === '') return fallback;
+  const num = Number(String(value).trim());
+  if (!Number.isInteger(num) || num < 1 || num > max) return null;
+  return num;
+}
+
 export class BusinessService {
   constructor(
     private readonly users: UserRepository,
     private readonly business: BusinessStore,
+    /**
+     * Catalogue reads for internal-job service validation. Optional so
+     * pre-7B constructions keep compiling; Stage 7B wiring always
+     * supplies the shared jobs store (memory in tests, MySQL in
+     * production) so fixture and catalogue ids stay consistent.
+     */
+    private readonly jobs?: Pick<JobsStore, 'findActiveService'>,
   ) {}
 
   /**
@@ -284,5 +314,232 @@ export class BusinessService {
     const updated = await this.business.updateTechnician(access.businessId, technicianId.trim(), input);
     if (!updated) return fail(404, 'NOT_FOUND', 'Technician not found.');
     return { status: 200, data: updated };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7B — business-managed customers.
+  //
+  // The owning business is always derived server-side from the
+  // authenticated membership — a `business_id` in the request is
+  // never read. Every customer row is re-scoped to that business:
+  // another business's customer reads as 404 NOT_FOUND, never 403.
+  // ------------------------------------------------------------------
+
+  async listBusinessCustomers(
+    authUserId: string,
+    query: Record<string, unknown>,
+  ): Promise<ServiceResult<{ items: BusinessCustomerDto[]; total: number; page: number; pageSize: number }>> {
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const page = readPage(query['page'], 1, 1000);
+    const pageSize = readPage(query['pageSize'] ?? query['page_size'], 20, 50);
+    if (page === null || pageSize === null) {
+      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1–1000 and pageSize 1–50.');
+    }
+    const rawSearch = query['search'] ?? query['q'];
+    const search =
+      rawSearch === undefined || rawSearch === null || String(rawSearch).trim() === ''
+        ? null
+        : String(rawSearch).trim();
+    if (search !== null && search.length > 128) {
+      return fail(422, 'VALIDATION_ERROR', 'Search must be 128 characters or fewer.');
+    }
+    const result = await this.business.listBusinessCustomers(access.businessId, page, pageSize, search);
+    return { status: 200, data: { ...result, page, pageSize } };
+  }
+
+  async getBusinessCustomer(authUserId: string, customerId: string): Promise<ServiceResult<BusinessCustomerDto>> {
+    if (!isNumericId(customerId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid customer id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const customer = await this.business.getBusinessCustomer(access.businessId, customerId.trim());
+    if (!customer) return fail(404, 'NOT_FOUND', 'Customer not found.');
+    return { status: 200, data: customer };
+  }
+
+  async createBusinessCustomer(authUserId: string, body: unknown): Promise<ServiceResult<BusinessCustomerDto>> {
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { input, error } = validateBusinessCustomerCreate(body);
+    if (!input || error) {
+      return fail(error?.status ?? 422, error?.code ?? 'VALIDATION_ERROR', error?.message ?? 'Invalid customer.');
+    }
+    const created = await this.business.createBusinessCustomer(access.businessId, input);
+    return { status: 201, data: created };
+  }
+
+  async updateBusinessCustomer(
+    authUserId: string,
+    customerId: string,
+    body: unknown,
+  ): Promise<ServiceResult<BusinessCustomerDto>> {
+    if (!isNumericId(customerId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid customer id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { input, error } = validateBusinessCustomerPatch(body);
+    if (!input || error) {
+      return fail(error?.status ?? 422, error?.code ?? 'VALIDATION_ERROR', error?.message ?? 'Invalid customer update.');
+    }
+    const updated = await this.business.updateBusinessCustomer(access.businessId, customerId.trim(), input);
+    if (!updated) return fail(404, 'NOT_FOUND', 'Customer not found.');
+    return { status: 200, data: updated };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7B — internal business jobs.
+  //
+  // Internal jobs reuse the ONE shared `jobs` table with
+  // `source = INTERNAL` and an initial `status = REQUESTED`. The
+  // business, customer ownership and service are all derived or
+  // verified server-side; `source`, `status`, `business_id` and
+  // `reference` are never read from the request. Status transitions
+  // stay server-controlled: PATCH rejects any `status` key, and only
+  // REQUESTED jobs may be edited or cancelled in this stage.
+  // Technician assignment, execution, parts and approvals belong to
+  // later stages and are intentionally absent.
+  // ------------------------------------------------------------------
+
+  async createInternalJob(authUserId: string, body: unknown): Promise<ServiceResult<InternalJobDto>> {
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { input, error } = validateInternalJobCreate(body);
+    if (!input || error) {
+      return fail(error?.status ?? 422, error?.code ?? 'VALIDATION_ERROR', error?.message ?? 'Invalid job.');
+    }
+    const customer = await this.business.findInternalCustomer(access.businessId, input.customerId);
+    if (!customer) return fail(404, 'NOT_FOUND', 'Customer not found.');
+    const service = await this.jobs?.findActiveService(input.serviceId);
+    if (!service) return fail(404, 'NOT_FOUND', 'Service not found.');
+    const business = await this.business.getBusinessById(access.businessId);
+    if (!business) return fail(404, 'NOT_FOUND', 'No business found for your account.');
+    const year = new Date().getFullYear();
+    const reference = `FL-${year}-${Date.now().toString().slice(-6)}`;
+    const job = await this.business.createInternalJob({
+      ...input,
+      reference,
+      businessId: access.businessId,
+      businessName: business.businessName,
+      serviceName: service.name,
+      serviceSlug: service.slug,
+      createdBy: authUserId,
+    });
+    return { status: 201, data: job };
+  }
+
+  async listInternalJobs(
+    authUserId: string,
+    query: Record<string, unknown>,
+  ): Promise<ServiceResult<{ items: InternalJobDto[]; total: number; page: number; pageSize: number }>> {
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const parsed = validateInternalJobListQuery(query);
+    if (parsed.error) {
+      return fail(parsed.error.status, parsed.error.code, parsed.error.message);
+    }
+    const result = await this.business.listInternalJobs(access.businessId, {
+      status: parsed.status,
+      search: parsed.search,
+      page: parsed.page,
+      pageSize: parsed.pageSize,
+    });
+    return { status: 200, data: { ...result, page: parsed.page, pageSize: parsed.pageSize } };
+  }
+
+  async getInternalJob(authUserId: string, jobId: string): Promise<ServiceResult<InternalJobDetailDto>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const detail = await this.business.getInternalJobDetail(access.businessId, jobId.trim());
+    // Ownership + source are part of existence: another business's
+    // job (or any marketplace job) reads as 404, never 403.
+    if (!detail) return fail(404, 'NOT_FOUND', 'Job not found.');
+    return { status: 200, data: detail };
+  }
+
+  async updateInternalJob(
+    authUserId: string,
+    jobId: string,
+    body: unknown,
+  ): Promise<ServiceResult<InternalJobDto>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { input, error } = validateInternalJobPatch(body);
+    if (!input || error) {
+      return fail(error?.status ?? 422, error?.code ?? 'VALIDATION_ERROR', error?.message ?? 'Invalid job update.');
+    }
+    const existing = await this.business.getInternalJob(access.businessId, jobId.trim());
+    if (!existing) return fail(404, 'NOT_FOUND', 'Job not found.');
+    if (existing.status !== 'REQUESTED') {
+      return fail(422, 'VALIDATION_ERROR', 'Only requested jobs can be updated.');
+    }
+    const updated = await this.business.updateInternalJob(access.businessId, jobId.trim(), input);
+    if (!updated) return fail(404, 'NOT_FOUND', 'Job not found.');
+    return { status: 200, data: updated };
+  }
+
+  async cancelInternalJob(authUserId: string, jobId: string, body: unknown): Promise<ServiceResult<InternalJobDto>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { reason, error } = validateInternalJobCancel(body);
+    if (error) {
+      return fail(error.status, error.code, error.message);
+    }
+    const existing = await this.business.getInternalJob(access.businessId, jobId.trim());
+    if (!existing) return fail(404, 'NOT_FOUND', 'Job not found.');
+    if (existing.status !== 'REQUESTED') {
+      return fail(422, 'VALIDATION_ERROR', 'Only requested jobs can be cancelled.');
+    }
+    try {
+      const cancelled = await this.business.cancelInternalJob(access.businessId, jobId.trim(), {
+        reason,
+        changedBy: authUserId,
+      });
+      if (!cancelled) return fail(404, 'NOT_FOUND', 'Job not found.');
+      return { status: 200, data: cancelled };
+    } catch (err) {
+      if (err instanceof JobNotCancellableError) {
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
+  }
+
+  async getInternalJobsSummary(authUserId: string): Promise<ServiceResult<InternalJobsSummary>> {
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const summary = await this.business.countInternalJobsByStatus(access.businessId);
+    return { status: 200, data: summary };
   }
 }

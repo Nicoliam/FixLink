@@ -5,37 +5,32 @@ import { RouterLink } from '@angular/router';
 import { BusinessService } from '../../core/services/business.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
 import { businessRoleLabel, verificationLabel } from '../../core/models/business.model';
-import type { Business, BusinessJobsSummary } from '../../core/models/business.model';
+import type { Business } from '../../core/models/business.model';
 
-type DashboardStatus = 'loading' | 'ready' | 'error';
+type ProfileStatus = 'loading' | 'ready' | 'error';
 
 /**
- * FixLink business dashboard — Stage 7A + 7B (`/business`, authenticated
- * BUSINESS_OWNER / BUSINESS_MANAGER).
+ * FixLink business profile — Stage 7B (`/business/profile`,
+ * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
  *
- * Shows the server-derived business profile (name, status, technician
- * count) with an owner-only profile editor, plus REAL internal-job
- * counts from GET /api/v1/business/jobs-summary (total, requested,
- * scheduled, in progress, completed — zero when there is no data,
- * never fake numbers). Technician assignment arrives in a later
- * stage. Authorization is backend-enforced; the role checks here only
- * decide which actions are offered.
+ * Shows the server-derived business profile with an owner-only
+ * editor (the same rules as the dashboard card). Managers see the
+ * profile read-only; the backend enforces the owner-only update.
  */
 @Component({
-  selector: 'app-business-dashboard',
+  selector: 'app-business-profile',
   imports: [ReactiveFormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './business-dashboard.html',
+  templateUrl: './business-profile.html',
 })
-export class BusinessDashboardComponent implements OnInit {
+export class BusinessProfileComponent implements OnInit {
   private readonly api = inject(BusinessService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly status = signal<DashboardStatus>('loading');
+  protected readonly status = signal<ProfileStatus>('loading');
   protected readonly errorMessage = signal('');
   protected readonly business = signal<Business | null>(null);
-  protected readonly summary = signal<BusinessJobsSummary | null>(null);
   protected readonly editing = signal(false);
   protected readonly saving = signal(false);
   protected readonly saveError = signal('');
@@ -62,40 +57,18 @@ export class BusinessDashboardComponent implements OnInit {
   protected load(): void {
     this.status.set('loading');
     this.errorMessage.set('');
-    let loadedBusiness: Business | null = null;
-    let loadedSummary: BusinessJobsSummary | null = null;
-    let failed = false;
-    const finish = (): void => {
-      if (failed || loadedBusiness === null || loadedSummary === null) return;
-      this.business.set(loadedBusiness);
-      this.summary.set(loadedSummary);
-      this.status.set('ready');
-    };
-    const fail = (error: unknown, fallback: string): void => {
-      if (failed) return;
-      failed = true;
-      this.errorMessage.set(getApiErrorMessage(error, fallback));
-      this.status.set('error');
-    };
     this.api
       .getMyBusiness()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (business) => {
-          loadedBusiness = business;
-          finish();
+          this.business.set(business);
+          this.status.set('ready');
         },
-        error: (error: unknown) => fail(error, 'Could not load your business. Please try again.'),
-      });
-    this.api
-      .getBusinessJobsSummary()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (summary) => {
-          loadedSummary = summary;
-          finish();
+        error: (error: unknown) => {
+          this.errorMessage.set(getApiErrorMessage(error, 'Could not load your business. Please try again.'));
+          this.status.set('error');
         },
-        error: (error: unknown) => fail(error, 'Could not load job statistics. Please try again.'),
       });
   }
 
@@ -148,13 +121,5 @@ export class BusinessDashboardComponent implements OnInit {
           this.saving.set(false);
         },
       });
-  }
-
-  protected technicianLabel(count: number): string {
-    return count === 1 ? '1 technician' : `${count} technicians`;
-  }
-
-  protected jobLabel(count: number): string {
-    return count === 1 ? '1 internal job' : `${count} internal jobs`;
   }
 }

@@ -1,0 +1,109 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/business/jobs">← Back to internal jobs</a>
+  </nav>
+
+  <p class="fl-eyebrow">Jobs</p>
+  <h1 class="fl-page-title">Create internal job</h1>
+  <p class="fl-page-subtitle">A job for a customer your business manages directly.</p>
+
+  @if (status() === 'loading' || status() === 'saving') {
+    <div class="fl-state" role="status">
+      <p>{{ status() === 'saving' ? 'Creating the job…' : 'Loading customers and services…' }}</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="loadOptions()">Try again</button>
+    </div>
+  } @else if (status() === 'created' && createdJob(); as job) {
+    <div class="fl-state" role="status">
+      <h2 class="fl-state-title">Job {{ job.reference }} created</h2>
+      <p class="fl-state-text">Status: {{ statusText(job.status) }} · {{ job.source }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="viewJob()">View job</button>
+      <a class="fl-link" routerLink="/business/jobs">Back to jobs</a>
+    </div>
+  } @else {
+    @if (customers().length === 0) {
+      <div class="fl-state" role="status">
+        <h2 class="fl-state-title">No customers yet</h2>
+        <p class="fl-state-text">Create a business customer first, then come back to create the job.</p>
+        <a class="fl-btn fl-btn-primary fl-btn-sm" routerLink="/business/customers">Manage customers</a>
+      </div>
+    } @else {
+      <section class="fl-card" aria-label="Create internal job">
+        <form class="fl-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+          <div class="fl-field">
+            <label for="job-customer">Customer</label>
+            <select id="job-customer" class="fl-input" formControlName="customerId">
+              <option value="">Select a customer</option>
+              @for (customer of customers(); track customer.id) {
+                <option [value]="customer.id">{{ customer.displayName }}</option>
+              }
+            </select>
+            @if (form.controls.customerId.touched && form.controls.customerId.invalid) {
+              <p class="fl-field-error" role="alert">Select a customer, or create one first.</p>
+            }
+            <p class="fl-card-text"><a class="fl-link" routerLink="/business/customers">Create a business customer first</a></p>
+          </div>
+          <div class="fl-field">
+            <label for="job-service">Service</label>
+            <select id="job-service" class="fl-input" formControlName="serviceId">
+              <option value="">Select a service</option>
+              @for (service of services(); track service.id) {
+                <option [value]="service.id">{{ service.name }}</option>
+              }
+            </select>
+            @if (form.controls.serviceId.touched && form.controls.serviceId.invalid) {
+              <p class="fl-field-error" role="alert">Select a service.</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="job-title">Title (optional)</label>
+            <input id="job-title" class="fl-input" type="text" formControlName="title" />
+          </div>
+          <div class="fl-field">
+            <label for="job-description">Description</label>
+            <textarea id="job-description" class="fl-input" formControlName="description" rows="4"></textarea>
+            @if (form.controls.description.touched && form.controls.description.invalid) {
+              <p class="fl-field-error" role="alert">Describe the work (at least 20 characters).</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="job-address">Address</label>
+            <input id="job-address" class="fl-input" type="text" formControlName="address" autocomplete="street-address" />
+            @if (form.controls.address.touched && form.controls.address.invalid) {
+              <p class="fl-field-error" role="alert">Add the job address.</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="job-city">City (optional)</label>
+            <input id="job-city" class="fl-input" type="text" formControlName="city" autocomplete="address-level2" />
+          </div>
+          <div class="fl-field">
+            <label for="job-province">Province (optional)</label>
+            <input id="job-province" class="fl-input" type="text" formControlName="province" autocomplete="address-level1" />
+          </div>
+          <div class="fl-field">
+            <label for="job-priority">Priority</label>
+            <select id="job-priority" class="fl-input" formControlName="priority">
+              <option value="LOW">Low</option>
+              <option value="NORMAL">Normal</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent</option>
+            </select>
+          </div>
+          <div class="fl-field">
+            <label for="job-scheduled">Preferred date/time (optional)</label>
+            <input id="job-scheduled" class="fl-input" type="datetime-local" formControlName="scheduledAt" />
+          </div>
+          @if (saveError()) {
+            <p class="fl-field-error" role="alert">{{ saveError() }}</p>
+          }
+          <button type="submit" class="fl-btn fl-btn-primary fl-btn-block">Create internal job</button>
+        </form>
+      </section>
+    }
+  }
+</div>

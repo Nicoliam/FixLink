@@ -300,3 +300,93 @@ Frontend (`apps/web`, run with `npx ng test --watch=false`):
 No migration in Stage 7A — the existing `business_profiles`,
 `business_members`, `technicians` and `users` tables already
 support it; no database doc change was required.
+
+
+## Stage 7B — Internal Business Jobs
+
+Backend (`backend/tests/business-internal-jobs.test.ts`,
+in-memory business + jobs stores, no MySQL required — run with
+`npm test` from `backend/`):
+
+- Authentication: unauthenticated customer endpoints (list,
+  create, read, patch) → `401`; unauthenticated job endpoints
+  (list, create, read, patch, cancel, summary) → `401`.
+- Roles: customer and professional cannot manage business
+  customers (`403`); technician cannot create/list/cancel
+  internal jobs or manage customers (`403`); admin has no
+  business identity (`403`); customers/professionals cannot
+  reach internal jobs (`403`).
+- Customers: owner and manager create (`201`, owned by the
+  caller's business, no auth internals leaked); owner/manager
+  list only their own customers; update works with spoofed
+  `business_id` ignored; empty/broken payloads (missing names,
+  bad email/phone/contact, empty patch) → `422`;
+  cross-business reads/patches → `404` (no probing); unknown →
+  `404`, malformed → `400`.
+- Jobs: owner and manager create (`201`, `source = INTERNAL`,
+  `status = REQUESTED`, correct `businessId`, spoofed
+  `business_id`/`status`/`source` ignored); unknown customer →
+  `404`, foreign-business customer → `404`, malformed customer
+  id → `400`; unknown/malformed service → `404`/`400`; short
+  description, missing address, bad priority/date → `422`;
+  owner/manager lists (INTERNAL only, business-scoped);
+  marketplace jobs never appear in the internal list and are
+  never served by the internal detail endpoint (marketplace
+  regression guard creates a real `MARKETPLACE` job first);
+  business A cannot read/patch/cancel business B jobs (`404`);
+  detail returns the correct customer/service/business plus the
+  timeline; creation writes the `NULL → REQUESTED` history
+  entry; `PATCH { status }` and cancel-with-status → `422`
+  with the job untouched; eligible cancel → `200 CANCELLED`
+  with a second history entry; repeat cancel → `422`;
+  REQUESTED-only field updates (post-cancel edits → `422`);
+  pagination (`total`/`page`/`pageSize`, invalid → `422`);
+  filtering (`status`, `search` over reference/description/
+  customer/service, invalid status → `422`); summary reports
+  real counts (zeros when empty, business-scoped); malformed →
+  `400`, unknown → `404`.
+- All asserted responses preserve the standard success/error
+  envelopes. Existing marketplace suites run unchanged
+  (regression: customer job creation still yields
+  `MARKETPLACE`/`REQUESTED` with provider assignment).
+
+Frontend (`apps/web`, run with `npx ng test --watch=false`):
+
+- `business-internal.service.spec.ts`: customer list params,
+  customer create/update body mapping (trimmed, no business
+  id), job list params (status/search/pagination), single-job
+  fetch, job create body mapping (no `source`/`status`/
+  `businessId`), job update without status control, cancel
+  through the dedicated endpoint, summary fetch.
+- `business-jobs-list.spec.ts`: loading/empty/error states,
+  job cards with status/customer/service/date/priority/source,
+  and no assignment/technician/parts controls.
+- `business-job-new.spec.ts`: customer/service options,
+  create-first prompt when empty, error state, creation showing
+  the reference with REQUESTED status, no assignment controls.
+- `business-job-detail.spec.ts`: customer/service/description/
+  address/priority/schedule/status/timeline/business display,
+  error state, REQUESTED cancellation, hidden management after
+  cancellation, no assignment/parts controls.
+- `business-customers.spec.ts`: list, empty and error states,
+  creation appending to the list.
+- `business-profile.spec.ts`: profile with role/verification,
+  error state, owner-only edit gating.
+- `business-dashboard.spec.ts` (updated): real internal-job
+  counts from the summary endpoint (zero-count case), replacing
+  the Stage 7A "Coming soon" placeholder test.
+- Environment note (2026-09-24): `npx ng test --watch=false`
+  cannot execute in this sandbox — vitest fork workers fail to
+  start (`[vitest-pool]: Failed to start forks worker … Timeout
+  waiting for worker to respond`, then `Worker exited
+  unexpectedly`), identically for untouched pre-existing specs
+  (verified with `src/app/app.spec.ts`). `node_modules` was
+  left alone per scope rules. Specs are verified by
+  `tsc --noEmit -p tsconfig.app.json`,
+  `tsc --noEmit -p tsconfig.spec.json` (both pass) and a
+  successful `npx ng build` (all new lazy chunks emitted).
+
+No migration in Stage 7B — `customer_profiles.business_id`,
+`jobs.business_id`/`source`/`status`/`priority`/`scheduled_at`
+and `job_status_history` already support it; no database doc
+change was required.

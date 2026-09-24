@@ -116,7 +116,9 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   // Auth-walled routers mount after the public marketplace routes: each
   // calls `router.use(requireAuth(...))`, which answers 401 for requests
   // without a token, so mounting earlier would shadow public endpoints.
-  app.use('/api/v1', makeBusinessRoutes(deps.users, business));
+  // The business router also receives the shared jobs store so internal
+  // jobs (Stage 7B) validate services against the same catalogue.
+  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

@@ -13,10 +13,20 @@
  * created as marketplace professionals here.
  */
 import type {
+  BusinessCustomerDto,
   BusinessDto,
   BusinessIdentity,
+  CreateBusinessCustomerInput,
+  CreateInternalJobInput,
+  InternalJobDetailDto,
+  InternalJobDto,
+  InternalJobsSummary,
+  InternalJobStatus,
+  InternalJobTimelineEntry,
   TechnicianDto,
+  UpdateBusinessCustomerInput,
   UpdateBusinessInput,
+  UpdateInternalJobInput,
   UpdateTechnicianInput,
 } from './business.types';
 
@@ -75,4 +85,85 @@ export interface BusinessStore {
     technicianId: string,
     patch: UpdateTechnicianInput,
   ): Promise<TechnicianDto | null>;
+  // ------------------------------------------------------------------
+  // Stage 7B — business-managed customers (`customer_profiles` with
+  // `user_id = NULL`, scoped by `business_id`). Every method re-scopes
+  // to the caller's business: another business's customer reads as
+  // null (NOT_FOUND upstream), never as a forbidden signal.
+  // ------------------------------------------------------------------
+  /** Customers for one business, creation order, paginated. */
+  listBusinessCustomers(
+    businessId: string,
+    page: number,
+    pageSize: number,
+    search: string | null,
+  ): Promise<{ items: BusinessCustomerDto[]; total: number }>;
+  /** One business customer, or null when unknown (or owned by another business). */
+  getBusinessCustomer(businessId: string, customerId: string): Promise<BusinessCustomerDto | null>;
+  /** Insert a `user_id = NULL` customer row owned by the business. */
+  createBusinessCustomer(businessId: string, input: CreateBusinessCustomerInput): Promise<BusinessCustomerDto>;
+  /** Apply a validated customer patch; null when unknown (or foreign). */
+  updateBusinessCustomer(
+    businessId: string,
+    customerId: string,
+    patch: UpdateBusinessCustomerInput,
+  ): Promise<BusinessCustomerDto | null>;
+  // ------------------------------------------------------------------
+  // Stage 7B — internal business jobs (the ONE shared `jobs` table with
+  // `source = INTERNAL`). Marketplace rows are never returned here: every
+  // read filters `source = INTERNAL` in addition to `business_id`.
+  // ------------------------------------------------------------------
+  /** Customer row for job validation (id + owning business), or null. */
+  findInternalCustomer(businessId: string, customerId: string): Promise<{ id: string } | null>;
+  /**
+   * Insert an INTERNAL / REQUESTED job plus the initial `NULL →
+   * REQUESTED` history entry. The caller guarantees the customer
+   * belongs to the business and the service is active.
+   */
+  createInternalJob(input: PersistInternalJobInput): Promise<InternalJobDto>;
+  /** INTERNAL jobs for one business, newest first, paginated + filtered. */
+  listInternalJobs(
+    businessId: string,
+    query: { status: InternalJobStatus | null; search: string | null; page: number; pageSize: number },
+  ): Promise<{ items: InternalJobDto[]; total: number }>;
+  /** One INTERNAL job with embedded customer/service/business, or null. */
+  getInternalJob(businessId: string, jobId: string): Promise<InternalJobDto | null>;
+  /** Apply a validated field patch (no status change); null when unknown/foreign. */
+  updateInternalJob(
+    businessId: string,
+    jobId: string,
+    patch: UpdateInternalJobInput,
+  ): Promise<InternalJobDto | null>;
+  /**
+   * Cancel a REQUESTED internal job: guarded `REQUESTED → CANCELLED`
+   * update plus the history entry, atomically. Returns null when the
+   * job is unknown/foreign; throws JobNotCancellableError when the
+   * current state forbids cancellation (the service maps it to 422).
+   */
+  cancelInternalJob(businessId: string, jobId: string, input: { reason: string | null; changedBy: string }): Promise<InternalJobDto | null>;
+  /** Status history for one INTERNAL job, oldest first (null when foreign). */
+  listInternalJobHistory(businessId: string, jobId: string): Promise<InternalJobTimelineEntry[] | null>;
+  /** INTERNAL job counts by status for the business dashboard. */
+  countInternalJobsByStatus(businessId: string): Promise<InternalJobsSummary>;
+  /** Full internal-job detail (job + timeline) for the detail endpoint. */
+  getInternalJobDetail(businessId: string, jobId: string): Promise<InternalJobDetailDto | null>;
+}
+
+/** The job is not in a cancellable state (only REQUESTED may cancel in Stage 7B). */
+export class JobNotCancellableError extends Error {
+  constructor(message = 'Only requested jobs can be cancelled.') {
+    super(message);
+    this.name = 'JobNotCancellableError';
+  }
+}
+
+/** Persist input for an internal job (ownership already verified by the service). */
+export interface PersistInternalJobInput extends CreateInternalJobInput {
+  reference: string;
+  businessId: string;
+  businessName: string;
+  createdBy: string;
+  /** Resolved service name/slug for the embedded projection. */
+  serviceName: string;
+  serviceSlug: string;
 }

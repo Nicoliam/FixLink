@@ -88,5 +88,103 @@ export function makeBusinessController(service: BusinessService) {
         fail(res, 'INTERNAL_ERROR', 'Could not update the technician. Please try again.', 500);
       }
     },
+
+    async listBusinessCustomers(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listBusinessCustomers(authUser(req).id, queryOf(req));
+        send(res, result, 'Customers retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve customers. Please try again.', 500);
+      }
+    },
+
+    async getBusinessCustomer(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBusinessCustomer(authUser(req).id, req.params['customerId'] ?? '');
+        send(res, result, 'Customer retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the customer. Please try again.', 500);
+      }
+    },
+
+    async createBusinessCustomer(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.createBusinessCustomer(authUser(req).id, req.body);
+        send(res, result, 'Customer added.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not add the customer. Please try again.', 500);
+      }
+    },
+
+    async updateBusinessCustomer(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.updateBusinessCustomer(
+          authUser(req).id,
+          req.params['customerId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Customer updated.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not update the customer. Please try again.', 500);
+      }
+    },
+
+    async listInternalJobs(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listInternalJobs(authUser(req).id, queryOf(req));
+        send(res, result, 'Jobs retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve jobs. Please try again.', 500);
+      }
+    },
+
+    async createInternalJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.createInternalJob(authUser(req).id, req.body);
+        send(res, result, 'Internal job created.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not create the job. Please try again.', 500);
+      }
+    },
+
+    async getInternalJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getInternalJob(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Job retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the job. Please try again.', 500);
+      }
+    },
+
+    async updateInternalJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.updateInternalJob(authUser(req).id, req.params['jobId'] ?? '', req.body);
+        send(res, result, 'Job updated.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not update the job. Please try again.', 500);
+      }
+    },
+
+    async cancelInternalJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.cancelInternalJob(authUser(req).id, req.params['jobId'] ?? '', req.body);
+        send(res, result, 'Job cancelled.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not cancel the job. Please try again.', 500);
+      }
+    },
+
+    async getInternalJobsSummary(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getInternalJobsSummary(authUser(req).id);
+        send(res, result, 'Job summary retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the job summary. Please try again.', 500);
+      }
+    },
   };
+}
+
+function queryOf(req: Request): Record<string, unknown> {
+  return req.query as Record<string, unknown>;
 }

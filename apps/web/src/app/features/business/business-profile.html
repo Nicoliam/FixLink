@@ -1,0 +1,90 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/business">← Back to business dashboard</a>
+  </nav>
+
+  <p class="fl-eyebrow">Business</p>
+  <h1 class="fl-page-title">Business profile</h1>
+  <p class="fl-page-subtitle">Your business identity as stored by FixLink.</p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading your business…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="load()">Try again</button>
+    </div>
+  } @else if (business(); as biz) {
+    <article class="fl-card">
+      <p class="fl-card-label">{{ roleLabel(biz.role) }} · {{ verificationText(biz.verificationStatus) }}</p>
+      <h2 class="fl-card-title">{{ biz.businessName }}</h2>
+      @if (biz.description) {
+        <p class="fl-card-text">{{ biz.description }}</p>
+      }
+      <p class="fl-card-text">{{ biz.city ?? 'No city on file' }}{{
+        biz.province ? ', ' + biz.province : ''
+      }}</p>
+      @if (biz.email) {
+        <p class="fl-card-text">{{ biz.email }}</p>
+      }
+      @if (biz.phone) {
+        <p class="fl-card-text">{{ biz.phone }}</p>
+      }
+      @if (canEdit() && !editing()) {
+        <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="startEditing()">
+          Edit profile
+        </button>
+      }
+    </article>
+
+    @if (editing()) {
+      <section class="fl-card" aria-label="Edit business profile">
+        <h2 class="fl-card-title">Edit business profile</h2>
+        <form class="fl-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+          <div class="fl-field">
+            <label for="profile-name">Business name</label>
+            <input id="profile-name" class="fl-input" type="text" formControlName="businessName" autocomplete="organization" />
+            @if (form.controls.businessName.touched && form.controls.businessName.invalid) {
+              <p class="fl-field-error" role="alert">Business name is required.</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="profile-description">Description</label>
+            <textarea id="profile-description" class="fl-input" formControlName="description" rows="3"></textarea>
+          </div>
+          <div class="fl-field">
+            <label for="profile-email">Email</label>
+            <input id="profile-email" class="fl-input" type="email" formControlName="email" autocomplete="email" />
+            @if (form.controls.email.touched && form.controls.email.invalid) {
+              <p class="fl-field-error" role="alert">Enter a valid email address.</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="profile-phone">Phone</label>
+            <input id="profile-phone" class="fl-input" type="tel" formControlName="phone" autocomplete="tel" />
+          </div>
+          <div class="fl-field">
+            <label for="profile-city">City</label>
+            <input id="profile-city" class="fl-input" type="text" formControlName="city" autocomplete="address-level2" />
+          </div>
+          <div class="fl-field">
+            <label for="profile-province">Province</label>
+            <input id="profile-province" class="fl-input" type="text" formControlName="province" autocomplete="address-level1" />
+          </div>
+          @if (saveError()) {
+            <p class="fl-field-error" role="alert">{{ saveError() }}</p>
+          }
+          <button type="submit" class="fl-btn fl-btn-primary fl-btn-block" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save changes' }}
+          </button>
+          <button type="button" class="fl-btn fl-btn-secondary fl-btn-block" (click)="cancelEditing()" [disabled]="saving()">
+            Cancel
+          </button>
+        </form>
+      </section>
+    }
+  }
+</div>

@@ -13,15 +13,29 @@
  */
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import {
+  JobNotCancellableError,
   TechnicianConflictError,
   type BusinessStore,
   type LinkTechnicianPersistInput,
+  type PersistInternalJobInput,
 } from './business.store';
 import type {
+  BusinessCustomerContact,
+  BusinessCustomerDto,
   BusinessDto,
   BusinessIdentity,
+  CreateBusinessCustomerInput,
+  InternalJobBusinessSummary,
+  InternalJobCustomerSummary,
+  InternalJobDetailDto,
+  InternalJobDto,
+  InternalJobsSummary,
+  InternalJobStatus,
+  InternalJobTimelineEntry,
   TechnicianDto,
+  UpdateBusinessCustomerInput,
   UpdateBusinessInput,
+  UpdateInternalJobInput,
   UpdateTechnicianInput,
 } from './business.types';
 
@@ -79,6 +93,52 @@ interface TechnicianRow extends RowDataPacket {
   updated_at: Date | string;
 }
 
+interface BusinessCustomerRow extends RowDataPacket {
+  id: number;
+  business_id: number;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  preferred_contact: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+interface InternalJobRow extends RowDataPacket {
+  id: number;
+  reference: string;
+  source: 'MARKETPLACE' | 'INTERNAL';
+  status: InternalJobStatus;
+  business_id: number;
+  business_name: string | null;
+  customer_id: number;
+  customer_first_name: string | null;
+  customer_last_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  service_id: number | null;
+  service_name: string | null;
+  service_slug: string | null;
+  title: string | null;
+  description: string;
+  address_line1: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
+  priority: InternalJobDto['priority'];
+  scheduled_at: Date | string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+interface InternalHistoryRow extends RowDataPacket {
+  previous_status: InternalJobStatus | null;
+  new_status: InternalJobStatus;
+  reason: string | null;
+  created_at: Date | string;
+}
+
 const BUSINESS_SELECT = `
   SELECT \`id\`, \`business_name\`, \`slug\`, \`description\`, \`logo_reference\`,
          \`email\`, \`phone\`, \`address_line1\`, \`city\`, \`province\`,
@@ -128,6 +188,82 @@ function mapTechnician(row: TechnicianRow): TechnicianDto {
     updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
   };
 }
+
+function mapBusinessCustomer(row: BusinessCustomerRow): BusinessCustomerDto {
+  const preferred = row.preferred_contact as BusinessCustomerContact | null;
+  return {
+    id: toStringId(row.id),
+    businessId: toStringId(row.business_id),
+    firstName: row.first_name,
+    lastName: row.last_name,
+    displayName: `${row.first_name} ${row.last_name}`,
+    email: row.email,
+    phone: row.phone,
+    preferredContact: preferred === 'EMAIL' || preferred === 'PHONE' || preferred === 'WHATSAPP' ? preferred : null,
+    createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+    updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
+  };
+}
+
+function mapInternalJob(row: InternalJobRow): InternalJobDto {
+  const customer: InternalJobCustomerSummary = {
+    id: toStringId(row.customer_id),
+    firstName: row.customer_first_name ?? '',
+    lastName: row.customer_last_name ?? '',
+    displayName: `${row.customer_first_name ?? ''} ${row.customer_last_name ?? ''}`.trim(),
+    email: row.customer_email,
+    phone: row.customer_phone,
+  };
+  const business: InternalJobBusinessSummary = {
+    id: toStringId(row.business_id),
+    businessName: row.business_name ?? '',
+  };
+  return {
+    id: toStringId(row.id),
+    reference: row.reference,
+    source: 'INTERNAL',
+    status: row.status,
+    businessId: toStringId(row.business_id),
+    business,
+    customerId: toStringId(row.customer_id),
+    customer,
+    service: {
+      id: row.service_id === null ? '' : toStringId(row.service_id),
+      name: row.service_name ?? '',
+      slug: row.service_slug ?? '',
+    },
+    title: row.title,
+    description: row.description,
+    addressLine1: row.address_line1,
+    city: row.city,
+    province: row.province,
+    postalCode: row.postal_code,
+    priority: row.priority,
+    scheduledAt: toIso(row.scheduled_at),
+    createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+    updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
+  };
+}
+
+const BUSINESS_CUSTOMER_SELECT = `
+  SELECT \`id\`, \`business_id\`, \`first_name\`, \`last_name\`, \`email\`,
+         \`phone\`, \`preferred_contact\`, \`created_at\`, \`updated_at\`
+    FROM \`customer_profiles\``;
+
+const INTERNAL_JOB_SELECT = `
+  SELECT j.\`id\`, j.\`reference\`, j.\`source\`, j.\`status\`,
+         j.\`business_id\`, bp.\`business_name\`,
+         j.\`customer_id\`, cp.\`first_name\` AS \`customer_first_name\`,
+         cp.\`last_name\` AS \`customer_last_name\`,
+         cp.\`email\` AS \`customer_email\`, cp.\`phone\` AS \`customer_phone\`,
+         j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
+         j.\`title\`, j.\`description\`, j.\`address_line1\`, j.\`city\`,
+         j.\`province\`, j.\`postal_code\`, j.\`priority\`, j.\`scheduled_at\`,
+         j.\`created_at\`, j.\`updated_at\`
+    FROM \`jobs\` j
+    INNER JOIN \`customer_profiles\` cp ON cp.\`id\` = j.\`customer_id\`
+    LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = j.\`business_id\`
+    LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\``;
 
 export class MysqlBusinessStore implements BusinessStore {
   constructor(private readonly pool: Pool) {}
@@ -353,4 +489,355 @@ export class MysqlBusinessStore implements BusinessStore {
       conn.release();
     }
   }
+
+  // ------------------------------------------------------------------
+  // Stage 7B — business-managed customers (MySQL implementation).
+  //
+  // Business customers are `customer_profiles` rows with
+  // `user_id = NULL` and `business_id` set (migration 003). Every
+  // read and write is scoped by `business_id` so Business A can
+  // never see Business B's customers.
+  // ------------------------------------------------------------------
+
+  async listBusinessCustomers(
+    businessId: string,
+    page: number,
+    pageSize: number,
+    search: string | null,
+  ): Promise<{ items: BusinessCustomerDto[]; total: number }> {
+    const needle = search === null ? null : `%${escapeLike(search)}%`;
+    const scope = '`business_id` = ? AND `user_id` IS NULL AND `deleted_at` IS NULL';
+    const searchSql = needle === null ? '' : ' AND (`first_name` LIKE ? ESCAPE \'\\\' OR `last_name` LIKE ? ESCAPE \'\\\' OR `email` LIKE ? ESCAPE \'\\\' OR `phone` LIKE ? ESCAPE \'\\\')';
+    const countParams = needle === null ? [businessId] : [businessId, needle, needle, needle, needle];
+    const [countRows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS \`total\` FROM \`customer_profiles\` WHERE ${scope}${searchSql}`,
+      countParams,
+    );
+    const total = Number((countRows as Array<{ total: number }>)[0]?.total ?? 0);
+    if (total === 0) return { items: [], total: 0 };
+    const offset = (page - 1) * pageSize;
+    const [rows] = await this.pool.query<BusinessCustomerRow[]>(
+      `${BUSINESS_CUSTOMER_SELECT} WHERE ${scope}${searchSql} ORDER BY \`id\` ASC LIMIT ? OFFSET ?`,
+      [...countParams, pageSize, offset],
+    );
+    return { items: (rows as BusinessCustomerRow[]).map(mapBusinessCustomer), total };
+  }
+
+  async getBusinessCustomer(businessId: string, customerId: string): Promise<BusinessCustomerDto | null> {
+    if (!/^[1-9][0-9]*$/.test(customerId)) return null;
+    const [rows] = await this.pool.query<BusinessCustomerRow[]>(
+      `${BUSINESS_CUSTOMER_SELECT} WHERE \`id\` = ? AND \`business_id\` = ? AND \`user_id\` IS NULL AND \`deleted_at\` IS NULL LIMIT 1`,
+      [customerId, businessId],
+    );
+    const list = rows as BusinessCustomerRow[];
+    // Business scoping is part of existence: another business's
+    // customer reads as NOT_FOUND so customer ids cannot be probed.
+    return list.length === 0 ? null : mapBusinessCustomer(list[0] as BusinessCustomerRow);
+  }
+
+  async createBusinessCustomer(businessId: string, input: CreateBusinessCustomerInput): Promise<BusinessCustomerDto> {
+    const [result] = await this.pool.query<ResultSetHeader>(
+      'INSERT INTO `customer_profiles` (`user_id`, `business_id`, `first_name`, `last_name`, `email`, `phone`, `preferred_contact`) VALUES (NULL, ?, ?, ?, ?, ?, ?)',
+      [businessId, input.firstName, input.lastName, input.email, input.phone, input.preferredContact],
+    );
+    const created = await this.getBusinessCustomer(businessId, String(result.insertId));
+    if (!created) throw new Error('Business customer creation failed: row not found after insert.');
+    return created;
+  }
+
+  async updateBusinessCustomer(
+    businessId: string,
+    customerId: string,
+    patch: UpdateBusinessCustomerInput,
+  ): Promise<BusinessCustomerDto | null> {
+    if (!/^[1-9][0-9]*$/.test(customerId)) return null;
+    const existing = await this.getBusinessCustomer(businessId, customerId);
+    if (!existing) return null;
+    const sets: string[] = [];
+    const params: Array<string | null> = [];
+    if (patch.firstName !== undefined) {
+      sets.push('`first_name` = ?');
+      params.push(patch.firstName);
+    }
+    if (patch.lastName !== undefined) {
+      sets.push('`last_name` = ?');
+      params.push(patch.lastName);
+    }
+    if (patch.email !== undefined) {
+      sets.push('`email` = ?');
+      params.push(patch.email);
+    }
+    if (patch.phone !== undefined) {
+      sets.push('`phone` = ?');
+      params.push(patch.phone);
+    }
+    if (patch.preferredContact !== undefined) {
+      sets.push('`preferred_contact` = ?');
+      params.push(patch.preferredContact);
+    }
+    if (sets.length > 0) {
+      await this.pool.query(
+        `UPDATE \`customer_profiles\` SET ${sets.join(', ')} WHERE \`id\` = ? AND \`business_id\` = ? AND \`user_id\` IS NULL AND \`deleted_at\` IS NULL`,
+        [...params, customerId, businessId],
+      );
+    }
+    return this.getBusinessCustomer(businessId, customerId);
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7B — internal business jobs (MySQL implementation).
+  //
+  // Internal jobs reuse the ONE shared `jobs` table with
+  // `source = INTERNAL` (migration 004). Every read filters both
+  // `business_id` and `source`, so marketplace rows never leak into
+  // the business surface and Business A never sees Business B jobs.
+  // ------------------------------------------------------------------
+
+  async findInternalCustomer(businessId: string, customerId: string): Promise<{ id: string } | null> {
+    if (!/^[1-9][0-9]*$/.test(customerId)) return null;
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT `id` FROM `customer_profiles` WHERE `id` = ? AND `business_id` = ? AND `user_id` IS NULL AND `deleted_at` IS NULL LIMIT 1',
+      [customerId, businessId],
+    );
+    const list = rows as Array<{ id: number }>;
+    return list.length === 0 ? null : { id: toStringId((list[0] as { id: number }).id) };
+  }
+
+  async createInternalJob(input: PersistInternalJobInput): Promise<InternalJobDto> {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      let reference = input.reference;
+      let jobId = 0;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          const [result] = await conn.query<ResultSetHeader>(
+            `INSERT INTO \`jobs\`
+               (\`reference\`, \`source\`, \`customer_id\`, \`business_id\`, \`service_id\`,
+                \`title\`, \`description\`, \`address_line1\`, \`city\`, \`province\`,
+                \`postal_code\`, \`priority\`, \`scheduled_at\`, \`status\`, \`currency\`, \`created_by\`)
+             VALUES (?, 'INTERNAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REQUESTED', 'ZAR', ?)`,
+            [
+              reference,
+              input.customerId,
+              input.businessId,
+              input.serviceId,
+              input.title,
+              input.description,
+              input.addressLine1,
+              input.city,
+              input.province,
+              input.postalCode,
+              input.priority,
+              input.scheduledAt,
+              input.createdBy,
+            ],
+          );
+          jobId = Number(result.insertId);
+          break;
+        } catch (err) {
+          if ((err as { code?: string } | null)?.code !== 'ER_DUP_ENTRY' || attempt === 4) throw err;
+          reference = `${input.reference.slice(0, 24)}-${Math.floor(Math.random() * 10000)}`;
+        }
+      }
+      await conn.query(
+        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, NULL, ?, ?, ?)',
+        [jobId, 'REQUESTED', input.createdBy, 'Internal job created by business'],
+      );
+      await conn.commit();
+      const created = await this.getInternalJob(input.businessId, String(jobId));
+      if (!created) throw new Error('Internal job creation failed: row not found after insert.');
+      return created;
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async listInternalJobs(
+    businessId: string,
+    query: { status: InternalJobStatus | null; search: string | null; page: number; pageSize: number },
+  ): Promise<{ items: InternalJobDto[]; total: number }> {
+    const scope = 'j.`business_id` = ? AND j.`source` = \'INTERNAL\' AND j.`deleted_at` IS NULL';
+    const params: Array<string | number> = [businessId];
+    let filter = '';
+    if (query.status !== null) {
+      filter += ' AND j.`status` = ?';
+      params.push(query.status);
+    }
+    if (query.search !== null) {
+      filter += ' AND (j.`reference` LIKE ? ESCAPE \'\\\' OR j.`description` LIKE ? ESCAPE \'\\\' OR j.`title` LIKE ? ESCAPE \'\\\' OR cp.`first_name` LIKE ? ESCAPE \'\\\' OR cp.`last_name` LIKE ? ESCAPE \'\\\' OR s.`name` LIKE ? ESCAPE \'\\\')';
+      const needle = `%${escapeLike(query.search)}%`;
+      params.push(needle, needle, needle, needle, needle, needle);
+    }
+    const [countRows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS \`total\` FROM \`jobs\` j INNER JOIN \`customer_profiles\` cp ON cp.\`id\` = j.\`customer_id\` LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\` WHERE ${scope}${filter}`,
+      params,
+    );
+    const total = Number((countRows as Array<{ total: number }>)[0]?.total ?? 0);
+    if (total === 0) return { items: [], total: 0 };
+    const offset = (query.page - 1) * query.pageSize;
+    const [rows] = await this.pool.query<InternalJobRow[]>(
+      `${INTERNAL_JOB_SELECT} WHERE ${scope}${filter} ORDER BY j.\`created_at\` DESC LIMIT ? OFFSET ?`,
+      [...params, query.pageSize, offset],
+    );
+    return { items: (rows as InternalJobRow[]).map(mapInternalJob), total };
+  }
+
+  async getInternalJob(businessId: string, jobId: string): Promise<InternalJobDto | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const [rows] = await this.pool.query<InternalJobRow[]>(
+      `${INTERNAL_JOB_SELECT} WHERE j.\`id\` = ? AND j.\`business_id\` = ? AND j.\`source\` = 'INTERNAL' AND j.\`deleted_at\` IS NULL LIMIT 1`,
+      [jobId, businessId],
+    );
+    const list = rows as InternalJobRow[];
+    // Business scoping + source are part of existence: another
+    // business's job (or any marketplace job) reads as NOT_FOUND.
+    return list.length === 0 ? null : mapInternalJob(list[0] as InternalJobRow);
+  }
+
+  async updateInternalJob(
+    businessId: string,
+    jobId: string,
+    patch: UpdateInternalJobInput,
+  ): Promise<InternalJobDto | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const existing = await this.getInternalJob(businessId, jobId);
+    if (!existing) return null;
+    const sets: string[] = [];
+    const params: Array<string | null> = [];
+    if (patch.title !== undefined) {
+      sets.push('`title` = ?');
+      params.push(patch.title);
+    }
+    if (patch.description !== undefined) {
+      sets.push('`description` = ?');
+      params.push(patch.description);
+    }
+    if (patch.addressLine1 !== undefined) {
+      sets.push('`address_line1` = ?');
+      params.push(patch.addressLine1);
+    }
+    if (patch.city !== undefined) {
+      sets.push('`city` = ?');
+      params.push(patch.city);
+    }
+    if (patch.province !== undefined) {
+      sets.push('`province` = ?');
+      params.push(patch.province);
+    }
+    if (patch.postalCode !== undefined) {
+      sets.push('`postal_code` = ?');
+      params.push(patch.postalCode);
+    }
+    if (patch.priority !== undefined) {
+      sets.push('`priority` = ?');
+      params.push(patch.priority);
+    }
+    if (patch.scheduledAt !== undefined) {
+      sets.push('`scheduled_at` = ?');
+      params.push(patch.scheduledAt);
+    }
+    if (sets.length > 0) {
+      await this.pool.query(
+        `UPDATE \`jobs\` SET ${sets.join(', ')} WHERE \`id\` = ? AND \`business_id\` = ? AND \`source\` = 'INTERNAL' AND \`deleted_at\` IS NULL`,
+        [...params, jobId, businessId],
+      );
+    }
+    return this.getInternalJob(businessId, jobId);
+  }
+
+  async cancelInternalJob(
+    businessId: string,
+    jobId: string,
+    input: { reason: string | null; changedBy: string },
+  ): Promise<InternalJobDto | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [rows] = await conn.query<RowDataPacket[]>(
+        "SELECT `id`, `status` FROM `jobs` WHERE `id` = ? AND `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL FOR UPDATE",
+        [jobId, businessId],
+      );
+      const row = (rows as Array<{ id: number; status: InternalJobStatus }>)[0];
+      if (!row) {
+        await conn.rollback();
+        return null;
+      }
+      if (row.status !== 'REQUESTED') {
+        throw new JobNotCancellableError();
+      }
+      const [updated] = await conn.query<ResultSetHeader>(
+        "UPDATE `jobs` SET `status` = 'CANCELLED' WHERE `id` = ? AND `status` = 'REQUESTED'",
+        [jobId],
+      );
+      if (updated.affectedRows !== 1) throw new JobNotCancellableError();
+      await conn.query(
+        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+        [jobId, 'REQUESTED', 'CANCELLED', input.changedBy, input.reason ?? 'Internal job cancelled by business'],
+      );
+      await conn.commit();
+      return this.getInternalJob(businessId, jobId);
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async listInternalJobHistory(businessId: string, jobId: string): Promise<InternalJobTimelineEntry[] | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const owned = await this.getInternalJob(businessId, jobId);
+    if (!owned) return null;
+    const [rows] = await this.pool.query<InternalHistoryRow[]>(
+      'SELECT `previous_status`, `new_status`, `reason`, `created_at` FROM `job_status_history` WHERE `job_id` = ? ORDER BY `created_at` ASC, `id` ASC',
+      [jobId],
+    );
+    return (rows as InternalHistoryRow[]).map((row) => ({
+      previousStatus: row.previous_status,
+      status: row.new_status,
+      reason: row.reason,
+      createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+    }));
+  }
+
+  async countInternalJobsByStatus(businessId: string): Promise<InternalJobsSummary> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT `status`, COUNT(*) AS `total` FROM `jobs` WHERE `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL GROUP BY `status`",
+      [businessId],
+    );
+    const summary: InternalJobsSummary = {
+      total: 0,
+      requested: 0,
+      scheduled: 0,
+      inProgress: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+    for (const row of rows as Array<{ status: InternalJobStatus; total: number }>) {
+      summary.total += Number(row.total);
+      if (row.status === 'REQUESTED') summary.requested += Number(row.total);
+      else if (row.status === 'SCHEDULED') summary.scheduled += Number(row.total);
+      else if (row.status === 'IN_PROGRESS') summary.inProgress += Number(row.total);
+      else if (row.status === 'COMPLETED') summary.completed += Number(row.total);
+      else if (row.status === 'CANCELLED') summary.cancelled += Number(row.total);
+    }
+    return summary;
+  }
+
+  async getInternalJobDetail(businessId: string, jobId: string): Promise<InternalJobDetailDto | null> {
+    const job = await this.getInternalJob(businessId, jobId);
+    if (!job) return null;
+    const timeline = (await this.listInternalJobHistory(businessId, jobId)) ?? [];
+    return { job, timeline };
+  }
+}
+
+/** Escape SQL LIKE wildcards so search input matches literally. */
+function escapeLike(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
