@@ -330,6 +330,24 @@ export class MemoryBusinessStore implements BusinessStore {
     );
   }
 
+  /**
+   * Stage 8 — notification recipients for business events: the owning
+   * user id plus active BUSINESS_OWNER / BUSINESS_MANAGER member user
+   * ids (technicians never included).
+   */
+  async findActiveManagerUserIds(businessId: string): Promise<string[]> {
+    const userIds = new Set<string>();
+    const business = this.businesses.get(businessId);
+    if (business) userIds.add(business.ownerUserId);
+    for (const member of this.members) {
+      if (member.businessId !== businessId || !member.isActive) continue;
+      if (member.role === 'BUSINESS_OWNER' || member.role === 'BUSINESS_MANAGER') {
+        userIds.add(member.userId);
+      }
+    }
+    return [...userIds];
+  }
+
   async getBusinessById(businessId: string): Promise<Omit<BusinessDto, 'role' | 'technicianCount'> | null> {
     const row = this.businesses.get(businessId);
     if (!row) return null;

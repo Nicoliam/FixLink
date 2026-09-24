@@ -210,6 +210,45 @@ export class MysqlQuotesStore implements QuotesStore {
     return [...identities.values()];
   }
 
+  /**
+   * Stage 8 — reverse lookup for notification recipients: login user
+   * ids that may act for a marketplace provider (the professional
+   * owner, or the business owner plus active owner/manager members —
+   * technicians are never marketplace recipients).
+   */
+  async findUserIdsForProvider(
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<string[]> {
+    if (!/^[1-9][0-9]*$/.test(providerNumericId)) return [];
+    const userIds = new Set<string>();
+    if (providerType === 'professional') {
+      const [rows] = await this.pool.query<RowDataPacket[]>(
+        'SELECT `user_id` FROM `professional_profiles` WHERE `id` = ? AND `deleted_at` IS NULL LIMIT 1',
+        [providerNumericId],
+      );
+      for (const row of rows as RowDataPacket[]) {
+        userIds.add(String(row['user_id'] as number));
+      }
+      return [...userIds];
+    }
+    const [owned] = await this.pool.query<RowDataPacket[]>(
+      'SELECT `owner_user_id` FROM `business_profiles` WHERE `id` = ? AND `deleted_at` IS NULL LIMIT 1',
+      [providerNumericId],
+    );
+    for (const row of owned as RowDataPacket[]) {
+      userIds.add(String(row['owner_user_id'] as number));
+    }
+    const [members] = await this.pool.query<MemberRow[]>(
+      "SELECT `user_id` FROM `business_members` WHERE `business_id` = ? AND `is_active` = 1 AND `role` IN ('BUSINESS_OWNER', 'BUSINESS_MANAGER')",
+      [providerNumericId],
+    );
+    for (const row of members as RowDataPacket[]) {
+      userIds.add(String(row['user_id'] as number));
+    }
+    return [...userIds];
+  }
+
   async listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }> {
     const statuses =
       filter.statuses.length > 0

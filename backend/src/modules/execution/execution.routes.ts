@@ -21,6 +21,7 @@ import { requireAuth } from '../../middleware/auth';
 import { JOB_IMAGE_MAX_BYTES } from '../../services/file-storage';
 import type { FileStorage } from '../../services/file-storage';
 import type { JobsStore } from '../jobs/jobs.store';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { QuotesStore } from '../quotes/quotes.store';
 import type { UserRepository } from '../users/user.repository';
 import { makeExecutionController } from './execution.controller';
@@ -34,9 +35,10 @@ export function makeExecutionRoutes(
   quotes: QuotesStore,
   execution: ExecutionStore,
   storage: FileStorage,
+  notify?: NotificationService,
 ): Router {
   const router = Router();
-  const service = new ExecutionService(jobs, quotes, users, execution, storage);
+  const service = new ExecutionService(jobs, quotes, users, execution, storage, notify);
   const controller = makeExecutionController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each

@@ -1,5 +1,54 @@
 # FixLink — Changelog
 
+## Stage 8 — In-App Notifications (2026-09-24)
+
+- MVP in-app system on the existing `notifications` table
+  (migration 008 — no new migration): central
+  `NotificationService`
+  (`backend/src/modules/notifications/` — types, store
+  contract, memory + MySQL stores, service, controller,
+  routes) with `create` / `createForUsers` / `listForUser` /
+  `getUnreadCount` / `markRead` / `markAllRead`. All 16
+  types (`JOB_REQUEST` … `PARTS_AVAILABLE`); references
+  `JOB` (marketplace) / `INTERNAL_JOB` (internal) so every
+  row opens exactly one job detail.
+- Endpoints: `GET /api/v1/notifications` (`unreadOnly`,
+  `page`/`pageSize`), `GET
+  /api/v1/notifications/unread-count`, `POST
+  /api/v1/notifications/:id/read`, `POST
+  /api/v1/notifications/read-all` — recipient always the
+  session user, foreign ids `404`, malformed ids
+  `400`/`422`.
+- Events wired best-effort after commit (delivery never
+  rolls back the operation; actor excluded; server-side
+  recipients): marketplace job requests/quotes/accept/
+  schedule/start/complete/confirm plus business
+  assignment/reassignment, technician start/updates/
+  photos/voice/completion, parts request/approve/reject/
+  info/available (exactly one per fulfilment)/respond.
+  The Stage 7F bus keeps emitting as a test seam and is
+  never persisted — no double delivery.
+- Recipient-resolution additions (memory + MySQL):
+  `findUserIdByCustomerId` (jobs),
+  `findUserIdsForProvider` (quotes),
+  `findActiveManagerUserIds` (business). No verification,
+  contact or admin-only data in messages; customers never
+  see internal notifications; cross-business delivery
+  impossible.
+- Angular: Oceanic bell + unread badge + compact panel in
+  the authenticated shell (60s badge polling, no
+  WebSockets), full `/notifications` inbox (filter, mark
+  read/all-read, pagination, loading/empty/error), and
+  role-specific navigation (`notificationRouteFor`).
+- Tests: `backend/tests/notifications.test.ts`
+  (33 cases) — full backend suite green: 386/386;
+  frontend suite green: 32 files, 268 tests;
+  `tsc --noEmit` (backend + web app + specs) and both
+  builds pass.
+- Out of scope (next: Stage 9 — Admin / Platform
+  Operations): admin contexts, email/SMS/WhatsApp/push,
+  payments, GPS, messaging.
+
 ## Stage 7G — Business Job Board + History (2026-09-24)
 
 - Operational board on the existing shared jobs

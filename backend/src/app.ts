@@ -28,6 +28,11 @@ import { MemoryBusinessStore } from './modules/business/memory-business.store';
 import { MysqlBusinessStore } from './modules/business/mysql-business.store';
 import type { BusinessStore } from './modules/business/business.store';
 import { PartsRequestEventBus } from './modules/business/parts-request-events';
+import { makeNotificationsRoutes } from './modules/notifications/notifications.routes';
+import { MemoryNotificationsStore } from './modules/notifications/memory-notifications.store';
+import { MysqlNotificationsStore } from './modules/notifications/mysql-notifications.store';
+import type { NotificationStore } from './modules/notifications/notifications.store';
+import { NotificationService } from './modules/notifications/notifications.service';
 import { LocalFileStorage, type FileStorage } from './services/file-storage';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
@@ -53,6 +58,14 @@ export interface AppDeps {
    * `notifications` table.
    */
   events?: PartsRequestEventBus;
+  /**
+   * Stage 8 — notification persistence. Optional so pre-8
+   * constructions keep compiling; defaults to a memory store. The
+   * single NotificationService built from it is shared by every
+   * feature service (jobs, quotes, execution, business) for
+   * best-effort in-app delivery.
+   */
+  notifications?: NotificationStore;
 }
 
 export function resolveDeps(): AppDeps {
@@ -69,6 +82,7 @@ export function resolveDeps(): AppDeps {
       execution: new MemoryExecutionStore(jobs, quotes),
       business: new MemoryBusinessStore(),
       storage: new LocalFileStorage(),
+      notifications: new MemoryNotificationsStore(),
     };
   }
   const pool = getPool();
@@ -82,6 +96,7 @@ export function resolveDeps(): AppDeps {
     execution: new MysqlExecutionStore(pool),
     business: new MysqlBusinessStore(pool),
     storage: new LocalFileStorage(),
+    notifications: new MysqlNotificationsStore(pool),
   };
 }
 
@@ -111,15 +126,19 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
       : undefined);
   const storage = deps.storage ?? new LocalFileStorage();
   const business = deps.business ?? new MemoryBusinessStore();
+  // Stage 8 — one central notification service shared by every
+  // feature service plus the notifications router below.
+  const notifications = deps.notifications ?? new MemoryNotificationsStore();
+  const notify = new NotificationService(notifications);
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));
   app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
-  app.use('/api/v1', makeJobsRoutes(deps.users, jobs, deps.marketplace, quotes));
+  app.use('/api/v1', makeJobsRoutes(deps.users, jobs, deps.marketplace, quotes, notify));
   if (quotes) {
-    app.use('/api/v1', makeQuotesRoutes(deps.users, jobs, quotes));
+    app.use('/api/v1', makeQuotesRoutes(deps.users, jobs, quotes, notify));
   }
   if (quotes && execution) {
-    app.use('/api/v1', makeExecutionRoutes(deps.users, jobs, quotes, execution, storage));
+    app.use('/api/v1', makeExecutionRoutes(deps.users, jobs, quotes, execution, storage, notify));
   }
   // Auth-walled routers mount after the public marketplace routes: each
   // calls `router.use(requireAuth(...))`, which answers 401 for requests
@@ -128,7 +147,9 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   // jobs (Stage 7B) validate services against the same catalogue, plus
   // the shared file storage so technician execution (Stage 7D) stores
   // photos and voice notes through the same adapter as marketplace work.
-  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs, storage, deps.events));
+  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs, storage, deps.events, notify));
+  // Stage 8 — in-app notification inbox (recipient is always the session user).
+  app.use('/api/v1', makeNotificationsRoutes(deps.users, notifications));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

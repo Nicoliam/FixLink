@@ -18,6 +18,12 @@ export interface CustomerProvision {
 
 export interface JobsStore {
   findCustomerProfileByUserId(userId: string): Promise<CustomerProfileRef | null>;
+  /**
+   * Stage 8 — reverse lookup for notification recipients: the login
+   * user id that owns a marketplace customer profile, or null for
+   * business-managed (`user_id = NULL`) profiles. Server-side only.
+   */
+  findUserIdByCustomerId(customerId: string): Promise<string | null>;
   createCustomerProfile(userId: string, provision: CustomerProvision): Promise<CustomerProfileRef>;
   findActiveService(serviceId: string): Promise<ActiveServiceRef | null>;
   createJob(input: PersistJobInput): Promise<JobDto>;

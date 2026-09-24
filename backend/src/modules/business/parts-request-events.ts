@@ -1,31 +1,19 @@
 /**
- * FixLink Stage 7F — parts-request notification event seam.
+ * FixLink Stage 7F — parts-request notification event seam (retained
+ * in Stage 8 as a test-observable seam).
  *
- * The `notifications` table (migration 008) exists, but no notification
- * delivery infrastructure is implemented yet (no service writes to it,
- * no listing endpoints — see docs/NOTIFICATIONS.md). This module is the
- * single seam between the parts-approval workflow and future
- * notification delivery:
+ * The `notifications` table (migration 008) is now written by the
+ * central Stage 8 `NotificationService`, persisted directly in
+ * `BusinessService` — this bus is never drained for delivery, so no
+ * event is delivered twice (existing Stage 7F tests keep draining
+ * it for assertions).
  *
- * - The business service emits one PartsRequestEvent per decision /
- *   fulfilment / resume (approved, rejected, needs-info, available,
- *   ready-to-continue, technician-responded).
- * - Stage 7F collects the events in memory (exposed for tests via
- *   `drainEvents`) and does NOT write to any table — so no second
- *   notification system is created.
- * - Stage 8 (notifications) consumes these events: persist one
- *   `notifications` row per recipient (type/title/message/reference
- *   mapping is documented below) and expose the listing endpoints.
- *
- * Event → future `notifications` row mapping (Stage 8):
- * - type: the event `type` (e.g. PARTS_REQUEST_APPROVED).
- * - title/message: the event `title` / `message` (already phrased).
- * - reference_type: 'PARTS_REQUEST'; reference_id: the request id.
- * - Recipients: `technicianUserId` (the requesting technician's login)
- *   for manager decisions; all active owner/manager logins of the
- *   business for technician responses. User-id resolution stays
- *   server-side in Stage 8 — this seam only carries the ids the
- *   stores already hold.
+ * Stage 8 reference decision (job-navigable rows, no read-time
+ * joins, identical behaviour on both stores): parts notifications
+ * persist with `reference_type = 'INTERNAL_JOB'` and the job id, so
+ * every notification opens exactly one job detail; the request id is
+ * named in the message. A fulfilment that resumes the job folds the
+ * resume into the single PARTS_AVAILABLE message.
  */
 
 export type PartsRequestEventType =

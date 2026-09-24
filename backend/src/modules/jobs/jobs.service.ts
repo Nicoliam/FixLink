@@ -11,6 +11,7 @@
  * quoting itself lives in the quotes module).
  */
 import type { MarketplaceStore } from '../marketplace/marketplace.store';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { UserRepository } from '../users/user.repository';
 import type { JobQuotesReader } from '../quotes/quotes.store';
 import type { JobWithQuotes } from '../quotes/quotes.types';
@@ -61,6 +62,25 @@ export class JobsService {
     private readonly marketplace: MarketplaceStore,
     private readonly users: UserRepository,
     private readonly quotes?: JobQuotesReader,
+    /**
+     * Stage 8 — central notification delivery (in-app only). Optional
+     * so pre-8 constructions keep compiling; Stage 8 wiring supplies
+     * the shared service. Delivery is best-effort: a failure here
+     * never rolls back the committed job request.
+     */
+    private readonly notify?: NotificationService,
+    /**
+     * Stage 8 — provider → login-user resolution for JOB_REQUEST
+     * recipients. The live quotes store implements it; the structural
+     * `quotes` reader above does not promise it, so this stays a
+     * separate optional capability with a runtime guard.
+     */
+    private readonly providerDirectory?: {
+      findUserIdsForProvider(
+        providerType: 'professional' | 'business',
+        providerNumericId: string,
+      ): Promise<string[]>;
+    },
   ) {}
 
   async createMarketplaceJob(authUserId: string, authEmail: string, body: unknown): Promise<ServiceResult<JobDto>> {
@@ -115,7 +135,35 @@ export class JobsService {
       scheduledAt: toScheduledAt(input.preferredDate, input.preferredTime),
       createdBy: authUserId,
     });
+    await this.emitJobRequest(job);
     return { status: 201, data: job };
+  }
+
+  /**
+   * Stage 8 — JOB_REQUEST: notify the selected professional/business
+   * that a customer requested work. Best-effort (never fails the
+   * committed request); recipients resolve server-side from the
+   * provider directory. The message carries only the service, the
+   * customer-supplied location the provider already sees on the
+   * request, and the reference — no private customer contact data.
+   */
+  private async emitJobRequest(job: JobDto): Promise<void> {
+    if (!this.notify || !this.providerDirectory) return;
+    try {
+      if (typeof this.providerDirectory.findUserIdsForProvider !== 'function') return;
+      const numeric = job.provider.id.split('-')[1] ?? '';
+      const userIds = await this.providerDirectory.findUserIdsForProvider(job.provider.providerType, numeric);
+      if (userIds.length === 0) return;
+      await this.notify.createForUsers(userIds, {
+        type: 'JOB_REQUEST',
+        title: 'New job request',
+        message: `${job.service.name} requested at ${job.location} (${job.reference}).`,
+        referenceType: 'JOB',
+        referenceId: job.id,
+      });
+    } catch {
+      // Notification delivery is best-effort — the job request stands.
+    }
   }
 
   async listMyJobs(

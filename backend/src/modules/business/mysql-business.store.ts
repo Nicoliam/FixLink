@@ -79,10 +79,12 @@ function isDuplicate(err: unknown): boolean {
 
 interface OwnedRow extends RowDataPacket {
   id: number;
+  owner_user_id?: number;
 }
 
 interface MemberRow extends RowDataPacket {
   business_id: number;
+  user_id?: number;
   role: 'BUSINESS_OWNER' | 'BUSINESS_MANAGER' | 'TECHNICIAN';
 }
 
@@ -622,6 +624,31 @@ export class MysqlBusinessStore implements BusinessStore {
     return [...identities.values()].sort(
       (a, b) => rank(a.role) - rank(b.role) || Number(a.businessId) - Number(b.businessId),
     );
+  }
+
+  /**
+   * Stage 8 — notification recipients for business events: the owning
+   * user id plus active BUSINESS_OWNER / BUSINESS_MANAGER member user
+   * ids (technicians never included).
+   */
+  async findActiveManagerUserIds(businessId: string): Promise<string[]> {
+    if (!/^[1-9][0-9]*$/.test(businessId)) return [];
+    const userIds = new Set<string>();
+    const [owned] = await this.pool.query<OwnedRow[]>(
+      'SELECT `owner_user_id` FROM `business_profiles` WHERE `id` = ? AND `deleted_at` IS NULL LIMIT 1',
+      [businessId],
+    );
+    for (const row of owned as OwnedRow[]) {
+      if (row.owner_user_id !== undefined) userIds.add(toStringId(row.owner_user_id));
+    }
+    const [members] = await this.pool.query<MemberRow[]>(
+      "SELECT `user_id` FROM `business_members` WHERE `business_id` = ? AND `is_active` = 1 AND `role` IN ('BUSINESS_OWNER', 'BUSINESS_MANAGER')",
+      [businessId],
+    );
+    for (const row of members as MemberRow[]) {
+      if (row.user_id !== undefined) userIds.add(toStringId(row.user_id));
+    }
+    return [...userIds];
   }
 
   async getBusinessById(businessId: string): Promise<Omit<BusinessDto, 'role' | 'technicianCount'> | null> {

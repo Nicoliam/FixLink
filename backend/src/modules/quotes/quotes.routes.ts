@@ -19,15 +19,21 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../../middleware/auth';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { UserRepository } from '../users/user.repository';
 import type { JobsStore } from '../jobs/jobs.store';
 import { makeQuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
 import type { QuotesStore } from './quotes.store';
 
-export function makeQuotesRoutes(users: UserRepository, jobs: JobsStore, quotes: QuotesStore): Router {
+export function makeQuotesRoutes(
+  users: UserRepository,
+  jobs: JobsStore,
+  quotes: QuotesStore,
+  notify?: NotificationService,
+): Router {
   const router = Router();
-  const service = new QuotesService(jobs, quotes, users);
+  const service = new QuotesService(jobs, quotes, users, notify);
   const controller = makeQuotesController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each

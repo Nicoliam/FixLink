@@ -128,6 +128,22 @@ export class MysqlJobsStore implements JobsStore {
     return { id: toStringId((rows[0] as CustomerRow).id) };
   }
 
+  /**
+   * Stage 8 — reverse lookup for notification recipients: the login
+   * user id behind a customer profile (null for business-managed
+   * `user_id = NULL` rows, which never receive notifications).
+   */
+  async findUserIdByCustomerId(customerId: string): Promise<string | null> {
+    if (!/^[1-9][0-9]*$/.test(customerId)) return null;
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT `user_id` FROM `customer_profiles` WHERE `id` = ? AND `deleted_at` IS NULL LIMIT 1',
+      [customerId],
+    );
+    if (rows.length === 0) return null;
+    const userId = (rows[0] as RowDataPacket)['user_id'] as number | null;
+    return userId === null || userId === undefined ? null : String(userId);
+  }
+
   async createCustomerProfile(userId: string, provision: CustomerProvision): Promise<CustomerProfileRef> {
     try {
       await this.pool.query(

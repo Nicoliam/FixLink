@@ -40,6 +40,17 @@ export class MemoryJobsStore implements JobsStore {
     return this.customerByUserId.get(userId) ?? null;
   }
 
+  /**
+   * Stage 8 — reverse lookup for notification recipients: the login
+   * user id behind a marketplace customer profile.
+   */
+  async findUserIdByCustomerId(customerId: string): Promise<string | null> {
+    for (const [userId, profile] of this.customerByUserId) {
+      if (profile.id === customerId) return userId;
+    }
+    return null;
+  }
+
   async createCustomerProfile(userId: string, provision: CustomerProvision): Promise<CustomerProfileRef> {
     const existing = this.customerByUserId.get(userId);
     if (existing) return existing;

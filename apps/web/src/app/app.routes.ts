@@ -14,6 +14,7 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
  * `/business/jobs/:id`) and the business profile (`/business/profile`).
  * Stage 7C adds technician assignment (within `/business/jobs/:id`)
  * and technician My Jobs (`/technician/jobs`, `/technician/jobs/:id`).
+ * Stage 8 adds the in-app notification inbox (`/notifications`).
  * Role dashboards and the quote lifecycle arrive in later stages.
  */
 export const routes: Routes = [
@@ -132,6 +133,12 @@ export const routes: Routes = [
   {
     path: 'account',
     loadComponent: () => import('./features/account/account').then((m) => m.AccountComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'notifications',
+    loadComponent: () =>
+      import('./features/notifications/notifications').then((m) => m.NotificationsComponent),
     canActivate: [authGuard],
   },
   { path: '**', redirectTo: '' },

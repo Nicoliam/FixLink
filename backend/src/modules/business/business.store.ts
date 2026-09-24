@@ -69,6 +69,12 @@ export interface LinkTechnicianPersistInput {
 export interface BusinessStore {
   /** Businesses the user may act for (owner row or active membership). */
   findBusinessesForUser(userId: string): Promise<BusinessIdentity[]>;
+  /**
+   * Stage 8 — notification recipients for business events: the owning
+   * user id plus active BUSINESS_OWNER / BUSINESS_MANAGER member user
+   * ids (technicians never included). Server-side only.
+   */
+  findActiveManagerUserIds(businessId: string): Promise<string[]>;
   /** Business profile row, or null when unknown/deleted. */
   getBusinessById(businessId: string): Promise<Omit<BusinessDto, 'role' | 'technicianCount'> | null>;
   /** Apply a validated profile patch; the row must exist (checked by the service). */

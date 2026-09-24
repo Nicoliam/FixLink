@@ -30,6 +30,8 @@ import {
 } from '../../services/file-storage';
 import type { UserRepository } from '../users/user.repository';
 import type { JobsStore } from '../jobs/jobs.store';
+import type { NotificationService } from '../notifications/notifications.service';
+import type { NotificationType } from '../notifications/notifications.types';
 import {
   JobNotCancellableError,
   JobNotStartableError,
@@ -137,6 +139,16 @@ export class BusinessService {
      * will persist into the `notifications` table.
      */
     events?: PartsRequestEventBus,
+    /**
+     * Stage 8 — central notification delivery (in-app only). Optional
+     * so pre-8 constructions keep compiling. Every emission runs
+     * AFTER the state change commits and is best-effort: delivery
+     * failures never roll back the assignment/execution/approval
+     * outcome. The Stage 7F bus keeps emitting (existing tests drain
+     * it); persistence goes through this service directly, so no
+     * event is ever delivered twice.
+     */
+    private readonly notify?: NotificationService,
   ) {
     this.storage = storage ?? new LocalFileStorage();
     this.events = events ?? new PartsRequestEventBus();
@@ -145,6 +157,55 @@ export class BusinessService {
   /** Stage 7F notification seam (Stage 8 persists these into `notifications`). */
   get eventBus(): PartsRequestEventBus {
     return this.events;
+  }
+
+  /**
+   * Stage 8 — notify the business owners/managers of one business.
+   * Recipients resolve server-side (`findActiveManagerUserIds` —
+   * owner + active owner/manager members, never technicians, never
+   * another business); the actor is excluded. Messages carry only
+   * the job reference/service/part facts visible on the job —
+   * never verification, customer-contact or admin-only data.
+   */
+  private async emitToManagers(
+    businessId: string,
+    excludeUserId: string,
+    event: { type: NotificationType; title: string; message: string; jobId: string },
+  ): Promise<void> {
+    if (!this.notify) return;
+    try {
+      const managers = await this.business.findActiveManagerUserIds(businessId);
+      const recipients = managers.filter((id) => id !== excludeUserId);
+      if (recipients.length === 0) return;
+      await this.notify.createForUsers(recipients, {
+        type: event.type,
+        title: event.title,
+        message: event.message,
+        referenceType: 'INTERNAL_JOB',
+        referenceId: event.jobId,
+      });
+    } catch {
+      // Best-effort — the committed business operation stands.
+    }
+  }
+
+  /** Stage 8 — notify exactly one technician (assignment / parts decisions). */
+  private async emitToTechnician(
+    technicianUserId: string,
+    event: { type: NotificationType; title: string; message: string; jobId: string },
+  ): Promise<void> {
+    if (!this.notify) return;
+    try {
+      await this.notify.createForUsers([technicianUserId], {
+        type: event.type,
+        title: event.title,
+        message: event.message,
+        referenceType: 'INTERNAL_JOB',
+        referenceId: event.jobId,
+      });
+    } catch {
+      // Best-effort — the committed business operation stands.
+    }
   }
 
   /**
@@ -680,11 +741,23 @@ export class BusinessService {
     if (!technician.isActive) {
       return fail(422, 'VALIDATION_ERROR', 'Only active technicians can be assigned to jobs.');
     }
+    const previous = await this.business.getActiveJobAssignment(access.businessId, jobId.trim());
     const assigned = await this.business.assignJobTechnician(access.businessId, jobId.trim(), {
       technicianId: technician.id,
       assignedBy: authUserId,
     });
     if (!assigned) return fail(404, 'NOT_FOUND', 'Job not found.');
+    // Stage 8 — assignment notification to the newly assigned
+    // technician only (never unrelated technicians, never the
+    // previous assignee). A previous active assignment to a
+    // different technician makes this a reassignment.
+    const reassigned = previous !== null && previous.technician.id !== technician.id;
+    await this.emitToTechnician(technician.userId, {
+      type: reassigned ? 'TECHNICIAN_REASSIGNED' : 'TECHNICIAN_ASSIGNED',
+      title: reassigned ? 'Job reassigned to you' : 'Job assigned to you',
+      message: `You were assigned to job ${job.reference} (${job.service.name}).`,
+      jobId: job.id,
+    });
     return { status: 200, data: assigned };
   }
 
@@ -821,6 +894,12 @@ export class BusinessService {
         startedBy: authUserId,
       });
       if (!job) return fail(404, 'NOT_FOUND', 'Job not found.');
+      await this.emitToManagers(job.businessId, authUserId, {
+        type: 'JOB_STARTED',
+        title: 'Technician started job',
+        message: `Work started on job ${job.reference} (${job.service.name}).`,
+        jobId: job.id,
+      });
       return { status: 200, data: job };
     } catch (err) {
       if (err instanceof JobNotStartableError) {
@@ -930,6 +1009,12 @@ export class BusinessService {
         originalFilename: sanitizeOriginalFilename(uploaded.originalname),
         mimeType: checked.mime,
         size: stored.size,
+      });
+      await this.emitToManagers(scoped.job.businessId, authUserId, {
+        type: 'WORK_DOCUMENTED',
+        title: 'New work photos',
+        message: `New work photos were added to job ${scoped.job.reference}.`,
+        jobId: scoped.job.id,
       });
       return { status: 201, data: image };
     } catch (err) {
@@ -1041,6 +1126,12 @@ export class BusinessService {
         phase: phase as TechnicianWorkPhase,
         note,
       });
+      await this.emitToManagers(scoped.job.businessId, authUserId, {
+        type: 'JOB_UPDATE',
+        title: 'New job update',
+        message: `A progress update was added to job ${scoped.job.reference}.`,
+        jobId: scoped.job.id,
+      });
       return { status: 201, data: update };
     } catch (err) {
       if (err instanceof TechnicianJobNotExecutableError) {
@@ -1100,6 +1191,12 @@ export class BusinessService {
         mimeType: checked.mime,
         size: stored.size,
         durationSeconds: duration,
+      });
+      await this.emitToManagers(scoped.job.businessId, authUserId, {
+        type: 'WORK_DOCUMENTED',
+        title: 'New voice note',
+        message: `A voice note was added to job ${scoped.job.reference}.`,
+        jobId: scoped.job.id,
       });
       return { status: 201, data: voiceNote };
     } catch (err) {
@@ -1213,6 +1310,12 @@ export class BusinessService {
         completedBy: authUserId,
       });
       if (!result) return fail(404, 'NOT_FOUND', 'Job not found.');
+      await this.emitToManagers(result.job.businessId, authUserId, {
+        type: 'JOB_COMPLETED',
+        title: 'Job completed',
+        message: `Work completed on job ${result.job.reference}. Please review the job.`,
+        jobId: result.job.id,
+      });
       return { status: 200, data: result };
     } catch (err) {
       if (err instanceof TechnicianJobNotCompletableError) {
@@ -1427,6 +1530,12 @@ export class BusinessService {
         photoMime: photo?.mime ?? null,
         photoSize: photo?.size ?? null,
       });
+      await this.emitToManagers(scoped.job.businessId, authUserId, {
+        type: 'PARTS_REQUESTED',
+        title: 'New parts request',
+        message: `${this.partNameOf(request) ?? 'A part'} was requested for job ${scoped.job.reference}.`,
+        jobId: scoped.job.id,
+      });
       return { status: 201, data: request };
     } catch (err) {
       if (photo) await this.storage.remove(photo.storageKey);
@@ -1630,6 +1739,33 @@ export class BusinessService {
           partName: this.partNameOf(result.request),
         }),
       );
+      // Stage 8 — the decision persists as an in-app notification to
+      // the requesting technician (the bus event above stays a
+      // test-observable seam and is never persisted, so delivery is
+      // exactly once).
+      const partLabel = this.partNameOf(result.request) ?? 'The requested part';
+      if (decision === 'APPROVE') {
+        await this.emitToTechnician(result.technicianUserId, {
+          type: 'PARTS_APPROVED',
+          title: 'Parts request approved',
+          message: `${partLabel} was approved for job ${result.job.reference}. The job is awaiting parts.`,
+          jobId: result.job.id,
+        });
+      } else if (decision === 'REJECT') {
+        await this.emitToTechnician(result.technicianUserId, {
+          type: 'PARTS_REJECTED',
+          title: 'Parts request rejected',
+          message: `${partLabel} was not approved for job ${result.job.reference}. See the manager's reason.`,
+          jobId: result.job.id,
+        });
+      } else {
+        await this.emitToTechnician(result.technicianUserId, {
+          type: 'PARTS_MORE_INFO',
+          title: 'More information requested',
+          message: `The manager needs more information about ${partLabel.toLowerCase()} for job ${result.job.reference}.`,
+          jobId: result.job.id,
+        });
+      }
       return { status: 200, data: result };
     } catch (err) {
       if (err instanceof PartsRequestNotActionableError) {
@@ -1720,6 +1856,18 @@ export class BusinessService {
           }),
         );
       }
+      // Stage 8 — one notification per fulfilment (the resume is folded
+      // into the same message when the job continues, so a single
+      // request never produces two notifications).
+      const availableLabel = this.partNameOf(result.request) ?? 'The requested part';
+      await this.emitToTechnician(result.technicianUserId, {
+        type: 'PARTS_AVAILABLE',
+        title: 'Parts available',
+        message: result.jobResumed
+          ? `${availableLabel} is available for job ${result.job.reference}. The job is ready to continue.`
+          : `${availableLabel} is available for job ${result.job.reference}. Other approved parts are still outstanding.`,
+        jobId: result.job.id,
+      });
       return { status: 200, data: result };
     } catch (err) {
       if (err instanceof PartsRequestNotActionableError) {
@@ -1769,6 +1917,13 @@ export class BusinessService {
           partName: this.partNameOf(request),
         }),
       );
+      // Stage 8 — the technician's response needs manager attention.
+      await this.emitToManagers(request.businessId, authUserId, {
+        type: 'PARTS_REQUESTED',
+        title: 'Technician responded to a parts request',
+        message: `Additional information was provided for ${(this.partNameOf(request) ?? 'a part').toLowerCase()} on job ${scoped.job.reference}.`,
+        jobId: request.jobId,
+      });
       return { status: 200, data: request };
     } catch (err) {
       if (err instanceof PartsRequestNotActionableError) {

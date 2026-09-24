@@ -139,6 +139,16 @@ export interface QuotesStore {
   findProfessionalProfileByUserId(userId: string): Promise<ProfessionalIdentity | null>;
   /** Businesses the user may act for (owner or manager member). */
   findBusinessIdsForUser(userId: string): Promise<BusinessIdentity[]>;
+  /**
+   * Stage 8 — reverse lookup for notification recipients: login user
+   * ids that may act for a marketplace provider (the professional
+   * owner, or the business owner + active owner/manager members).
+   * Server-side only — never derived from request parameters.
+   */
+  findUserIdsForProvider(
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<string[]>;
   /** Marketplace requests addressed to the provider, newest first. */
   listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }>;
   /** Privacy-limited customer display name (first name + last initial). */

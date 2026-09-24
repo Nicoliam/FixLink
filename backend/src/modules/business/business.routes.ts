@@ -91,6 +91,7 @@ import { requireAuth } from '../../middleware/auth';
 import { VOICE_NOTE_MAX_BYTES } from '../../services/file-storage';
 import type { FileStorage } from '../../services/file-storage';
 import type { JobsStore } from '../jobs/jobs.store';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { UserRepository } from '../users/user.repository';
 import { makeBusinessController } from './business.controller';
 import { BusinessService } from './business.service';
@@ -104,9 +105,10 @@ export function makeBusinessRoutes(
   jobs?: Pick<JobsStore, 'findActiveService'>,
   storage?: FileStorage,
   events?: PartsRequestEventBus,
+  notify?: NotificationService,
 ): Router {
   const router = Router();
-  const service = new BusinessService(users, business, jobs, storage, events);
+  const service = new BusinessService(users, business, jobs, storage, events, notify);
   const controller = makeBusinessController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each

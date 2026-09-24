@@ -1222,13 +1222,47 @@ POST /api/v1/verification/certificates
 GET /api/v1/verification/certificates
 
 
-# 22. Notifications
+# 22. Notifications (Stage 8 — in-app only)
+
+MVP delivery is in-app only: no email, SMS, WhatsApp, push or
+WebSockets. The frontend polls `unread-count` modestly (60s) for
+badge freshness. The recipient is always the session user —
+ownership is never accepted from the request, and another user's
+notification id reads as `404` (never `403`), so ids cannot be
+probed across accounts.
 
 GET /api/v1/notifications
 
-PATCH /api/v1/notifications/:id/read
+Query parameters: `unreadOnly` (true/false), `page` (1–1000),
+`pageSize` (1–50). Response items expose `id`, `type`, `title`,
+`message`, `relatedJobId` (job detail target), `relatedEntityType`
+(`JOB` = marketplace, `INTERNAL_JOB` = internal business),
+`relatedEntityId`, `read`, `createdAt`, `readAt`.
 
-PATCH /api/v1/notifications/read-all
+GET /api/v1/notifications/unread-count
+
+Resolves `{ "unreadCount": number }` for the badge.
+
+POST /api/v1/notifications/:id/read
+
+Marks one owned notification read (idempotent). Unknown or
+foreign ids read as `404 NOT_FOUND`; malformed ids as `400`.
+
+POST /api/v1/notifications/read-all
+
+Marks every owned notification read. Resolves
+`{ "markedRead": number }` (0 when already clear).
+
+Notification types: `JOB_REQUEST`, `QUOTE_RECEIVED`,
+`QUOTE_ACCEPTED`, `JOB_SCHEDULED`, `JOB_STARTED`, `JOB_COMPLETED`,
+`JOB_CONFIRMED`, `TECHNICIAN_ASSIGNED`, `TECHNICIAN_REASSIGNED`,
+`JOB_UPDATE`, `WORK_DOCUMENTED`, `PARTS_REQUESTED`,
+`PARTS_APPROVED`, `PARTS_REJECTED`, `PARTS_MORE_INFO`,
+`PARTS_AVAILABLE`. Recipients resolve server-side (provider
+directory, customer-profile owner, business owner + active
+owner/manager members, assigned technician); the actor is
+excluded. Delivery is best-effort — a notification failure never
+rolls back the committed job/quote/assignment operation.
 
 
 # 23. Admin

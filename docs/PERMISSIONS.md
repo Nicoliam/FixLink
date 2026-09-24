@@ -383,6 +383,32 @@ Admin:
 
 Users can only access their own notifications.
 
+Stage 8 rules (all enforced server-side; the frontend never
+supplies ownership):
+
+- The recipient of every notification endpoint (`GET
+  /notifications`, `GET /notifications/unread-count`, `POST
+  /notifications/:id/read`, `POST /notifications/read-all`) is
+  always the authenticated session user.
+- Listing, counting and read operations are scoped to `user_id`
+  only. Another user's notification id reads as `404 NOT_FOUND`
+  (never `403`), so notification ids cannot be probed across
+  accounts — the same convention as customer jobs and provider
+  requests.
+- Event recipients resolve server-side from existing ownership:
+  marketplace providers (professional owner / business owner +
+  active owner/manager members), the customer-profile owner, the
+  business owner + active owner/manager members, or the assigned
+  technician. The acting user is excluded.
+- Cross-business notifications are impossible: business events
+  notify only the owning business's managers/technician.
+  Customers never see internal (`INTERNAL_JOB`) notifications;
+  technicians never see jobs outside their assignments.
+- Notification messages carry only job/business display facts
+  (service, reference, amount, status). Verification documents,
+  private customer contact details, credentials and admin-only
+  information are never included.
+
 Admin access is only allowed where explicitly required.
 
 

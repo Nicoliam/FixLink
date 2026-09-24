@@ -82,6 +82,27 @@ export class MemoryQuotesStore implements QuotesStore {
     return [...(this.businessesByUserId.get(userId) ?? [])];
   }
 
+  /**
+   * Stage 8 — reverse lookup for notification recipients: login user
+   * ids that may act for a marketplace provider.
+   */
+  async findUserIdsForProvider(
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<string[]> {
+    const userIds: string[] = [];
+    if (providerType === 'professional') {
+      for (const [userId, numericId] of this.professionalByUserId) {
+        if (numericId === providerNumericId) userIds.push(userId);
+      }
+      return userIds;
+    }
+    for (const [userId, memberships] of this.businessesByUserId) {
+      if (memberships.some((entry) => entry.businessId === providerNumericId)) userIds.push(userId);
+    }
+    return userIds;
+  }
+
   async listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }> {
     const statuses =
       filter.statuses.length > 0

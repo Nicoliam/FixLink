@@ -19,6 +19,7 @@ import {
 } from '../../services/file-storage';
 import type { JobsStore } from '../jobs/jobs.store';
 import type { JobDto } from '../jobs/jobs.types';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { QuotesStore } from '../quotes/quotes.store';
 import type { JobWithQuotes } from '../quotes/quotes.types';
 import type { UserRepository } from '../users/user.repository';
@@ -70,7 +71,49 @@ export class ExecutionService {
     private readonly users: UserRepository,
     private readonly execution: ExecutionStore,
     private readonly storage: FileStorage,
+    /**
+     * Stage 8 — central notification delivery (in-app only). Optional
+     * so pre-8 constructions keep compiling. Emissions run AFTER the
+     * transition commits and are best-effort.
+     */
+    private readonly notify?: NotificationService,
   ) {}
+
+  /**
+   * Stage 8 — notify the parties that did not perform the action.
+   * Recipients resolve server-side; messages carry only the service,
+   * reference and outcome already visible to each party on the job.
+   */
+  private async emitCompletion(job: JobDto, actorUserId: string, kind: 'completed' | 'confirmed'): Promise<void> {
+    if (!this.notify) return;
+    try {
+      const recipients: string[] = [];
+      if (kind === 'completed') {
+        const customer = await this.jobs.findUserIdByCustomerId(job.customerId).catch(() => null);
+        if (customer) recipients.push(customer);
+      }
+      const numeric = job.provider.id.split('-')[1] ?? '';
+      const providers = await this.quotes
+        .findUserIdsForProvider(job.provider.providerType, numeric)
+        .catch((): string[] => []);
+      for (const id of providers) {
+        if (id !== actorUserId) recipients.push(id);
+      }
+      if (recipients.length === 0) return;
+      await this.notify.createForUsers(recipients, {
+        type: kind === 'completed' ? 'JOB_COMPLETED' : 'JOB_CONFIRMED',
+        title: kind === 'completed' ? 'Job completed' : 'Job confirmed',
+        message:
+          kind === 'completed'
+            ? `Work completed on job ${job.reference}. Please review and confirm.`
+            : `The customer confirmed completion of job ${job.reference}.`,
+        referenceType: 'JOB',
+        referenceId: job.id,
+      });
+    } catch {
+      // Best-effort — the committed transition stands.
+    }
+  }
 
   /** Resolve the marketplace identities a user may act for, or null when the role has none. */
   private async resolveIdentity(authUserId: string): Promise<{ identity: ProviderIdentity } | { forbidden: string }> {
@@ -376,6 +419,7 @@ export class ExecutionService {
       });
       const refreshed = await this.jobs.getJobById(authz.job.id);
       if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      await this.emitCompletion(refreshed, authUserId, 'completed');
       return { status: 200, data: { job: await this.withQuotes(refreshed), update } };
     } catch (err) {
       if (err instanceof JobNotCompletableError) {
@@ -398,6 +442,7 @@ export class ExecutionService {
       await this.execution.confirmJob({ jobId: authz.job.id, customerUserId: authUserId });
       const refreshed = await this.jobs.getJobById(authz.job.id);
       if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      await this.emitCompletion(refreshed, authUserId, 'confirmed');
       return { status: 200, data: { job: await this.withQuotes(refreshed) } };
     } catch (err) {
       if (err instanceof JobNotConfirmableError) {

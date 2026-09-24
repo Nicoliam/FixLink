@@ -705,3 +705,72 @@ No migration in Stage 7G — `jobs` (`business_id`,
 `created_at`), `job_assignments`, the execution tables
 and `parts_requests.status` already support the board;
 `011_parts_available.sql` remains the latest migration.
+
+## Stage 8 — In-App Notifications
+
+Backend (`backend/tests/notifications.test.ts`, 33
+cases, in-memory notifications store with the same
+recipient-isolation rules as the MySQL implementation —
+run with `npm test` from `backend/`):
+
+- Inbox API (1–11): unauthenticated `401` on all four
+  endpoints; empty list + zero count for a new user;
+  documented item shape (`id`, `type`, `title`,
+  `message`, `relatedJobId`, `relatedEntityType`,
+  `read`, `createdAt`, `readAt`); `unreadOnly`
+  filtering; newest-first pagination; invalid
+  pagination/filter `422`; single mark-read (state,
+  count, idempotency); invalid id `400`, foreign and
+  missing ids `404`; mark-all-read (count, zeroing,
+  empty repeat); provider recipient isolation; `userId`
+  parameters ignored (session owns the inbox).
+- Marketplace events (12–19): `JOB_REQUEST` to the
+  selected professional (customer excluded) and to
+  business owner + manager; `QUOTE_RECEIVED` to the
+  customer (amount in message); `QUOTE_ACCEPTED`,
+  `JOB_SCHEDULED` (customer notified, acting provider
+  excluded), `JOB_STARTED`, `JOB_COMPLETED` to the
+  customer; `JOB_CONFIRMED` to the provider (confirming
+  customer excluded).
+- Business events (20–33): `TECHNICIAN_ASSIGNED` and
+  `TECHNICIAN_REASSIGNED` (only the newly assigned
+  technician); `JOB_STARTED`, `JOB_UPDATE`,
+  `WORK_DOCUMENTED`, `PARTS_REQUESTED` to owners +
+  managers; `PARTS_APPROVED`/`REJECTED`/`MORE_INFO` to
+  the technician (deciding manager excluded);
+  `PARTS_AVAILABLE` exactly once per fulfilment;
+  technician respond → managers; internal
+  `JOB_COMPLETED` → managers; cross-business and
+  customer/internal separation; notification-store
+  failure leaves job/quote creation green.
+- Full backend suite green (386/386, incl. all prior
+  stages and the pre-existing working-tree 7B spec).
+
+Frontend (`apps/web`, `npm test` — 32 files, 268 tests,
+all green):
+
+- `notification.service.spec.ts` (new): list params
+  (page/pageSize/unreadOnly, filter omission),
+  unread-count fetch, badge refresh + failure
+  retention, mark-read (badge refresh), mark-all-read
+  (badge zeroed), 60s poll interval.
+- `notification.model.spec.ts` (new): all 16 type
+  labels, role-specific routing (customer/technician/
+  business-internal/provider-marketplace, no internal
+  job on customer screens, jobless fallback), relative
+  timestamps.
+- `notifications.spec.ts` (new page): auth guard,
+  list rendering with unread styling, empty/error +
+  retry states, unread-only toggle, mark-all-read
+  reload, open-unread (mark-read then customer route),
+  open-read (direct technician route), business route
+  for internal jobs, pagination.
+- Existing shell/suite untouched and passing —
+  the bell renders only when authenticated (anonymous
+  specs issue no notification traffic).
+
+No migration in Stage 8 — the migration 008
+`notifications` table already supports recipient, type,
+title/message, related entity, read state and
+timestamps; `reference_type` carries `JOB` (marketplace)
+or `INTERNAL_JOB` (internal) for exact navigation.

@@ -14,6 +14,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../../middleware/auth';
 import type { MarketplaceStore } from '../marketplace/marketplace.store';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { JobQuotesReader } from '../quotes/quotes.store';
 import type { UserRepository } from '../users/user.repository';
 import { makeJobsController } from './jobs.controller';
@@ -25,9 +26,15 @@ export function makeJobsRoutes(
   jobs: JobsStore,
   marketplace: MarketplaceStore,
   quotes?: JobQuotesReader,
+  notify?: NotificationService,
 ): Router {
   const router = Router();
-  const service = new JobsService(jobs, marketplace, users, quotes);
+  const service = new JobsService(jobs, marketplace, users, quotes, notify, quotes as unknown as {
+    findUserIdsForProvider(
+      providerType: 'professional' | 'business',
+      providerNumericId: string,
+    ): Promise<string[]>;
+  });
   const controller = makeJobsController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each

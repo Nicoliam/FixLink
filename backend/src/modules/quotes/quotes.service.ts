@@ -15,6 +15,7 @@
 import type { UserRepository } from '../users/user.repository';
 import type { JobsStore } from '../jobs/jobs.store';
 import type { JobDto } from '../jobs/jobs.types';
+import type { NotificationService } from '../notifications/notifications.service';
 import type { QuotesStore } from './quotes.store';
 import {
   JobNotAcceptableError,
@@ -81,7 +82,57 @@ export class QuotesService {
     private readonly jobs: JobsStore,
     private readonly quotes: QuotesStore,
     private readonly users: UserRepository,
+    /**
+     * Stage 8 — central notification delivery (in-app only). Optional
+     * so pre-8 constructions keep compiling. Every emission runs
+     * AFTER the state transition commits and is best-effort: delivery
+     * failures never roll back the quote/schedule/start outcome.
+     */
+    private readonly notify?: NotificationService,
   ) {}
+
+  /**
+   * Stage 8 helpers — all recipients resolve server-side (provider
+   * directory, customer profile owner); the actor is excluded where
+   * the actor already knows the outcome. Messages carry only service,
+   * reference, amount and schedule facts already visible to each
+   * party on the job — never private contact or verification data.
+   */
+  private async customerUserId(job: JobDto): Promise<string | null> {
+    try {
+      return await this.jobs.findUserIdByCustomerId(job.customerId);
+    } catch {
+      return null;
+    }
+  }
+
+  private async providerUserIds(job: JobDto, excludeUserId?: string): Promise<string[]> {
+    try {
+      const numeric = job.provider.id.split('-')[1] ?? '';
+      const userIds = await this.quotes.findUserIdsForProvider(job.provider.providerType, numeric);
+      return excludeUserId ? userIds.filter((id) => id !== excludeUserId) : userIds;
+    } catch {
+      return [];
+    }
+  }
+
+  private async emit(
+    userIds: string[],
+    event: { type: 'QUOTE_RECEIVED' | 'QUOTE_ACCEPTED' | 'JOB_SCHEDULED' | 'JOB_STARTED'; title: string; message: string; jobId: string },
+  ): Promise<void> {
+    if (!this.notify || userIds.length === 0) return;
+    try {
+      await this.notify.createForUsers(userIds, {
+        type: event.type,
+        title: event.title,
+        message: event.message,
+        referenceType: 'JOB',
+        referenceId: event.jobId,
+      });
+    } catch {
+      // Best-effort — the committed transition stands.
+    }
+  }
 
   /** Resolve the marketplace identities a user may act for, or null when the role has none. */
   private async resolveIdentity(authUserId: string): Promise<{ identity: ProviderIdentity } | { forbidden: string }> {
@@ -176,6 +227,13 @@ export class QuotesService {
         input,
         createdBy: authUserId,
       });
+      const customer = await this.customerUserId(job);
+      await this.emit(customer ? [customer] : [], {
+        type: 'QUOTE_RECEIVED',
+        title: 'New quote received',
+        message: `${job.provider.name} quoted ${quote.currency} ${quote.total} for ${job.service.name} (${job.reference}).`,
+        jobId: job.id,
+      });
       return { status: 201, data: quote };
     } catch (err) {
       if (err instanceof QuoteConflictError) {
@@ -262,6 +320,12 @@ export class QuotesService {
       });
       const refreshed = await this.jobs.getJobById(job.id);
       if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      await this.emit(await this.providerUserIds(refreshed, authUserId), {
+        type: 'QUOTE_ACCEPTED',
+        title: 'Quote accepted',
+        message: `Your quote for ${refreshed.service.name} (${refreshed.reference}) was accepted.`,
+        jobId: refreshed.id,
+      });
       return {
         status: 200,
         data: { job: await this.getCustomerJobWithQuotes(authUserId, refreshed), quote: accepted.quote },
@@ -334,6 +398,15 @@ export class QuotesService {
       await this.quotes.scheduleJob({ jobId: job.id, scheduledAtIso, scheduledBy: authUserId });
       const refreshed = await this.jobs.getJobById(job.id);
       if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      const recipients = await this.providerUserIds(refreshed, authUserId);
+      const customer = await this.customerUserId(refreshed);
+      if (customer) recipients.push(customer);
+      await this.emit(recipients, {
+        type: 'JOB_SCHEDULED',
+        title: 'Job scheduled',
+        message: `Job ${refreshed.reference} is scheduled.`,
+        jobId: refreshed.id,
+      });
       return { status: 200, data: { job: await this.getCustomerJobWithQuotes(authUserId, refreshed) } };
     } catch (err) {
       if (err instanceof JobNotSchedulableError) {
@@ -373,6 +446,15 @@ export class QuotesService {
       await this.quotes.startJob({ jobId: job.id, startedBy: authUserId });
       const refreshed = await this.jobs.getJobById(job.id);
       if (!refreshed) return fail(404, 'NOT_FOUND', 'Job not found.');
+      const recipients = await this.providerUserIds(refreshed, authUserId);
+      const customer = await this.customerUserId(refreshed);
+      if (customer) recipients.push(customer);
+      await this.emit(recipients, {
+        type: 'JOB_STARTED',
+        title: 'Job started',
+        message: `Work started on job ${refreshed.reference}.`,
+        jobId: refreshed.id,
+      });
       return { status: 200, data: { job: await this.getCustomerJobWithQuotes(authUserId, refreshed) } };
     } catch (err) {
       if (err instanceof JobNotStartableError) {

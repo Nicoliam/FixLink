@@ -1,0 +1,99 @@
+<div class="fl-page">
+  <p class="fl-eyebrow">Notifications</p>
+  <h1 class="fl-page-title">Your notifications</h1>
+  <p class="fl-page-subtitle">Job updates, quotes and parts decisions for your account.</p>
+
+  <div class="fl-notifications-toolbar">
+    <button
+      type="button"
+      class="fl-btn fl-btn-secondary fl-btn-sm"
+      [class.fl-btn-active]="unreadOnly()"
+      [attr.aria-pressed]="unreadOnly()"
+      (click)="toggleUnreadOnly()"
+    >
+      {{ unreadOnly() ? 'Showing unread' : 'Show unread only' }}
+    </button>
+    @if (status() === 'ready' && items().length > 0) {
+      <button
+        type="button"
+        class="fl-btn fl-btn-secondary fl-btn-sm"
+        (click)="markAllRead()"
+        [disabled]="markingAll()"
+      >
+        {{ markingAll() ? 'Marking…' : 'Mark all as read' }}
+      </button>
+    }
+  </div>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading your notifications…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  } @else if (status() === 'empty') {
+    <div class="fl-state" role="status">
+      <h2 class="fl-state-title">{{ unreadOnly() ? 'No unread notifications' : 'No notifications yet' }}</h2>
+      <p class="fl-state-text">
+        {{ unreadOnly() ? 'You are all caught up.' : 'Job requests, quotes and work updates will appear here.' }}
+      </p>
+      @if (unreadOnly()) {
+        <button type="button" class="fl-btn fl-btn-secondary" (click)="toggleUnreadOnly()">Show all</button>
+      } @else {
+        <a class="fl-btn fl-btn-primary" routerLink="/marketplace">Browse the marketplace</a>
+      }
+    </div>
+  } @else {
+    <ul class="fl-notification-list">
+      @for (item of items(); track item.id) {
+        <li>
+          <article class="fl-notification" [class.fl-notification-unread]="!item.read">
+            <button
+              type="button"
+              class="fl-notification-open"
+              (click)="open(item)"
+              [attr.aria-label]="(item.read ? 'Open ' : 'Mark as read and open ') + item.title"
+            >
+              <span class="fl-notification-top">
+                <span class="fl-pill fl-pill-info">{{ typeLabel(item.type) }}</span>
+                @if (!item.read) {
+                  <span class="fl-notification-dot" aria-label="Unread"></span>
+                }
+                <span class="fl-notification-time">{{ formatTime(item.createdAt) }}</span>
+              </span>
+              <span class="fl-notification-title">{{ item.title }}</span>
+              @if (item.message) {
+                <span class="fl-notification-message">{{ item.message }}</span>
+              }
+            </button>
+          </article>
+        </li>
+      }
+    </ul>
+    @if (total() > pageSize()) {
+      <div class="fl-pagination">
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary fl-btn-sm"
+          (click)="previousPage()"
+          [disabled]="page() <= 1"
+        >
+          Previous
+        </button>
+        <span class="fl-pagination-status" role="status">Page {{ page() }}</span>
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary fl-btn-sm"
+          (click)="nextPage()"
+          [disabled]="page() * pageSize() >= total()"
+        >
+          Next
+        </button>
+      </div>
+    }
+  }
+</div>

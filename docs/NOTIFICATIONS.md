@@ -1,17 +1,46 @@
 # FixLink — Notifications
 
-## Status (Stage 7F)
+## Status (Stage 8 — implemented)
 
-The `notifications` table exists (migration 008: `user_id`, `type`,
-`title`, `message`, `reference_type`, `reference_id`, `read_at`,
-`created_at`) but **no notification infrastructure is implemented
-yet**: nothing writes to the table and no listing/read endpoints
-exist (`GET /api/v1/notifications` in docs/API.md §10 is a planned
-placeholder).
+In-app notifications are live (MVP: no email/SMS/WhatsApp/push,
+no WebSockets — the frontend polls `unread-count` every 60s):
 
-## Stage 7F event seam (implemented)
+- Central `NotificationService`
+  (`backend/src/modules/notifications/notifications.service.ts` —
+  `create` / `createForUsers` / `listForUser` / `getUnreadCount` /
+  `markRead` / `markAllRead`) over the existing `notifications`
+  table (migration 008 — no new migration). Stores (memory + MySQL)
+  scope every operation to `user_id`; foreign ids read as null
+  (404 upstream), never as forbidden signals.
+- Endpoints (`backend/src/modules/notifications/`): `GET
+  /api/v1/notifications` (`unreadOnly`, `page`, `pageSize`), `GET
+  /api/v1/notifications/unread-count`, `POST
+  /api/v1/notifications/:id/read`, `POST
+  /api/v1/notifications/read-all`. The recipient is always the
+  session user.
+- Feature services resolve recipients server-side and emit AFTER
+  the state change commits, best-effort (a delivery failure never
+  rolls back the job/quote/assignment/approval): jobs
+  (JOB_REQUEST), quotes (QUOTE_RECEIVED/ACCEPTED/SCHEDULED/
+  STARTED), execution (JOB_COMPLETED/CONFIRMED), business
+  (TECHNICIAN_ASSIGNED/REASSIGNED, JOB_STARTED/UPDATE/COMPLETED,
+  WORK_DOCUMENTED, PARTS_REQUESTED/APPROVED/REJECTED/MORE_INFO/
+  AVAILABLE + technician respond).
+- Reference vocabulary: `JOB` (marketplace job id) and
+  `INTERNAL_JOB` (internal job id) — every notification navigates
+  to exactly one job detail with no read-time joins and identical
+  behaviour on both stores. The parts request id is named in the
+  message; a fulfilment that resumes the job folds the resume into
+  the single PARTS_AVAILABLE message (no double delivery).
+- Frontend: Oceanic bell + badge + compact panel in the
+  authenticated shell (`app.ts`/`app.html`), full `/notifications`
+  inbox (filter, mark read/all-read, pagination, loading/empty/
+  error states), role-specific navigation
+  (`notificationRouteFor`).
 
-The parts-approval workflow emits one event per decision /
+## Stage 7F event seam (retained)
+
+The parts-approval workflow still emits one event per decision /
 fulfilment / resume on the shared in-memory bus
 (`backend/src/modules/business/parts-request-events.ts`,
 `PartsRequestEventBus`, threaded through `createApp` deps so tests
@@ -27,23 +56,19 @@ can drain it):
 
 Each event carries `businessId`, `jobId`, `partsRequestId`,
 `actorUserId`, `technicianUserId`, `title`, `message` and
-`createdAt`. This is a collector only — Stage 7F writes nothing
-to `notifications`, creating no second notification system.
+`createdAt`. The bus is now a test-observable seam only: Stage 8
+persists notifications directly in `BusinessService` (same data),
+so events are delivered exactly once and the bus is never drained
+for delivery. The header mapping note in `parts-request-events.ts`
+records the final reference decision (job-navigable rows).
 
-## What remains for Stage 8
+## What remains after Stage 8
 
-1. Persist one `notifications` row per recipient per event
-   (`type` = event type, `reference_type = 'PARTS_REQUEST'`,
-   `reference_id` = request id; resolve manager logins
-   server-side from the business — ids are never trusted from
-   the client).
-2. Expose the listing/read surface (`GET /api/v1/notifications`,
-   `PATCH /api/v1/notifications/:id/read`,
-   `PATCH /api/v1/notifications/read-all`) scoped to the
-   session user (`user_id` only — §PERMISSIONS: users access
-   only their own notifications).
-3. Drain (not peek) the bus at the persistence boundary so
-   events are delivered exactly once; add idempotency if
-   delivery retries are introduced.
-4. Extend the seam with job-assignment, completion, review and
-   dispute event types as those workflows land.
+1. Admin/platform notification contexts (Stage 9) — the
+   recipient-scoping and reference vocabulary already support
+   them; only new event types and admin surfacing are needed.
+2. Future delivery channels (email/SMS/WhatsApp/push) and
+   idempotent retry if delivery retries are introduced — the
+   central service is the single place to add them.
+3. Extend the seam with review and dispute event types as those
+   workflows land.

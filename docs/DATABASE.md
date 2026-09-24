@@ -498,7 +498,10 @@ Stores provider/business responses.
 
 ### notifications
 
-Stores user notifications.
+Stores user notifications (Stage 8 persists one row per recipient
+per event — no migration was required, migration 008 already
+supports recipient, type, title/message, related entity, read state
+and timestamps).
 
 Examples:
 
@@ -510,6 +513,17 @@ Examples:
 - reference_id
 - read_at
 - created_at
+
+Stage 8 vocabulary: `type` is one of `JOB_REQUEST`,
+`QUOTE_RECEIVED`, `QUOTE_ACCEPTED`, `JOB_SCHEDULED`,
+`JOB_STARTED`, `JOB_COMPLETED`, `JOB_CONFIRMED`,
+`TECHNICIAN_ASSIGNED`, `TECHNICIAN_REASSIGNED`, `JOB_UPDATE`,
+`WORK_DOCUMENTED`, `PARTS_REQUESTED`, `PARTS_APPROVED`,
+`PARTS_REJECTED`, `PARTS_MORE_INFO`, `PARTS_AVAILABLE`;
+`reference_type` is `JOB` (marketplace `jobs` id) or
+`INTERNAL_JOB` (internal `jobs` id) so every row navigates to
+exactly one job detail; `read_at` NULL means unread. No duplicate
+job data is stored — only the reference.
 
 
 ## 26. Saved Providers

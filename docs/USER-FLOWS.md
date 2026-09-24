@@ -941,11 +941,91 @@ DISPUTED
 Exact allowed transitions must be enforced by the backend.
 
 
-# 13. NOTIFICATION FLOW
+# 13. NOTIFICATION FLOW (Stage 8 — in-app only)
 
-Important events generate notifications.
+Important events generate in-app notifications (bell + `/notifications`
+inbox; `unread-count` polled every 60s — no email/SMS/push/WebSockets).
+Every notification references its job (`relatedJobId`) and opens the
+role-specific detail: customers → `/my-jobs/:id`, providers →
+`/requests/:id`, business roles → `/business/jobs/:id` for internal
+jobs, technicians → `/technician/jobs/:id`.
 
-Example:
+Marketplace:
+
+Job request submitted
+↓
+Selected professional/business notification (JOB_REQUEST)
+
+Quote submitted
+↓
+Customer notification (QUOTE_RECEIVED)
+
+Quote accepted
+↓
+Provider/business notification (QUOTE_ACCEPTED)
+
+Job scheduled
+↓
+Customer notification (JOB_SCHEDULED; other provider-side managers included, actor excluded)
+
+Job started
+↓
+Customer notification (JOB_STARTED)
+
+Provider completes job
+↓
+Customer notification (JOB_COMPLETED)
+
+Customer confirms
+↓
+Provider/business notification (JOB_CONFIRMED)
+
+Business workflow:
+
+Technician assigned / reassigned
+↓
+Newly assigned technician notification (TECHNICIAN_ASSIGNED / TECHNICIAN_REASSIGNED)
+
+Technician starts job
+↓
+Owner/manager notification (JOB_STARTED)
+
+Technician adds update
+↓
+Owner/manager notification (JOB_UPDATE)
+
+Technician documents work (photos, voice note)
+↓
+Owner/manager notification (WORK_DOCUMENTED)
+
+Parts requested
+↓
+Owner/manager notification (PARTS_REQUESTED)
+
+Parts approved / rejected / more-info requested
+↓
+Technician notification (PARTS_APPROVED / PARTS_REJECTED / PARTS_MORE_INFO)
+
+Parts available
+↓
+Technician notification (PARTS_AVAILABLE — exactly one per
+fulfilment; the resume message is folded in, no double delivery)
+
+Technician responds to a parts request
+↓
+Owner/manager notification (PARTS_REQUESTED)
+
+Internal job completed
+↓
+Owner/manager notification (JOB_COMPLETED)
+
+Delivery is best-effort: a notification failure never rolls back
+the committed job, quote, assignment or approval. The Stage 7F
+parts-request event bus keeps emitting as a test-observable seam;
+persistence goes through the central notification service directly,
+so no event is delivered twice.
+
+Example (legacy sketch retained):
 
 Quote submitted
 ↓

@@ -32,6 +32,78 @@
         @if (showTechnicianJobs()) {
           <a class="fl-link fl-nav-link" routerLink="/technician/jobs">My jobs</a>
         }
+        @if (showNotifications()) {
+          <div class="fl-bell-wrap">
+            <button
+              type="button"
+              class="fl-bell"
+              (click)="togglePanel()"
+              [attr.aria-expanded]="panelOpen()"
+              [attr.aria-label]="
+                notifications.unreadCount() > 0
+                  ? 'Notifications, ' + notifications.unreadCount() + ' unread'
+                  : 'Notifications'
+              "
+            >
+              <span aria-hidden="true">🔔</span>
+              @if (notifications.unreadCount() > 0) {
+                <span class="fl-bell-badge" role="status">{{ notifications.unreadCount() }}</span>
+              }
+            </button>
+            @if (panelOpen()) {
+              <div class="fl-bell-panel" role="dialog" aria-label="Recent notifications">
+                <div class="fl-bell-panel-head">
+                  <p class="fl-bell-panel-title">Notifications</p>
+                  <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="closePanel()">
+                    Close
+                  </button>
+                </div>
+                @if (panelLoading()) {
+                  <p class="fl-state-text" role="status">Loading notifications…</p>
+                } @else if (panelError()) {
+                  <div class="fl-state fl-state-error" role="alert">
+                    <p class="fl-state-text">{{ panelError() }}</p>
+                    <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="refreshPanel()">
+                      Try again
+                    </button>
+                  </div>
+                } @else if (panelItems().length === 0) {
+                  <p class="fl-state-text" role="status">No notifications yet.</p>
+                } @else {
+                  <ul class="fl-notification-list">
+                    @for (item of panelItems(); track item.id) {
+                      <li>
+                        <article class="fl-notification" [class.fl-notification-unread]="!item.read">
+                          <button
+                            type="button"
+                            class="fl-notification-open"
+                            (click)="openPanelItem(item)"
+                            [attr.aria-label]="(item.read ? 'Open ' : 'Mark as read and open ') + item.title"
+                          >
+                            <span class="fl-notification-top">
+                              <span class="fl-pill fl-pill-info">{{ typeLabel(item.type) }}</span>
+                              @if (!item.read) {
+                                <span class="fl-notification-dot" aria-label="Unread"></span>
+                              }
+                              <span class="fl-notification-time">{{ formatTime(item.createdAt) }}</span>
+                            </span>
+                            <span class="fl-notification-title">{{ item.title }}</span>
+                          </button>
+                        </article>
+                      </li>
+                    }
+                  </ul>
+                  <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="markAllRead()">
+                    Mark all as read
+                  </button>
+                }
+                <a class="fl-btn fl-btn-primary fl-btn-sm" routerLink="/notifications" (click)="closePanel()">
+                  View all notifications
+                </a>
+              </div>
+            }
+          </div>
+        }
         <span class="fl-nav-status">{{ auth.currentUser()?.email }}</span>
         <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/account">My account</a>
       } @else {
