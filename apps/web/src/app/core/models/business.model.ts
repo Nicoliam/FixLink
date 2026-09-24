@@ -479,20 +479,50 @@ export interface CompleteTechnicianJobResult {
 }
 
 /**
- * Technician parts-request contracts for Stage 7E.
+ * Technician parts-request contracts for Stage 7E + manager-approval
+ * contracts for Stage 7F.
  *
  * Mirrors the technician submission endpoints
- * (POST/GET /technician/jobs/:id/parts) and the read-only business
- * visibility endpoints (GET /business/jobs/:id/parts). Requests reuse
- * the shared `parts_requests` / `parts_request_items` tables — the API
- * returns the request with its items (never storage keys or binaries;
- * photo evidence loads through the authorized file endpoint). New
- * requests are always PENDING; approve/reject/needs-info arrives with
- * the Stage 7F manager-approval workflow.
+ * (POST/GET /technician/jobs/:id/parts), the read-only business
+ * visibility endpoints (GET /business/jobs/:id/parts) and the Stage 7F
+ * decision endpoints (POST /business/jobs/:id/parts/:requestId/
+ * approve|reject|request-info|available, POST
+ * /technician/jobs/:id/parts/:requestId/respond, POST
+ * /technician/jobs/:id/resume). Requests reuse the shared
+ * `parts_requests` / `parts_request_items` tables and decisions reuse
+ * `job_approvals` — the API returns the request with its items (never
+ * storage keys or binaries; photo evidence loads through the
+ * authorized file endpoint).
  */
 
-/** Lifecycle state of a parts request (mirrors the backend ENUM). */
-export type PartsRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO' | 'CANCELLED';
+/**
+ * Lifecycle state of a parts request (mirrors the backend ENUM;
+ * PARTS_AVAILABLE arrives with migration 011, Stage 7F).
+ *
+ * PENDING → APPROVED → PARTS_AVAILABLE; PENDING → REJECTED |
+ * NEEDS_INFO; NEEDS_INFO → PENDING (technician responds) or back to
+ * review. REJECTED / CANCELLED / PARTS_AVAILABLE are terminal.
+ */
+export type PartsRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'NEEDS_INFO'
+  | 'CANCELLED'
+  | 'PARTS_AVAILABLE';
+
+/** Manager/technician decision on a parts request (a `job_approvals` row). */
+export interface PartsApproval {
+  id: string;
+  jobId: string;
+  partsRequestId: string;
+  requestedBy: string | null;
+  reviewedBy: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO';
+  comments: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
 
 /** One requested part/material. */
 export interface PartsRequestItem {
@@ -523,6 +553,15 @@ export interface PartsRequest {
   createdAt: string;
   updatedAt: string;
   items: PartsRequestItem[];
+  /**
+   * Stage 7F — latest manager decision (login user id only, never
+   * contact details). Null until a manager first reviews the request.
+   */
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  /** Stage 7F — decision history for the request, oldest first. */
+  approvals: PartsApproval[];
 }
 
 export interface PartsRequestList {
@@ -551,7 +590,38 @@ export function partsRequestStatusLabel(status: PartsRequestStatus): string {
       return 'Needs info';
     case 'CANCELLED':
       return 'Cancelled';
+    case 'PARTS_AVAILABLE':
+      return 'Parts available';
     default:
       return status;
   }
+}
+
+/**
+ * Stage 7F result contracts.
+ *
+ * A manager decision returns the updated request, the recorded
+ * `job_approvals` decision and the (possibly moved) job. Marking parts
+ * available additionally reports whether the job resumed
+ * (AWAITING_PARTS → IN_PROGRESS because no APPROVED request remains).
+ */
+
+/** Result of POST …/parts/:requestId/approve|reject|request-info. */
+export interface PartsReviewResult {
+  request: PartsRequest;
+  approval: PartsApproval;
+  job: BusinessJob;
+}
+
+/** Result of POST …/parts/:requestId/available. */
+export interface PartsAvailableResult {
+  request: PartsRequest;
+  job: BusinessJob;
+  jobResumed: boolean;
+}
+
+/** Payload for a manager decision (comment required for reject/request-info). */
+export interface PartsDecisionRequest {
+  comment?: string;
+  reason?: string;
 }

@@ -26,13 +26,15 @@ import type {
  * FixLink technician API client — Stage 7C (My Jobs) + Stage 7D
  * (execution: start, BEFORE/DURING/AFTER photos and notes, voice
  * notes, timeline, completion) + Stage 7E (parts requests: submit,
- * list, read, photo evidence).
+ * list, read, photo evidence) + Stage 7F (respond to needs-info,
+ * resume once parts are available).
  *
  * Single owner of technician calls. All endpoints require
  * authentication; the technician identity is derived by the backend
  * from the session user, never from these payloads. Only jobs with
  * an active TECHNICIAN assignment to the caller are visible.
- * Approvals and notifications arrive in later stages.
+ * Manager approvals are never exposed here; notifications arrive in
+ * a later stage.
  */
 @Injectable({ providedIn: 'root' })
 export class TechnicianService {
@@ -247,5 +249,32 @@ export class TechnicianService {
   /** Stage 7E — fetch authorized photo-evidence bytes as a Blob. */
   fetchMyJobPartsPhotoBlob(jobId: string, requestId: string): Observable<Blob> {
     return this.http.get(this.myJobPartsPhotoFileUrl(jobId, requestId), { responseType: 'blob' });
+  }
+
+  /**
+   * Stage 7F — respond to a NEEDS_INFO request (→ PENDING) with an
+   * optional note for the manager's next review. Only the assigned
+   * technician may respond; the backend enforces the state.
+   */
+  respondToMyJobPartsRequest(jobId: string, requestId: string, note?: string): Observable<PartsRequest> {
+    const body: Record<string, string> = {};
+    if (note?.trim()) body['note'] = note.trim();
+    return this.http
+      .post<ApiSuccess<PartsRequest>>(
+        `${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}/respond`,
+        body,
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Stage 7F — continue work once parts are available
+   * (AWAITING_PARTS → IN_PROGRESS). Allowed only when no APPROVED
+   * request remains outstanding; the backend enforces the rule.
+   */
+  resumeMyJob(jobId: string): Observable<BusinessJob> {
+    return this.http
+      .post<ApiSuccess<BusinessJob>>(`${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/resume`, {})
+      .pipe(map((res) => res.data));
   }
 }

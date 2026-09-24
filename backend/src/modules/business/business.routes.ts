@@ -57,11 +57,21 @@
  * GET   /api/v1/business/jobs/:id/parts/:requestId          one request (owner/manager, read-only)
  * GET   /api/v1/business/jobs/:id/parts/:requestId/photo/file  photo evidence bytes (owner/manager)
  *
- * Parts requests are the job-scoped /jobs/:jobId/parts surface applied
- * to the existing technician/business surfaces so business isolation
- * holds; creating a request never changes job status. Manager
- * approvals (approve/reject/needs-info, IN_PROGRESS → AWAITING_PARTS)
- * and notifications belong to Stage 7F and are intentionally absent.
+ * Stage 7F (manager approvals + awaiting parts + technician
+ * respond/resume). Parts requests are the job-scoped
+ * /jobs/:jobId/parts surface applied to the existing
+ * technician/business surfaces so business isolation holds:
+ * POST  /api/v1/business/jobs/:id/parts/:requestId/approve      approve (PENDING/NEEDS_INFO → APPROVED, IN_PROGRESS → AWAITING_PARTS)
+ * POST  /api/v1/business/jobs/:id/parts/:requestId/reject       reject (→ REJECTED, job unchanged, reason required)
+ * POST  /api/v1/business/jobs/:id/parts/:requestId/request-info ask for more info (→ NEEDS_INFO, comment required)
+ * POST  /api/v1/business/jobs/:id/parts/:requestId/available    mark fulfilled (APPROVED → PARTS_AVAILABLE, resumes when nothing outstanding)
+ * POST  /api/v1/technician/jobs/:id/parts/:requestId/respond    technician responds (NEEDS_INFO → PENDING)
+ * POST  /api/v1/technician/jobs/:id/resume                      technician continues (AWAITING_PARTS → IN_PROGRESS when allowed)
+ *
+ * Approvals are atomic (request + job_approvals row + job move +
+ * history succeed or roll back together). Notification delivery
+ * belongs to Stage 8 — Stage 7F emits events on the
+ * parts-request-events seam only.
  */
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
@@ -75,6 +85,7 @@ import type { UserRepository } from '../users/user.repository';
 import { makeBusinessController } from './business.controller';
 import { BusinessService } from './business.service';
 import type { BusinessStore } from './business.store';
+import type { PartsRequestEventBus } from './parts-request-events';
 import { fail } from '../../utils/response';
 
 export function makeBusinessRoutes(
@@ -82,9 +93,10 @@ export function makeBusinessRoutes(
   business: BusinessStore,
   jobs?: Pick<JobsStore, 'findActiveService'>,
   storage?: FileStorage,
+  events?: PartsRequestEventBus,
 ): Router {
   const router = Router();
-  const service = new BusinessService(users, business, jobs, storage);
+  const service = new BusinessService(users, business, jobs, storage, events);
   const controller = makeBusinessController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each
@@ -169,6 +181,14 @@ export function makeBusinessRoutes(
   router.get('/business/jobs/:jobId/parts', controller.listBusinessPartsRequests);
   router.get('/business/jobs/:jobId/parts/:requestId', controller.getBusinessPartsRequest);
   router.get('/business/jobs/:jobId/parts/:requestId/photo/file', controller.getBusinessPartsPhotoFile);
+  // Stage 7F — manager approvals + parts availability (owner/manager only).
+  router.post('/business/jobs/:jobId/parts/:requestId/approve', controller.approvePartsRequest);
+  router.post('/business/jobs/:jobId/parts/:requestId/reject', controller.rejectPartsRequest);
+  router.post('/business/jobs/:jobId/parts/:requestId/request-info', controller.requestPartsInfo);
+  router.post('/business/jobs/:jobId/parts/:requestId/available', controller.markPartsAvailable);
+  // Stage 7F — technician respond/resume (assigned technician only).
+  router.post('/technician/jobs/:jobId/parts/:requestId/respond', controller.respondToPartsRequest);
+  router.post('/technician/jobs/:jobId/resume', controller.resumeTechnicianJob);
 
   // Multer errors surface here (before the controller): map size/field
   // violations to the standard 422 envelope instead of a 500.

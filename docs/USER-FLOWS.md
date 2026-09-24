@@ -512,11 +512,24 @@ Open request
 ↓
 Review details
 ↓
-Approve
+Approve (optional comment)
 ↓
-Technician notified
+Request becomes APPROVED, job moves IN_PROGRESS → AWAITING_PARTS
 ↓
-Work continues
+Mark parts available when they arrive (APPROVED → PARTS_AVAILABLE)
+↓
+Job resumes automatically once nothing approved is outstanding
+(AWAITING_PARTS → IN_PROGRESS), otherwise it keeps waiting
+↓
+Technician continues work
+
+Stage 7F implementation note (2026-09-24): approve / reject /
+request-info / mark-available are implemented for owner/manager on
+their own INTERNAL jobs (atomic with the `job_approvals` row and
+history). "Technician notified" above is currently the
+`parts-request-events` seam (`PARTS_REQUEST_APPROVED`, …) — no
+`notifications` rows are written until Stage 8 (see
+docs/NOTIFICATIONS.md).
 
 
 ## 5.7 Manager Rejects Parts
@@ -529,9 +542,42 @@ Open request
 ↓
 Reject
 ↓
-Add reason
+Add reason (required)
 ↓
-Technician notified
+Request becomes REJECTED, job stays IN_PROGRESS
+↓
+Technician sees the decision and reason, continues work
+
+
+## 5.7a Manager Requests More Information
+
+Business Manager
+↓
+Parts Requests
+↓
+Open request
+↓
+Request more info (comment required)
+↓
+Request becomes NEEDS_INFO, job stays IN_PROGRESS
+↓
+Technician responds with the missing information (→ PENDING)
+↓
+Manager approves / rejects / asks again
+
+
+## 5.7b Technician Resumes After Parts
+
+Technician
+↓
+Job awaiting parts
+↓
+Parts available — job ready to continue
+↓
+Continue job (AWAITING_PARTS → IN_PROGRESS, only when no
+approved request is outstanding)
+↓
+Work continues
 
 
 ## 5.8 Technician Completes Job

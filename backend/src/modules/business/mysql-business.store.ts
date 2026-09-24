@@ -15,6 +15,7 @@ import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql
 import {
   JobNotCancellableError,
   JobNotStartableError,
+  PartsRequestNotActionableError,
   TechnicianConflictError,
   TechnicianImageNotDeletableError,
   TechnicianJobNotCompletableError,
@@ -45,6 +46,7 @@ import type {
   JobAssignmentDetailDto,
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
+  PartsApprovalDto,
   PartsRequestDto,
   PartsRequestItemDto,
   PartsRequestStatus,
@@ -274,6 +276,10 @@ interface PartsRequestRow extends RowDataPacket {
   requester_id: number | null;
   status: string;
   reason: string;
+  /** Stage 7F — latest manager decision columns. */
+  reviewed_by: number | null;
+  reviewed_at: Date | string | null;
+  review_notes: string | null;
   business_id: number;
   technician_id: number | null;
   technician_name: string | null;
@@ -300,12 +306,52 @@ function toPartsStatus(value: string): PartsRequestStatus {
     value === 'APPROVED' ||
     value === 'REJECTED' ||
     value === 'NEEDS_INFO' ||
-    value === 'CANCELLED'
+    value === 'CANCELLED' ||
+    value === 'PARTS_AVAILABLE'
   ) {
     return value;
   }
   throw new Error(`Unknown parts request status: ${value}`);
 }
+
+/** Stage 7F — one `job_approvals` row with `request_type = PARTS`. */
+interface PartsApprovalRow extends RowDataPacket {
+  id: number;
+  job_id: number;
+  parts_request_id: number | null;
+  requested_by: number | null;
+  reviewed_by: number | null;
+  status: string;
+  comments: string | null;
+  reviewed_at: Date | string | null;
+  created_at: Date | string;
+}
+
+function toApprovalStatus(value: string): PartsApprovalDto['status'] {
+  if (value === 'PENDING' || value === 'APPROVED' || value === 'REJECTED' || value === 'NEEDS_INFO') {
+    return value;
+  }
+  throw new Error(`Unknown approval status: ${value}`);
+}
+
+function mapPartsApproval(row: PartsApprovalRow): PartsApprovalDto {
+  return {
+    id: toStringId(row.id),
+    jobId: toStringId(row.job_id),
+    partsRequestId: row.parts_request_id === null ? '' : toStringId(row.parts_request_id),
+    requestedBy: row.requested_by === null ? null : toStringId(row.requested_by),
+    reviewedBy: row.reviewed_by === null ? null : toStringId(row.reviewed_by),
+    status: toApprovalStatus(row.status),
+    comments: row.comments,
+    reviewedAt: toIso(row.reviewed_at),
+    createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+  };
+}
+
+const PARTS_APPROVAL_SELECT = `
+  SELECT \`id\`, \`job_id\`, \`parts_request_id\`, \`requested_by\`, \`reviewed_by\`,
+         \`status\`, \`comments\`, \`reviewed_at\`, \`created_at\`
+    FROM \`job_approvals\``;
 
 function mapPartsRequestItem(row: PartsRequestItemRow): PartsRequestItemDto {
   return {
@@ -321,6 +367,7 @@ function mapPartsRequestItem(row: PartsRequestItemRow): PartsRequestItemDto {
 
 const PARTS_REQUEST_SELECT = `
   SELECT pr.\`id\`, pr.\`job_id\`, pr.\`requester_id\`, pr.\`status\`, pr.\`reason\`,
+         pr.\`reviewed_by\`, pr.\`reviewed_at\`, pr.\`review_notes\`,
          j.\`business_id\`,
          t.\`id\` AS \`technician_id\`, t.\`display_name\` AS \`technician_name\`,
          pr.\`created_at\`, pr.\`updated_at\`
@@ -1692,6 +1739,32 @@ export class MysqlBusinessStore implements BusinessStore {
   // a bound parameter.
   // ------------------------------------------------------------------
 
+  /** Stage 7F — decision history for one request, oldest first. */
+  private async listPartsApprovals(requestId: number): Promise<PartsApprovalDto[]> {
+    const [rows] = await this.pool.query<PartsApprovalRow[]>(
+      `${PARTS_APPROVAL_SELECT} WHERE \`parts_request_id\` = ? ORDER BY \`created_at\` ASC, \`id\` ASC`,
+      [requestId],
+    );
+    return (rows as PartsApprovalRow[]).map(mapPartsApproval);
+  }
+
+  /** Stage 7F — decision history for every request of a job (single query). */
+  private async listPartsApprovalsForJob(jobId: string): Promise<Map<string, PartsApprovalDto[]>> {
+    const [rows] = await this.pool.query<PartsApprovalRow[]>(
+      `${PARTS_APPROVAL_SELECT} WHERE \`job_id\` = ? AND \`request_type\` = 'PARTS' ORDER BY \`created_at\` ASC, \`id\` ASC`,
+      [jobId],
+    );
+    const byRequest = new Map<string, PartsApprovalDto[]>();
+    for (const row of rows as PartsApprovalRow[]) {
+      if (row.parts_request_id === null) continue;
+      const key = toStringId(row.parts_request_id);
+      const list = byRequest.get(key) ?? [];
+      list.push(mapPartsApproval(row));
+      byRequest.set(key, list);
+    }
+    return byRequest;
+  }
+
   /** Hydrate one request row with its items (photo keys stay server-side). */
   private async mapPartsRequest(row: PartsRequestRow): Promise<PartsRequestDto> {
     const [itemRows] = await this.pool.query<PartsRequestItemRow[]>(
@@ -1711,6 +1784,10 @@ export class MysqlBusinessStore implements BusinessStore {
       createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
       updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
       items: (itemRows as PartsRequestItemRow[]).map(mapPartsRequestItem),
+      reviewedBy: row.reviewed_by === null ? null : toStringId(row.reviewed_by),
+      reviewedAt: toIso(row.reviewed_at),
+      reviewNotes: row.review_notes,
+      approvals: await this.listPartsApprovals(row.id),
     };
   }
 
@@ -1733,6 +1810,7 @@ export class MysqlBusinessStore implements BusinessStore {
       list.push(mapPartsRequestItem(item));
       itemsByRequest.set(key, list);
     }
+    const approvalsByRequest = await this.listPartsApprovalsForJob(jobId);
     return requests.map((row) => ({
       id: toStringId(row.id),
       jobId: toStringId(row.job_id),
@@ -1746,6 +1824,10 @@ export class MysqlBusinessStore implements BusinessStore {
       createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
       updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
       items: itemsByRequest.get(toStringId(row.id)) ?? [],
+      reviewedBy: row.reviewed_by === null ? null : toStringId(row.reviewed_by),
+      reviewedAt: toIso(row.reviewed_at),
+      reviewNotes: row.review_notes,
+      approvals: approvalsByRequest.get(toStringId(row.id)) ?? [],
     }));
   }
 
@@ -1887,6 +1969,335 @@ export class MysqlBusinessStore implements BusinessStore {
       filename: null,
       storageKey: item.photo_reference,
     };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7F — manager approvals + awaiting parts (MySQL).
+  //
+  // Reuses `parts_requests` / `job_approvals` / `jobs` /
+  // `job_status_history` (migrations 004 + 006, ENUM extended by 011).
+  // Every write holds the job row lock (`FOR UPDATE`) and commits the
+  // request update, the `job_approvals` decision row and any job-status
+  // move (+ history) in one transaction with guarded status updates,
+  // so concurrent reviews cannot double-transition. Every value is a
+  // bound parameter. Business scoping joins `jobs.business_id` because
+  // `parts_requests` carries no business column; technician scoping
+  // reuses the active TECHNICIAN assignment. Foreign jobs read as null
+  // (NOT_FOUND upstream); every other invalid action throws
+  // PartsRequestNotActionableError (422 upstream).
+  // ------------------------------------------------------------------
+
+  async reviewPartsRequest(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+    input: { decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO'; comment: string | null; reviewerId: string },
+  ): Promise<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto; technicianUserId: string } | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId) || !/^[1-9][0-9]*$/.test(requestId)) return null;
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [jobRows] = await conn.query<RowDataPacket[]>(
+        "SELECT `id`, `status`, `source` FROM `jobs` WHERE `id` = ? AND `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL FOR UPDATE",
+        [jobId, businessId],
+      );
+      const job = (jobRows as Array<{ id: number; status: InternalJobStatus; source: string }>)[0];
+      if (!job) {
+        await conn.rollback();
+        return null;
+      }
+      const [requestRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id`, `job_id`, `requester_id`, `status` FROM `parts_requests` WHERE `id` = ? FOR UPDATE',
+        [requestId],
+      );
+      const parts = (
+        requestRows as Array<{ id: number; job_id: number; requester_id: number | null; status: string }>
+      )[0];
+      if (!parts || String(parts.job_id) !== String(jobId)) {
+        await conn.rollback();
+        return null;
+      }
+      if (parts.status !== 'PENDING' && parts.status !== 'NEEDS_INFO') {
+        throw new PartsRequestNotActionableError(
+          `This parts request has already been ${parts.status === 'APPROVED' ? 'approved' : parts.status === 'REJECTED' ? 'rejected' : 'actioned'}.`,
+        );
+      }
+      if (parts.requester_id !== null && String(parts.requester_id) === String(input.reviewerId)) {
+        throw new PartsRequestNotActionableError('You cannot review your own parts request.');
+      }
+      if (job.status !== 'IN_PROGRESS' && job.status !== 'AWAITING_PARTS') {
+        throw new PartsRequestNotActionableError('Parts can only be reviewed while the job is in progress.');
+      }
+      const [assignmentRows] = await conn.query<RowDataPacket[]>(
+        "SELECT 1 AS `one` FROM `job_assignments` WHERE `job_id` = ? AND `assignment_type` = 'TECHNICIAN' AND `unassigned_at` IS NULL LIMIT 1",
+        [jobId],
+      );
+      if ((assignmentRows as RowDataPacket[]).length === 0) {
+        throw new PartsRequestNotActionableError('Parts can only be reviewed for an assigned job.');
+      }
+      const nextStatus = input.decision === 'APPROVE' ? 'APPROVED' : input.decision === 'REJECT' ? 'REJECTED' : 'NEEDS_INFO';
+      const [updated] = await conn.query<ResultSetHeader>(
+        'UPDATE `parts_requests` SET `status` = ?, `reviewed_by` = ?, `reviewed_at` = NOW(), `review_notes` = ? WHERE `id` = ? AND `status` = ?',
+        [nextStatus, input.reviewerId, input.comment, requestId, parts.status],
+      );
+      if (updated.affectedRows !== 1) throw new PartsRequestNotActionableError('This parts request was updated by another reviewer.');
+      const [approvalResult] = await conn.query<ResultSetHeader>(
+        "INSERT INTO `job_approvals` (`job_id`, `request_type`, `parts_request_id`, `requested_by`, `reviewed_by`, `status`, `comments`, `reviewed_at`) VALUES (?, 'PARTS', ?, ?, ?, ?, ?, NOW())",
+        [jobId, requestId, parts.requester_id, input.reviewerId, nextStatus, input.comment],
+      );
+      const approvalId = Number(approvalResult.insertId);
+      if (input.decision === 'APPROVE' && job.status === 'IN_PROGRESS') {
+        const [moved] = await conn.query<ResultSetHeader>(
+          "UPDATE `jobs` SET `status` = 'AWAITING_PARTS' WHERE `id` = ? AND `status` = 'IN_PROGRESS'",
+          [jobId],
+        );
+        if (moved.affectedRows !== 1) throw new PartsRequestNotActionableError('The job changed while reviewing.');
+        await conn.query(
+          'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+          [jobId, 'IN_PROGRESS', 'AWAITING_PARTS', input.reviewerId, 'Parts request approved — awaiting parts'],
+        );
+      }
+      await conn.commit();
+      const [approvalRows] = await this.pool.query<PartsApprovalRow[]>(
+        `${PARTS_APPROVAL_SELECT} WHERE \`id\` = ? LIMIT 1`,
+        [approvalId],
+      );
+      const approval = (approvalRows as PartsApprovalRow[])[0];
+      if (!approval) throw new Error('Parts review failed: approval not found after insert.');
+      const [requestHydrated] = await this.pool.query<PartsRequestRow[]>(
+        `${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`,
+        [requestId],
+      );
+      const hydrated = (requestHydrated as PartsRequestRow[])[0];
+      if (!hydrated) throw new Error('Parts review failed: request not found after update.');
+      const jobDto = await this.getInternalJob(businessId, jobId);
+      if (!jobDto) throw new Error('Parts review failed: job not found after update.');
+      return {
+        request: await this.mapPartsRequest(hydrated),
+        approval: mapPartsApproval(approval),
+        job: jobDto,
+        technicianUserId: parts.requester_id === null ? '' : String(parts.requester_id),
+      };
+    } catch (err) {
+      try {
+        await conn.rollback();
+      } catch {
+        // Best effort: the original error carries the failure reason.
+      }
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async markPartsAvailable(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+    input: { comment: string | null; markedBy: string },
+  ): Promise<{ request: PartsRequestDto; job: InternalJobDto; jobResumed: boolean; technicianUserId: string } | null> {
+    void input.comment;
+    if (!/^[1-9][0-9]*$/.test(jobId) || !/^[1-9][0-9]*$/.test(requestId)) return null;
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [jobRows] = await conn.query<RowDataPacket[]>(
+        "SELECT `id`, `status` FROM `jobs` WHERE `id` = ? AND `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL FOR UPDATE",
+        [jobId, businessId],
+      );
+      const job = (jobRows as Array<{ id: number; status: InternalJobStatus }>)[0];
+      if (!job) {
+        await conn.rollback();
+        return null;
+      }
+      const [requestRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id`, `job_id`, `requester_id`, `status` FROM `parts_requests` WHERE `id` = ? FOR UPDATE',
+        [requestId],
+      );
+      const parts = (
+        requestRows as Array<{ id: number; job_id: number; requester_id: number | null; status: string }>
+      )[0];
+      if (!parts || String(parts.job_id) !== String(jobId)) {
+        await conn.rollback();
+        return null;
+      }
+      if (parts.status !== 'APPROVED') {
+        throw new PartsRequestNotActionableError(
+          parts.status === 'PARTS_AVAILABLE'
+            ? 'These parts have already been marked as available.'
+            : 'Only approved parts requests can be marked as available.',
+        );
+      }
+      if (job.status !== 'AWAITING_PARTS' && job.status !== 'IN_PROGRESS') {
+        throw new PartsRequestNotActionableError('Parts availability can only be recorded while the job is awaiting parts.');
+      }
+      const [updated] = await conn.query<ResultSetHeader>(
+        "UPDATE `parts_requests` SET `status` = 'PARTS_AVAILABLE' WHERE `id` = ? AND `status` = 'APPROVED'",
+        [requestId],
+      );
+      if (updated.affectedRows !== 1) throw new PartsRequestNotActionableError('This parts request was updated by another reviewer.');
+      // Multiple-request rule: resume only when no APPROVED request
+      // remains outstanding for the job.
+      let jobResumed = false;
+      if (job.status === 'AWAITING_PARTS') {
+        const [outstanding] = await conn.query<RowDataPacket[]>(
+          "SELECT 1 AS `one` FROM `parts_requests` WHERE `job_id` = ? AND `status` = 'APPROVED' LIMIT 1",
+          [jobId],
+        );
+        if ((outstanding as RowDataPacket[]).length === 0) {
+          const [resumed] = await conn.query<ResultSetHeader>(
+            "UPDATE `jobs` SET `status` = 'IN_PROGRESS' WHERE `id` = ? AND `status` = 'AWAITING_PARTS'",
+            [jobId],
+          );
+          if (resumed.affectedRows !== 1) throw new PartsRequestNotActionableError('The job changed while recording availability.');
+          await conn.query(
+            'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+            [jobId, 'AWAITING_PARTS', 'IN_PROGRESS', input.markedBy, 'Parts available — job ready to continue'],
+          );
+          jobResumed = true;
+        }
+      }
+      await conn.commit();
+      const [requestHydrated] = await this.pool.query<PartsRequestRow[]>(
+        `${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`,
+        [requestId],
+      );
+      const hydrated = (requestHydrated as PartsRequestRow[])[0];
+      if (!hydrated) throw new Error('Parts availability failed: request not found after update.');
+      const jobDto = await this.getInternalJob(businessId, jobId);
+      if (!jobDto) throw new Error('Parts availability failed: job not found after update.');
+      return {
+        request: await this.mapPartsRequest(hydrated),
+        job: jobDto,
+        jobResumed,
+        technicianUserId: parts.requester_id === null ? '' : String(parts.requester_id),
+      };
+    } catch (err) {
+      try {
+        await conn.rollback();
+      } catch {
+        // Best effort: the original error carries the failure reason.
+      }
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async respondToPartsRequest(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+    input: { note: string | null; responderId: string },
+  ): Promise<PartsRequestDto | null> {
+    if (!/^[1-9][0-9]*$/.test(technicianId) || !/^[1-9][0-9]*$/.test(jobId) || !/^[1-9][0-9]*$/.test(requestId)) {
+      return null;
+    }
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      if (!(await this.hasActiveAssignment(conn, technicianId, jobId))) {
+        await conn.rollback();
+        return null;
+      }
+      const [requestRows] = await conn.query<RowDataPacket[]>(
+        'SELECT `id`, `job_id`, `requester_id`, `status` FROM `parts_requests` WHERE `id` = ? FOR UPDATE',
+        [requestId],
+      );
+      const parts = (
+        requestRows as Array<{ id: number; job_id: number; requester_id: number | null; status: string }>
+      )[0];
+      if (!parts || String(parts.job_id) !== String(jobId)) {
+        await conn.rollback();
+        return null;
+      }
+      if (parts.status !== 'NEEDS_INFO') {
+        throw new PartsRequestNotActionableError('This parts request is not waiting for more information.');
+      }
+      const [updated] = await conn.query<ResultSetHeader>(
+        "UPDATE `parts_requests` SET `status` = 'PENDING' WHERE `id` = ? AND `status` = 'NEEDS_INFO'",
+        [requestId],
+      );
+      if (updated.affectedRows !== 1) throw new PartsRequestNotActionableError('This parts request was updated while responding.');
+      await conn.query(
+        "INSERT INTO `job_approvals` (`job_id`, `request_type`, `parts_request_id`, `requested_by`, `reviewed_by`, `status`, `comments`, `reviewed_at`) VALUES (?, 'PARTS', ?, ?, NULL, 'PENDING', ?, NULL)",
+        [jobId, requestId, input.responderId, input.note],
+      );
+      await conn.commit();
+      const [requestHydrated] = await this.pool.query<PartsRequestRow[]>(
+        `${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`,
+        [requestId],
+      );
+      const hydrated = (requestHydrated as PartsRequestRow[])[0];
+      if (!hydrated) throw new Error('Parts response failed: request not found after update.');
+      return this.mapPartsRequest(hydrated);
+    } catch (err) {
+      try {
+        await conn.rollback();
+      } catch {
+        // Best effort: the original error carries the failure reason.
+      }
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async resumeTechnicianJob(
+    technicianId: string,
+    jobId: string,
+    input: { resumedBy: string },
+  ): Promise<InternalJobDto | null> {
+    if (!/^[1-9][0-9]*$/.test(technicianId) || !/^[1-9][0-9]*$/.test(jobId)) return null;
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      if (!(await this.hasActiveAssignment(conn, technicianId, jobId))) {
+        await conn.rollback();
+        return null;
+      }
+      const [jobRows] = await conn.query<RowDataPacket[]>(
+        "SELECT `id`, `status` FROM `jobs` WHERE `id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL FOR UPDATE",
+        [jobId],
+      );
+      const job = (jobRows as Array<{ id: number; status: InternalJobStatus }>)[0];
+      if (!job) {
+        await conn.rollback();
+        return null;
+      }
+      if (job.status !== 'AWAITING_PARTS') {
+        throw new PartsRequestNotActionableError('Only jobs awaiting parts can be resumed.');
+      }
+      const [outstanding] = await conn.query<RowDataPacket[]>(
+        "SELECT 1 AS `one` FROM `parts_requests` WHERE `job_id` = ? AND `status` = 'APPROVED' LIMIT 1",
+        [jobId],
+      );
+      if ((outstanding as RowDataPacket[]).length > 0) {
+        throw new PartsRequestNotActionableError('Some approved parts are still outstanding.');
+      }
+      const [resumed] = await conn.query<ResultSetHeader>(
+        "UPDATE `jobs` SET `status` = 'IN_PROGRESS' WHERE `id` = ? AND `status` = 'AWAITING_PARTS'",
+        [jobId],
+      );
+      if (resumed.affectedRows !== 1) throw new PartsRequestNotActionableError('The job changed while resuming.');
+      await conn.query(
+        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+        [jobId, 'AWAITING_PARTS', 'IN_PROGRESS', input.resumedBy, 'Technician resumed job — parts available'],
+      );
+      await conn.commit();
+      const refreshed = await this.getTechnicianJob(technicianId, jobId);
+      if (!refreshed) throw new Error('Job resume failed: job not found after update.');
+      return refreshed;
+    } catch (err) {
+      try {
+        await conn.rollback();
+      } catch {
+        // Best effort: the original error carries the failure reason.
+      }
+      throw err;
+    } finally {
+      conn.release();
+    }
   }
 }
 

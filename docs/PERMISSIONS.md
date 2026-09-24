@@ -152,6 +152,8 @@ ADMIN
 - Add voice notes where supported
 - Create parts requests
 - View parts request status
+- Respond to needs-info parts requests (Stage 7F)
+- Resume jobs awaiting parts once the server allows (Stage 7F)
 - Complete assigned jobs
 
 ## Cannot
@@ -935,3 +937,67 @@ reads, cross-business owner `404`, role/anonymous rejection
 (`401`/`403` both surfaces), timeline inclusion (technician
 + business), photo upload + authorized delivery (`404`
 for foreign/no-photo), invalid file + invalid ids.
+
+# 31. Stage 7F Implementation Notes — Manager Approvals + Awaiting Parts
+
+Implemented 2026-09-24 (`backend/src/modules/business/` — same
+router, new `business-approvals.validation.ts` + shared
+`parts-request-events.ts` seam, one migration:
+`011_parts_available.sql` extends `parts_requests.status` with
+`PARTS_AVAILABLE`; `job_approvals` reused unchanged).
+
+- Only `BUSINESS_OWNER` / `BUSINESS_MANAGER` may review or
+  fulfil, and only for their own business's INTERNAL jobs
+  (business, job, request and reviewer identity derived
+  server-side). `TECHNICIAN`, `CUSTOMER`, `PROFESSIONAL` (incl.
+  marketplace professionals — the internal approval workflow is
+  never exposed to them) receive `403 FORBIDDEN_ROLE` on the
+  decision routes; owners/managers receive `403` on the
+  technician respond/resume routes; unauthenticated → `401`.
+- Another business's job reads as `404 NOT_FOUND` (never `403`),
+  so request and job ids cannot be probed across businesses.
+  Marketplace ids read as `404`. Malformed ids → `400`.
+- Reviewers can never approve their own requests (reviewer ==
+  requester → `422`). Only PENDING / NEEDS_INFO requests are
+  reviewable; APPROVED → PARTS_AVAILABLE only; REJECTED /
+  CANCELLED / PARTS_AVAILABLE are terminal — every duplicate or
+  out-of-state action is rejected with `422
+  VALIDATION_ERROR`, never silently applied.
+- Approve moves IN_PROGRESS → AWAITING_PARTS (an already-waiting
+  job stays AWAITING_PARTS); reject / request-info leave the job
+  IN_PROGRESS. Reject and request-info require a comment/reason
+  (stored on the request and the `job_approvals` row); approve
+  accepts an optional comment.
+- Multiple-request rule: the job stays AWAITING_PARTS while ANY
+  request is APPROVED. Marking a request PARTS_AVAILABLE resumes
+  the job (AWAITING_PARTS → IN_PROGRESS) only when no APPROVED
+  request remains; PENDING / NEEDS_INFO / REJECTED / CANCELLED
+  never block. The technician resume endpoint enforces the same
+  rule, so a technician can continue only when the server allows.
+- Technicians may only view decisions (status + manager comment +
+  timestamp) for their assigned jobs, respond to NEEDS_INFO
+  (→ PENDING, note kept as a PENDING approval row) and resume
+  when allowed. Customers never see the internal workflow.
+- Every decision/fulfilment/resume is atomic (request +
+  `job_approvals` row + job move + history in one transaction)
+  and appears in the existing execution timeline (one `parts`
+  event per decision/response plus the status-move events). No
+  second timeline or notification system was created: decisions
+  emit events on the `parts-request-events` bus (Stage 8 persists
+  them into `notifications`).
+
+Permission tests added
+(`backend/tests/parts-approvals.test.ts`, 17 cases):
+owner/manager approve (APPROVED + AWAITING_PARTS + approval
+record + history), reject (reason required/stored, job stays
+IN_PROGRESS), request-info (comment required, NEEDS_INFO,
+technician visibility), technician respond (→ PENDING, second
+review), parts-available resume (+ history), the two-request
+outstanding rule (+ technician resume blocked/allowed),
+idempotency/terminal rejections, role isolation
+(technician/customer/professional/anonymous `403`/`401`,
+owner/manager on technician routes `403`), cross-business
+`404`, marketplace `404`, invalid ids (`400`/`404`),
+rollback behaviour (failed actions write nothing),
+notification-seam event order + payloads, timeline inclusion
+(both surfaces), technician respond/resume guards.

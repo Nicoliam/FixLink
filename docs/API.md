@@ -596,20 +596,83 @@ technician resolves from `requester_id` via the business roster.
   BUSINESS_MANAGER, owned INTERNAL jobs only, foreign → `404`):
   `GET /api/v1/business/jobs/:jobId/parts` (+
   `.../parts/:requestId`, `.../parts/:requestId/photo/file`).
-  No approve/reject/needs-info capability is exposed here — that
-  arrives in Stage 7F (`job_approvals` table and the
-  IN_PROGRESS → AWAITING_PARTS transition are intentionally
-  untouched).
-- Both execution timelines (`GET .../technician/jobs/:jobId/
-  timeline`, `GET .../business/jobs/:jobId/timeline`) now include
-  `parts` events (`{ kind: 'parts', partsRequestId, partName,
-  quantity, partsStatus, reason }`, oldest first). Inclusion is
-  read-time — no history row is written when a request is created.
-- Status vocabulary reuses the table ENUM (PENDING, APPROVED,
-  REJECTED, NEEDS_INFO, CANCELLED). Stage 7E only ever creates
-  PENDING rows; there is deliberately no estimated-cost field
-  (migration 006 has no cost column — cost is a Stage 7F+
-  consideration).
+  Each request now also carries the Stage 7F decision fields
+  (`reviewedBy` login id, `reviewedAt`, `reviewNotes`) and the
+  decision history (`approvals: [{ id, jobId, partsRequestId,
+  requestedBy, reviewedBy, status, comments, reviewedAt,
+  createdAt }]`, oldest first).
+
+## 8.2 Parts approvals + awaiting parts (Stage 7F)
+
+Manager review reuses the existing `job_approvals` table
+(`request_type = PARTS`, status PENDING/APPROVED/REJECTED/
+NEEDS_INFO) — no new tables; migration `011_parts_available.sql`
+only extends `parts_requests.status` with `PARTS_AVAILABLE`.
+Every decision is atomic: request update + `job_approvals` row +
+optional job move + `job_status_history` entry succeed together or
+roll back together.
+
+- `POST /api/v1/business/jobs/:jobId/parts/:requestId/approve`
+  (owner/manager, `{ comment? }` ≤1000 chars) moves PENDING (or
+  NEEDS_INFO) → APPROVED, records the `job_approvals` row
+  (requested_by = technician login, reviewed_by = manager) and
+  moves the job IN_PROGRESS → AWAITING_PARTS (an already-waiting
+  job stays AWAITING_PARTS) with history reason `Parts request
+  approved — awaiting parts`. Returns `200` `{ request, approval,
+  job }`. The job must be INTERNAL, owned, assigned and
+  IN_PROGRESS/AWAITING_PARTS.
+- `POST .../parts/:requestId/reject` (`{ comment|reason }`
+  required) moves → REJECTED and records the decision; the job
+  stays IN_PROGRESS (no AWAITING_PARTS move, but the decision is a
+  timeline event). Returns `200` `{ request, approval, job }`.
+- `POST .../parts/:requestId/request-info` (`{ comment }`
+  required) moves → NEEDS_INFO and records the decision; the job
+  stays IN_PROGRESS. The technician sees the status plus the
+  manager comment and responds via the technician surface.
+- `POST .../parts/:requestId/available` (owner/manager, `{
+  comment? }`) moves APPROVED → PARTS_AVAILABLE. Multiple-request
+  rule: the job resumes (AWAITING_PARTS → IN_PROGRESS, history
+  reason `Parts available — job ready to continue`) only when no
+  APPROVED request remains outstanding for the job; otherwise it
+  stays AWAITING_PARTS. Returns `200` `{ request, job,
+  jobResumed }`.
+- `POST /api/v1/technician/jobs/:jobId/parts/:requestId/respond`
+  (assigned technician, `{ note? }` ≤1000 chars) moves NEEDS_INFO
+  → PENDING and records the note as a PENDING `job_approvals`
+  row for the manager's next review. Returns `200` (the request).
+- `POST /api/v1/technician/jobs/:jobId/resume` (assigned
+  technician) moves AWAITING_PARTS → IN_PROGRESS, allowed only
+  when no APPROVED request remains outstanding (history reason
+  `Technician resumed job — parts available`). Returns `200` (the
+  job).
+- Parts state machine (server-enforced, invalid actions →
+  `422 VALIDATION_ERROR`, never silent): PENDING → APPROVED →
+  PARTS_AVAILABLE; PENDING → REJECTED | NEEDS_INFO; NEEDS_INFO →
+  PENDING (technician responds) or → APPROVED / REJECTED /
+  NEEDS_INFO (manager acts again); REJECTED / CANCELLED /
+  PARTS_AVAILABLE are terminal. Self-review (reviewer ==
+  requester) is rejected. Malformed ids → `400`; foreign jobs →
+  `404`; technicians/customers/professionals on the business
+  decision routes (and owners/managers on the technician
+  respond/resume routes) → `403 FORBIDDEN_ROLE`.
+- Both execution timelines now include one `parts` event per
+  recorded decision/response in addition to the read-time request
+  event (`partsStatus` = the decision status, `reason` = the
+  manager/technician comment, `actor` = business for manager
+  decisions, technician for responses), plus the `IN_PROGRESS →
+  AWAITING_PARTS → IN_PROGRESS` status events. No second timeline
+  system exists.
+- Status vocabulary: `parts_requests` is now PENDING, APPROVED,
+  REJECTED, NEEDS_INFO, CANCELLED, PARTS_AVAILABLE (migration
+  011); `job_approvals` keeps PENDING/APPROVED/REJECTED/
+  NEEDS_INFO.
+- Notification seam: each decision/fulfilment/resume emits one
+  event (`PARTS_REQUEST_APPROVED/REJECTED/NEEDS_INFO/RESPONDED`,
+  `PARTS_AVAILABLE`, `JOB_READY_TO_CONTINUE`) on the in-memory
+  `parts-request-events` bus — nothing is written to the
+  `notifications` table in this stage. Stage 8 persists these
+  (type/title/message → notification row, reference
+  PARTS_REQUEST) and exposes the listing endpoints.
 - Role matrix: managers/owners/customers/professionals →
   `403 FORBIDDEN_ROLE` on the technician submission surface (and
   vice versa on the business surface); unauthenticated → `401`.

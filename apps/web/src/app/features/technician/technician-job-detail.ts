@@ -48,8 +48,13 @@ type RecordingState = 'idle' | 'requesting' | 'recording';
  * and a completion section where the required completion note enables
  * Complete Job (→ COMPLETED). Stage 7E adds Request Parts
  * (IN_PROGRESS/AWAITING_PARTS → PENDING request, job state unchanged)
- * with the submitted requests listed under Parts Required. Approvals
- * and notifications arrive in later stages and are not shown.
+ * with the submitted requests listed under Parts Required. Stage 7F
+ * adds the manager decision display (approved / rejected / needs-info
+ * with the manager's comment), the technician response for NEEDS_INFO
+ * requests (→ PENDING) and the awaiting-parts workspace (parts
+ * available notice with resume → IN_PROGRESS once the server allows).
+ * Approval controls stay manager-only; notifications arrive in a later
+ * stage and are not shown.
  */
 @Component({
   selector: 'app-technician-job-detail',
@@ -145,6 +150,23 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
   protected readonly partsSubmitError = signal<string | null>(null);
   protected readonly partsPhotoName = signal<string | null>(null);
   protected readonly partsPhotoUrls = signal<Record<string, string>>({});
+
+  /**
+   * Stage 7F — technician response to NEEDS_INFO requests (→ PENDING)
+   * and resume from AWAITING_PARTS (→ IN_PROGRESS when the server
+   * allows, i.e. no APPROVED request remains outstanding).
+   */
+  protected readonly respondingRequestId = signal<string | null>(null);
+  protected readonly responding = signal(false);
+  protected readonly respondError = signal<string | null>(null);
+  protected readonly resuming = signal(false);
+  protected readonly resumeError = signal<string | null>(null);
+
+  protected readonly isAwaitingParts = computed<boolean>(() => this.detail()?.job.status === 'AWAITING_PARTS');
+
+  readonly respondForm = this.fb.group({
+    note: ['', [Validators.maxLength(1000)]],
+  });
 
   private partsPhotoFile: File | null = null;
 
@@ -717,6 +739,79 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
           },
         });
     }
+  }
+
+  // ---------------------------------------------------------------
+  // Stage 7F — technician response + resume. NEEDS_INFO requests
+  // offer a response form (→ PENDING for the manager's next review);
+  // an AWAITING_PARTS job offers resume (→ IN_PROGRESS) once every
+  // approved request has its parts available. The backend enforces
+  // both transitions — these controls are UX only and never approve.
+  // ---------------------------------------------------------------
+
+  /** A response form is offered only for NEEDS_INFO requests. */
+  protected canRespond(request: PartsRequest): boolean {
+    return request.status === 'NEEDS_INFO';
+  }
+
+  /** True when every approved request has its parts available. */
+  protected readonly allPartsAvailable = computed<boolean>(() => {
+    const outstanding = this.partsRequests().some((request) => request.status === 'APPROVED');
+    return !outstanding;
+  });
+
+  protected startRespond(requestId: string): void {
+    this.respondingRequestId.set(requestId);
+    this.respondError.set(null);
+    this.respondForm.reset({ note: '' });
+  }
+
+  protected cancelRespond(): void {
+    if (this.responding()) return;
+    this.respondingRequestId.set(null);
+    this.respondError.set(null);
+  }
+
+  protected confirmRespond(requestId: string): void {
+    const job = this.detail()?.job;
+    if (!job || this.responding() || this.respondingRequestId() !== requestId) return;
+    const note = (this.respondForm.get('note')?.value ?? '').trim();
+    this.responding.set(true);
+    this.respondError.set(null);
+    this.api
+      .respondToMyJobPartsRequest(job.id, requestId, note)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.responding.set(false);
+          this.respondingRequestId.set(null);
+          this.partsRequests.update((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+        },
+        error: (error: unknown) => {
+          this.responding.set(false);
+          this.respondError.set(getApiErrorMessage(error, 'Could not submit the response. Please try again.'));
+        },
+      });
+  }
+
+  protected resumeJob(): void {
+    const job = this.detail()?.job;
+    if (!job || this.resuming() || !this.isAwaitingParts()) return;
+    this.resuming.set(true);
+    this.resumeError.set(null);
+    this.api
+      .resumeMyJob(job.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.resuming.set(false);
+          this.detail.update((current) => (current ? { ...current, job: updated } : current));
+        },
+        error: (error: unknown) => {
+          this.resuming.set(false);
+          this.resumeError.set(getApiErrorMessage(error, 'Could not resume the job. Please try again.'));
+        },
+      });
   }
 }
 

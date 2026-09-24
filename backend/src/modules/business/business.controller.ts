@@ -581,6 +581,91 @@ export function makeBusinessController(service: BusinessService) {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
       }
     },
+
+    // --------------------------------------------------------------
+    // Stage 7F — manager approvals + parts availability (owner/manager
+    // only; the service derives the business from the session) and
+    // technician respond/resume (assigned technician only).
+    // --------------------------------------------------------------
+
+    async approvePartsRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.approvePartsRequest(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Parts request approved. The job is awaiting parts.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not approve the parts request. Please try again.', 500);
+      }
+    },
+
+    async rejectPartsRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.rejectPartsRequest(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Parts request rejected.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not reject the parts request. Please try again.', 500);
+      }
+    },
+
+    async requestPartsInfo(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.requestPartsInfo(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'More information requested from the technician.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not request more information. Please try again.', 500);
+      }
+    },
+
+    async markPartsAvailable(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.markPartsAvailable(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Parts marked as available.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not mark the parts as available. Please try again.', 500);
+      }
+    },
+
+    async respondToPartsRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.respondToPartsRequest(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Response submitted. The request is pending review again.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not submit the response. Please try again.', 500);
+      }
+    },
+
+    async resumeTechnicianJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.resumeTechnicianJob(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Job resumed. You can continue the work.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not resume the job. Please try again.', 500);
+      }
+    },
   };
 }
 

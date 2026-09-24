@@ -406,8 +406,39 @@ export interface TechnicianExecutionTimelineDto {
  * Stage 7F manager-approval workflow.
  */
 
-/** Lifecycle state of a parts request (mirrors the table ENUM). */
-export type PartsRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO' | 'CANCELLED';
+/**
+ * Lifecycle state of a parts request (mirrors the table ENUM;
+ * PARTS_AVAILABLE arrives with migration 011, Stage 7F).
+ *
+ * State machine (all transitions server-side, see `business.store`):
+ * PENDING → APPROVED → PARTS_AVAILABLE
+ * PENDING → REJECTED | NEEDS_INFO
+ * NEEDS_INFO → PENDING (technician responds) or → APPROVED / REJECTED /
+ *   NEEDS_INFO (manager acts again)
+ * REJECTED / CANCELLED / PARTS_AVAILABLE are terminal.
+ */
+export type PartsRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'NEEDS_INFO'
+  | 'CANCELLED'
+  | 'PARTS_AVAILABLE';
+
+/** Manager/technician decision on a parts request (a `job_approvals` row projection). */
+export interface PartsApprovalDto {
+  id: string;
+  jobId: string;
+  partsRequestId: string;
+  /** Login user id that submitted the request (the technician). */
+  requestedBy: string | null;
+  /** Login user id that reviewed it (the owner/manager), or null for technician responses. */
+  reviewedBy: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO';
+  comments: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
 
 /** One requested part/material (a `parts_request_items` row projection). */
 export interface PartsRequestItemDto {
@@ -438,6 +469,21 @@ export interface PartsRequestDto {
   createdAt: string;
   updatedAt: string;
   items: PartsRequestItemDto[];
+  /**
+   * Stage 7F — latest manager decision (`parts_requests.reviewed_by` /
+   * `reviewed_at` / `review_notes`; login user id only, never contact
+   * details). Null until a manager first reviews the request.
+   */
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
+  /**
+   * Stage 7F — full decision history for this request (`job_approvals`
+   * rows with `request_type = PARTS`, oldest first). Drives the manager
+   * decision display and the timeline approval events; empty until the
+   * first review or technician response.
+   */
+  approvals: PartsApprovalDto[];
 }
 
 /** Validated parts-request creation body (single item — see note above). */

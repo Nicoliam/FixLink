@@ -33,6 +33,7 @@ import type { JobsStore } from '../jobs/jobs.store';
 import {
   JobNotCancellableError,
   JobNotStartableError,
+  PartsRequestNotActionableError,
   TechnicianConflictError,
   TechnicianImageNotDeletableError,
   TechnicianJobNotCompletableError,
@@ -40,6 +41,13 @@ import {
   buildTechnicianExecutionEvents,
   type BusinessStore,
 } from './business.store';
+import {
+  PartsRequestEventBus,
+  approvalEvent,
+  jobReadyEvent,
+  partsAvailableEvent,
+  technicianRespondedEvent,
+} from './parts-request-events';
 import type {
   BusinessCustomerDto,
   BusinessDto,
@@ -49,6 +57,7 @@ import type {
   InternalJobsSummary,
   JobAssignmentDetailDto,
   JobAssignmentDto,
+  PartsApprovalDto,
   PartsRequestDto,
   TechnicianDto,
   TechnicianExecutionTimelineDto,
@@ -65,6 +74,7 @@ import {
 import { validateBusinessCustomerCreate, validateBusinessCustomerPatch } from './business-customers.validation';
 import { validateAssignmentCreate } from './business-assignment.validation';
 import { validatePartsRequestCreate } from './business-parts.validation';
+import { validateApprovalDecision, validatePartsResponse } from './business-approvals.validation';
 import {
   validateInternalJobCancel,
   validateInternalJobCreate,
@@ -99,6 +109,7 @@ function readPage(value: unknown, fallback: number, max: number): number | null 
 
 export class BusinessService {
   private readonly storage: FileStorage;
+  private readonly events: PartsRequestEventBus;
 
   constructor(
     private readonly users: UserRepository,
@@ -117,8 +128,21 @@ export class BusinessService {
      * tests, the local MVP dir in production).
      */
     storage?: FileStorage,
+    /**
+     * Stage 7F notification seam. Optional so pre-7F constructions keep
+     * compiling; Stage 7F wiring supplies the shared bus (a fresh bus
+     * per test app, one process-wide bus in production) that Stage 8
+     * will persist into the `notifications` table.
+     */
+    events?: PartsRequestEventBus,
   ) {
     this.storage = storage ?? new LocalFileStorage();
+    this.events = events ?? new PartsRequestEventBus();
+  }
+
+  /** Stage 7F notification seam (Stage 8 persists these into `notifications`). */
+  get eventBus(): PartsRequestEventBus {
+    return this.events;
   }
 
   /**
@@ -1512,6 +1536,246 @@ export class BusinessService {
         filename: found.filename ?? `job-${jobId.trim()}-part-photo`,
       },
     };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7F — manager approvals + awaiting parts.
+  //
+  // Only BUSINESS_OWNER / BUSINESS_MANAGER (via resolveManagement) may
+  // review or fulfil. Technicians review through the technician
+  // surface only (respond/resume); customers, marketplace
+  // professionals and technicians hitting the business routes receive
+  // 403 FORBIDDEN_ROLE, and cross-business jobs read as 404 NOT_FOUND.
+  // Reviewers can never approve their own requests (the store rejects
+  // reviewer == requester). Every decision emits one notification
+  // event on the Stage 8 seam — the service never writes to the
+  // `notifications` table directly.
+  // ------------------------------------------------------------------
+
+  private partNameOf(request: PartsRequestDto): string | null {
+    return request.items[0]?.partName ?? null;
+  }
+
+  private async decidePartsRequest(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+    body: unknown,
+    decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO',
+  ): Promise<ServiceResult<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto }>> {
+    if (!isNumericId(jobId) || !isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { comment, error } = validateApprovalDecision(body, decision);
+    if (error) {
+      return fail(error.status, error.code, error.message);
+    }
+    try {
+      const result = await this.business.reviewPartsRequest(access.businessId, jobId.trim(), requestId.trim(), {
+        decision,
+        comment,
+        reviewerId: authUserId,
+      });
+      if (!result) return fail(404, 'NOT_FOUND', 'Parts request not found.');
+      const eventType =
+        decision === 'APPROVE'
+          ? 'PARTS_REQUEST_APPROVED'
+          : decision === 'REJECT'
+            ? 'PARTS_REQUEST_REJECTED'
+            : 'PARTS_REQUEST_NEEDS_INFO';
+      this.events.emit(
+        approvalEvent(eventType, {
+          businessId: access.businessId,
+          jobId: result.job.id,
+          partsRequestId: result.request.id,
+          actorUserId: authUserId,
+          technicianUserId: result.technicianUserId,
+          partName: this.partNameOf(result.request),
+        }),
+      );
+      return { status: 200, data: result };
+    } catch (err) {
+      if (err instanceof PartsRequestNotActionableError) {
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
+  }
+
+  /** Manager approves a PENDING (or NEEDS_INFO) request; the job moves IN_PROGRESS → AWAITING_PARTS. */
+  async approvePartsRequest(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+    body: unknown,
+  ): Promise<ServiceResult<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto }>> {
+    return this.decidePartsRequest(authUserId, jobId, requestId, body, 'APPROVE');
+  }
+
+  /** Manager rejects a PENDING (or NEEDS_INFO) request; the job stays IN_PROGRESS. */
+  async rejectPartsRequest(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+    body: unknown,
+  ): Promise<ServiceResult<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto }>> {
+    return this.decidePartsRequest(authUserId, jobId, requestId, body, 'REJECT');
+  }
+
+  /** Manager asks the technician for more information; the job stays IN_PROGRESS. */
+  async requestPartsInfo(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+    body: unknown,
+  ): Promise<ServiceResult<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto }>> {
+    return this.decidePartsRequest(authUserId, jobId, requestId, body, 'REQUEST_INFO');
+  }
+
+  /**
+   * Manager marks an APPROVED request as fulfilled (APPROVED →
+   * PARTS_AVAILABLE). The job resumes (AWAITING_PARTS → IN_PROGRESS)
+   * only when no APPROVED request remains outstanding — otherwise it
+   * stays waiting. Emits PARTS_AVAILABLE and, on resume, JOB_READY.
+   */
+  async markPartsAvailable(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+    body: unknown,
+  ): Promise<ServiceResult<{ request: PartsRequestDto; job: InternalJobDto; jobResumed: boolean }>> {
+    if (!isNumericId(jobId) || !isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { comment, error } = validateApprovalDecision(body, 'AVAILABLE');
+    if (error) {
+      return fail(error.status, error.code, error.message);
+    }
+    try {
+      const result = await this.business.markPartsAvailable(access.businessId, jobId.trim(), requestId.trim(), {
+        comment,
+        markedBy: authUserId,
+      });
+      if (!result) return fail(404, 'NOT_FOUND', 'Parts request not found.');
+      this.events.emit(
+        partsAvailableEvent({
+          businessId: access.businessId,
+          jobId: result.job.id,
+          partsRequestId: result.request.id,
+          actorUserId: authUserId,
+          technicianUserId: result.technicianUserId,
+          partName: this.partNameOf(result.request),
+          jobResumed: result.jobResumed,
+        }),
+      );
+      if (result.jobResumed) {
+        this.events.emit(
+          jobReadyEvent({
+            businessId: access.businessId,
+            jobId: result.job.id,
+            partsRequestId: result.request.id,
+            actorUserId: authUserId,
+            technicianUserId: result.technicianUserId,
+          }),
+        );
+      }
+      return { status: 200, data: result };
+    } catch (err) {
+      if (err instanceof PartsRequestNotActionableError) {
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Technician responds to a NEEDS_INFO request (NEEDS_INFO → PENDING)
+   * with an optional note for the manager's next review. Only the
+   * actively assigned technician may respond.
+   */
+  async respondToPartsRequest(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+    body: unknown,
+  ): Promise<ServiceResult<PartsRequestDto>> {
+    if (!isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid parts request id.');
+    }
+    const scoped = await this.technicianJob(authUserId, jobId);
+    if (scoped.technicianId === null) {
+      return fail(scoped.status, scoped.code, scoped.message);
+    }
+    const { note, error } = validatePartsResponse(body);
+    if (error) {
+      return fail(error.status, error.code, error.message);
+    }
+    try {
+      const request = await this.business.respondToPartsRequest(
+        scoped.technicianId,
+        scoped.job.id,
+        requestId.trim(),
+        { note, responderId: authUserId },
+      );
+      if (!request) return fail(404, 'NOT_FOUND', 'Parts request not found.');
+      this.events.emit(
+        technicianRespondedEvent({
+          businessId: request.businessId,
+          jobId: request.jobId,
+          partsRequestId: request.id,
+          actorUserId: authUserId,
+          technicianUserId: authUserId,
+          partName: this.partNameOf(request),
+        }),
+      );
+      return { status: 200, data: request };
+    } catch (err) {
+      if (err instanceof PartsRequestNotActionableError) {
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Technician continues work (AWAITING_PARTS → IN_PROGRESS) once every
+   * approved request has its parts available. Blocked while any APPROVED
+   * request remains outstanding.
+   */
+  async resumeTechnicianJob(authUserId: string, jobId: string): Promise<ServiceResult<InternalJobDto>> {
+    const scoped = await this.technicianJob(authUserId, jobId);
+    if (scoped.technicianId === null) {
+      return fail(scoped.status, scoped.code, scoped.message);
+    }
+    try {
+      const job = await this.business.resumeTechnicianJob(scoped.technicianId, scoped.job.id, {
+        resumedBy: authUserId,
+      });
+      if (!job) return fail(404, 'NOT_FOUND', 'Job not found.');
+      this.events.emit(
+        jobReadyEvent({
+          businessId: job.businessId,
+          jobId: job.id,
+          partsRequestId: '',
+          actorUserId: authUserId,
+          technicianUserId: authUserId,
+        }),
+      );
+      return { status: 200, data: job };
+    } catch (err) {
+      if (err instanceof PartsRequestNotActionableError) {
+        return fail(422, 'VALIDATION_ERROR', err.message);
+      }
+      throw err;
+    }
   }
 }
 

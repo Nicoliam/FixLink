@@ -366,6 +366,30 @@
 
         <div aria-label="Parts required">
           <p class="fl-card-title">Parts Required</p>
+          @if (isAwaitingParts()) {
+            <div role="status" aria-label="Awaiting parts">
+              <p class="fl-card-text"><strong>Job Status: Awaiting Parts</strong></p>
+              @if (allPartsAvailable()) {
+                <p class="fl-card-text">Parts Available — Job ready to continue.</p>
+                @if (resumeError()) {
+                  <p class="fl-alert-error" role="alert">{{ resumeError() }}</p>
+                }
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-primary fl-btn-block"
+                  (click)="resumeJob()"
+                  [disabled]="resuming()"
+                >
+                  {{ resuming() ? 'Resuming…' : 'Continue Job' }}
+                </button>
+              } @else {
+                <p class="fl-card-text">Waiting for the business to confirm the approved parts are available.</p>
+                @if (resumeError()) {
+                  <p class="fl-alert-error" role="alert">{{ resumeError() }}</p>
+                }
+              }
+            </div>
+          }
           @if (canRequestParts()) {
             <form class="fl-form" [formGroup]="partsForm" (ngSubmit)="submitPartsRequest()" novalidate>
               <div class="fl-field">
@@ -426,8 +450,55 @@
                   }
                   <p class="fl-card-text">Reason: {{ partsRequest.reason }}</p>
                   <p class="fl-card-text">Status: {{ partsStatusText(partsRequest.status) }} · {{ partsRequest.createdAt }}</p>
+                  @if (partsRequest.status === 'APPROVED') {
+                    <p class="fl-card-text">Decision: Approved by Manager{{ partsRequest.reviewedAt ? ' · ' + partsRequest.reviewedAt : '' }}</p>
+                    @if (partsRequest.reviewNotes) {
+                      <p class="fl-card-text">{{ partsRequest.reviewNotes }}</p>
+                    }
+                  } @else if (partsRequest.status === 'REJECTED') {
+                    <p class="fl-card-text">Decision: Rejected by Manager{{ partsRequest.reviewedAt ? ' · ' + partsRequest.reviewedAt : '' }}</p>
+                    @if (partsRequest.reviewNotes) {
+                      <p class="fl-card-text">{{ partsRequest.reviewNotes }}</p>
+                    }
+                  } @else if (partsRequest.status === 'NEEDS_INFO') {
+                    <p class="fl-card-text">Decision: More information requested by Manager{{ partsRequest.reviewedAt ? ' · ' + partsRequest.reviewedAt : '' }}</p>
+                    @if (partsRequest.reviewNotes) {
+                      <p class="fl-card-text">{{ partsRequest.reviewNotes }}</p>
+                    }
+                  } @else if (partsRequest.status === 'PARTS_AVAILABLE') {
+                    <p class="fl-card-text"><strong>Parts Available — Job ready to continue.</strong></p>
+                  }
                   @if (partsPhotoUrl(partsRequest.id)) {
                     <img class="fl-photo" [src]="partsPhotoUrl(partsRequest.id)" alt="Parts request photo evidence" loading="lazy" />
+                  }
+                  @if (canRespond(partsRequest)) {
+                    @if (respondingRequestId() === partsRequest.id) {
+                      <form class="fl-form" [formGroup]="respondForm" (ngSubmit)="confirmRespond(partsRequest.id)" novalidate>
+                        <div class="fl-field">
+                          <label class="fl-label" [for]="'respond-note-' + partsRequest.id">Additional information</label>
+                          <textarea
+                            [id]="'respond-note-' + partsRequest.id"
+                            class="fl-input"
+                            rows="3"
+                            formControlName="note"
+                            maxlength="1000"
+                          ></textarea>
+                        </div>
+                        @if (respondError()) {
+                          <p class="fl-alert-error" role="alert">{{ respondError() }}</p>
+                        }
+                        <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="cancelRespond()" [disabled]="responding()">
+                          Cancel
+                        </button>
+                        <button type="submit" class="fl-btn fl-btn-primary fl-btn-sm" [disabled]="responding()">
+                          {{ responding() ? 'Submitting…' : 'Submit Response' }}
+                        </button>
+                      </form>
+                    } @else {
+                      <button type="button" class="fl-btn fl-btn-primary fl-btn-sm" (click)="startRespond(partsRequest.id)">
+                        Respond with More Info
+                      </button>
+                    }
                   }
                 </li>
               }

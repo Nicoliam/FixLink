@@ -1,5 +1,64 @@
 # FixLink — Changelog
 
+## Stage 7F — Manager Approvals + Awaiting Parts (2026-09-24)
+
+- Manager approval workflow on the existing tables — no new
+  tables, no duplicate job architecture: `job_approvals`
+  (`request_type = PARTS`) reused for every decision;
+  migration `011_parts_available.sql` only extends
+  `parts_requests.status` with `PARTS_AVAILABLE`.
+  Owner/manager decisions
+  (`backend/src/modules/business/` — same router, new
+  `business-approvals.validation.ts`, everything derived
+  server-side, atomic request + approval + job + history
+  writes): `POST
+  /api/v1/business/jobs/:jobId/parts/:requestId/approve`
+  (PENDING/NEEDS_INFO → APPROVED, IN_PROGRESS →
+  AWAITING_PARTS) returns `200 { request, approval, job }`;
+  `.../reject` (comment required, → REJECTED, job stays
+  IN_PROGRESS); `.../request-info` (comment required, →
+  NEEDS_INFO); `.../available` (APPROVED → PARTS_AVAILABLE,
+  resumes AWAITING_PARTS → IN_PROGRESS only when no
+  APPROVED request remains — the documented multiple-request
+  rule — returns `200 { request, job, jobResumed }`).
+  Technician surface: `POST
+  .../technician/jobs/:jobId/parts/:requestId/respond`
+  (NEEDS_INFO → PENDING, note kept as a PENDING approval
+  row) and `POST .../technician/jobs/:jobId/resume`
+  (guarded by the same outstanding-approved rule).
+- State machine enforced server-side (duplicates/terminal/
+  self-review/out-of-state → `422`, foreign → `404`,
+  wrong roles → `403`/`401`); decisions carry reviewer,
+  comment and timestamp on the request plus full history,
+  and every action appears in the existing execution
+  timeline (one `parts` event per decision/response plus
+  status moves). Notification seam only: decisions emit
+  `PARTS_REQUEST_*` / `PARTS_AVAILABLE` /
+  `JOB_READY_TO_CONTINUE` events on the shared
+  `parts-request-events` bus (threaded through app deps
+  for tests) — nothing is written to `notifications`
+  until Stage 8.
+- Angular: `/business/jobs/:id` gains Approve / Reject /
+  Request More Info (comment required for reject/info) for
+  PENDING/NEEDS_INFO plus Mark Parts Available for
+  APPROVED, with decision/comment/timestamp per request
+  and no actions on terminal states; `/technician/jobs/:id`
+  gains the decision display, NEEDS_INFO response form,
+  Awaiting Parts banner, Parts Available notice and
+  Continue Job (only when the server allows) — no approval
+  controls on the technician surface.
+- Tests: `backend/tests/parts-approvals.test.ts` (17
+  cases: approve/reject/info/respond/available/resume,
+  two-request rule, idempotency, isolation, rollback,
+  seam events, timelines, guards) plus new/updated
+  frontend specs. Full backend suite green: 331/331;
+  frontend suite green: 29 files, 231 tests; `tsc
+  --noEmit` (backend + web app + specs) and both builds
+  pass.
+- Out of scope (next: Stage 7G — Business Job Board +
+  History): notification persistence/delivery (Stage 8),
+  payments, admin, GPS, messaging.
+
 ## Stage 7E — Technician Parts Requests (2026-09-24)
 
 - Technician parts-request foundation on the existing

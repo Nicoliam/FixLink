@@ -28,6 +28,7 @@ import type {
   JobAssignmentDetailDto,
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
+  PartsApprovalDto,
   PartsRequestDto,
   TechnicianDto,
   TechnicianExecutionEventDto,
@@ -352,6 +353,87 @@ export interface BusinessStore {
     jobId: string,
     requestId: string,
   ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null>;
+  // ------------------------------------------------------------------
+  // Stage 7F — manager approvals + awaiting parts (existing
+  // `parts_requests` / `job_approvals` / `jobs` / `job_status_history`
+  // tables — no new tables; migration 011 only extends the
+  // `parts_requests.status` ENUM with PARTS_AVAILABLE). Every write is
+  // atomic: the request update, the `job_approvals` decision row and
+  // any job-status move (+ its history entry) succeed together or roll
+  // back together. Reads stay scoped as in Stage 7E (business owns the
+  // INTERNAL job; technician holds the active TECHNICIAN assignment) —
+  // foreign jobs read as null (NOT_FOUND upstream), never 403.
+  //
+  // Parts state machine (server-enforced):
+  // PENDING → APPROVED → PARTS_AVAILABLE
+  // PENDING → REJECTED | NEEDS_INFO (terminal / technician responds)
+  // NEEDS_INFO → PENDING (technician responds) or → APPROVED /
+  //   REJECTED / NEEDS_INFO (manager acts again)
+  // REJECTED / CANCELLED / PARTS_AVAILABLE are terminal.
+  //
+  // Multiple-request rule: the job stays AWAITING_PARTS while ANY of
+  // its requests is APPROVED (approved but parts not yet available).
+  // Marking a request PARTS_AVAILABLE resumes the job
+  // (AWAITING_PARTS → IN_PROGRESS) only when no APPROVED request
+  // remains. PENDING / NEEDS_INFO / REJECTED / CANCELLED requests never
+  // block the resume.
+  // ------------------------------------------------------------------
+  /**
+   * Manager decision on a PENDING (or NEEDS_INFO) request. APPROVE moves
+   * an IN_PROGRESS job to AWAITING_PARTS (an already-waiting job stays
+   * AWAITING_PARTS); REJECT and NEEDS_INFO leave the job untouched.
+   * Returns null when the job is unknown/foreign or the request is
+   * off-job; throws PartsRequestNotActionableError for any other
+   * invalid action (wrong request state, wrong job state, self-review,
+   * non-INTERNAL job) — the service maps it to 422.
+   */
+  reviewPartsRequest(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+    input: { decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO'; comment: string | null; reviewerId: string },
+  ): Promise<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto; technicianUserId: string } | null>;
+  /**
+   * Manager marks an APPROVED request as fulfilled (APPROVED →
+   * PARTS_AVAILABLE). When the job is AWAITING_PARTS and no APPROVED
+   * request remains, the job resumes (AWAITING_PARTS → IN_PROGRESS)
+   * in the same transaction. Returns null when unknown/foreign/off-job;
+   * throws PartsRequestNotActionableError otherwise (incl. marking a
+   * job that is cancelled/completed/closed).
+   */
+  markPartsAvailable(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+    input: { comment: string | null; markedBy: string },
+  ): Promise<{ request: PartsRequestDto; job: InternalJobDto; jobResumed: boolean; technicianUserId: string } | null>;
+  /**
+   * Technician response to a NEEDS_INFO request (NEEDS_INFO → PENDING)
+   * with an optional note recorded as a `job_approvals` PENDING row so
+   * the manager sees what changed. Returns null when the job is not
+   * assigned to this technician; throws
+   * PartsRequestNotActionableError when the request is not awaiting
+   * information.
+   */
+  respondToPartsRequest(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+    input: { note: string | null; responderId: string },
+  ): Promise<PartsRequestDto | null>;
+  /**
+   * Technician continues work (AWAITING_PARTS → IN_PROGRESS). Allowed
+   * only when no APPROVED request remains outstanding — otherwise the
+   * parts are not all available yet. Returns null when the job is not
+   * assigned to this technician; throws
+   * PartsRequestNotActionableError when the resume is not allowed
+   * (wrong job state or outstanding approved requests).
+   */
+  resumeTechnicianJob(
+    technicianId: string,
+    jobId: string,
+    input: { resumedBy: string },
+  ): Promise<InternalJobDto | null>;
 }
 
 /** The job is not in a cancellable state (only REQUESTED may cancel in Stage 7B). */
@@ -391,6 +473,19 @@ export class TechnicianJobNotCompletableError extends Error {
   constructor(message = 'This job cannot be completed in its current state.') {
     super(message);
     this.name = 'TechnicianJobNotCompletableError';
+  }
+}
+
+/**
+ * The parts request cannot be actioned (duplicate/terminal transition,
+ * wrong job state, self-review, non-INTERNAL job, resume blocked by
+ * outstanding approved requests). The service maps it to 422
+ * VALIDATION_ERROR — never silent, never a state change.
+ */
+export class PartsRequestNotActionableError extends Error {
+  constructor(message = 'This parts request cannot be actioned in its current state.') {
+    super(message);
+    this.name = 'PartsRequestNotActionableError';
   }
 }
 
@@ -451,7 +546,17 @@ export interface CreatePartsRequestPersistInput extends CreatePartsRequestInput 
   photoSize: number | null;
 }
 
-/** Build the chronological execution timeline from its parts (shared helper). */
+/**
+ * Build the chronological execution timeline from its parts (shared helper).
+ *
+ * Stage 7F: each request still contributes its read-time `parts` event
+ * (current status), and every `job_approvals` decision attached to the
+ * request contributes one more `parts` event carrying the decision
+ * status and the manager/technician comment — so requested, approved,
+ * rejected, needs-info, responded, available and the AWAITING_PARTS /
+ * IN_PROGRESS moves all appear in the one existing timeline. No second
+ * timeline system exists.
+ */
 export function buildTechnicianExecutionEvents(
   history: InternalJobTimelineEntry[],
   assignments: JobAssignmentHistoryEntry[],
@@ -522,6 +627,23 @@ export function buildTechnicianExecutionEvents(
       partsStatus: request.status,
       reason: request.reason,
     });
+    // Stage 7F — one timeline event per recorded decision/response on
+    // the request (manager approve/reject/needs-info, technician
+    // response). The actor reflects who acted: managers are
+    // 'business', technician responses are 'technician'.
+    for (const approval of request.approvals ?? []) {
+      const firstItem = request.items[0];
+      events.push({
+        kind: 'parts',
+        createdAt: approval.reviewedAt ?? approval.createdAt,
+        actor: approval.reviewedBy === null ? 'technician' : 'business',
+        partsRequestId: request.id,
+        partName: firstItem?.partName,
+        quantity: firstItem?.quantity,
+        partsStatus: approvalStatusToPartsStatus(approval.status, request.status),
+        reason: approval.comments,
+      });
+    }
   }
   const kindOrder: Record<TechnicianExecutionEventDto['kind'], number> = {
     status: 0,
@@ -535,6 +657,21 @@ export function buildTechnicianExecutionEvents(
     a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : kindOrder[a.kind] - kindOrder[b.kind],
   );
   return events;
+}
+
+/**
+ * Stage 7F — an approval decision status maps directly onto the parts
+ * vocabulary it records (a PENDING approval row is the technician's
+ * response resetting the request to PENDING).
+ */
+function approvalStatusToPartsStatus(
+  status: PartsApprovalDto['status'],
+  fallback: TechnicianExecutionEventDto['partsStatus'],
+): TechnicianExecutionEventDto['partsStatus'] {
+  if (status === 'APPROVED' || status === 'REJECTED' || status === 'NEEDS_INFO' || status === 'PENDING') {
+    return status;
+  }
+  return fallback;
 }
 
 /** Persist input for an internal job (ownership already verified by the service). */

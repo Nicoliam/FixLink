@@ -12,6 +12,7 @@
 import {
   JobNotCancellableError,
   JobNotStartableError,
+  PartsRequestNotActionableError,
   TechnicianImageNotDeletableError,
   TechnicianConflictError,
   TechnicianJobNotCompletableError,
@@ -42,6 +43,7 @@ import type {
   JobAssignmentDetailDto,
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
+  PartsApprovalDto,
   PartsRequestDto,
   PartsRequestItemDto,
   PartsRequestStatus,
@@ -182,8 +184,28 @@ interface PartsRequestRow {
   technicianName: string;
   status: PartsRequestStatus;
   reason: string;
+  /** Stage 7F — latest manager decision (`reviewed_by` / `reviewed_at` / `review_notes`). */
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNotes: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Stage 7F — mirrors one `job_approvals` row with
+ * `request_type = PARTS` (shared table, no new tables).
+ */
+interface PartsApprovalRow {
+  id: string;
+  jobId: string;
+  requestId: string;
+  requestedBy: string | null;
+  reviewedBy: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO';
+  comments: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
 }
 
 /** Stage 7E — mirrors one `parts_request_items` row (shared table). */
@@ -239,6 +261,9 @@ export class MemoryBusinessStore implements BusinessStore {
   private readonly partsRequests = new Map<string, PartsRequestRow>();
   private partsItemSeq = 0;
   private readonly partsItems = new Map<string, PartsRequestItemRow>();
+  /** Stage 7F — mirrors `job_approvals` rows with `request_type = PARTS`. */
+  private partsApprovalSeq = 0;
+  private readonly partsApprovals: PartsApprovalRow[] = [];
 
   /** Test setup: provision a business owned by the given user. */
   seedBusiness(input: SeedBusinessInput): BusinessRow {
@@ -1069,6 +1094,9 @@ export class MemoryBusinessStore implements BusinessStore {
       technicianName: technician.displayName,
       status: 'PENDING',
       reason: input.reason,
+      reviewedBy: null,
+      reviewedAt: null,
+      reviewNotes: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1179,6 +1207,10 @@ export class MemoryBusinessStore implements BusinessStore {
         photoMime: item.photoMime,
         createdAt: item.createdAt,
       }));
+    const approvals: PartsApprovalDto[] = this.partsApprovals
+      .filter((approval) => approval.requestId === row.id)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((approval) => ({ ...approval, partsRequestId: approval.requestId }));
     const job = this.internalJobs.get(row.jobId);
     return {
       id: row.id,
@@ -1190,7 +1222,266 @@ export class MemoryBusinessStore implements BusinessStore {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       items,
+      reviewedBy: row.reviewedBy,
+      reviewedAt: row.reviewedAt,
+      reviewNotes: row.reviewNotes,
+      approvals,
     };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7F — manager approvals + awaiting parts (memory).
+  //
+  // Mirrors the shared `parts_requests` / `job_approvals` / `jobs` /
+  // `job_status_history` tables with the same rules as the MySQL
+  // implementation. Every method validates everything before mutating
+  // anything, so a rejected action leaves request, approval, job and
+  // history untouched (the in-memory equivalent of a rolled-back
+  // transaction).
+  // ------------------------------------------------------------------
+
+  /** Owned INTERNAL job row, or null (NOT_FOUND upstream). */
+  private ownedInternalJobRow(businessId: string, jobId: string): InternalJobRow | null {
+    const row = this.internalJobs.get(jobId);
+    return row && row.businessId === businessId ? row : null;
+  }
+
+  /** Active TECHNICIAN assignment of the job, or null. */
+  private activeAssignmentForJob(jobId: string): AssignmentRow | null {
+    return this.assignments.find((a) => a.jobId === jobId && a.unassignedAt === null) ?? null;
+  }
+
+  /** True while the job waits on approved-but-unavailable parts. */
+  private hasOutstandingApprovedParts(jobId: string, excludeRequestId: string | null = null): boolean {
+    return [...this.partsRequests.values()].some(
+      (request) =>
+        request.jobId === jobId && request.status === 'APPROVED' && request.id !== excludeRequestId,
+    );
+  }
+
+  private recordPartsApproval(input: {
+    jobId: string;
+    requestId: string;
+    requestedBy: string | null;
+    reviewedBy: string | null;
+    status: PartsApprovalRow['status'];
+    comments: string | null;
+    reviewedAt: string | null;
+  }): PartsApprovalRow {
+    this.partsApprovalSeq += 1;
+    const now = nowIso();
+    const row: PartsApprovalRow = {
+      id: String(this.partsApprovalSeq),
+      jobId: input.jobId,
+      requestId: input.requestId,
+      requestedBy: input.requestedBy,
+      reviewedBy: input.reviewedBy,
+      status: input.status,
+      comments: input.comments,
+      reviewedAt: input.reviewedAt,
+      createdAt: now,
+    };
+    this.partsApprovals.push(row);
+    return row;
+  }
+
+  private toPartsApprovalDto(row: PartsApprovalRow): PartsApprovalDto {
+    return { ...row, partsRequestId: row.requestId };
+  }
+
+  async reviewPartsRequest(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+    input: { decision: 'APPROVE' | 'REJECT' | 'REQUEST_INFO'; comment: string | null; reviewerId: string },
+  ): Promise<{ request: PartsRequestDto; approval: PartsApprovalDto; job: InternalJobDto; technicianUserId: string } | null> {
+    const job = this.ownedInternalJobRow(businessId, jobId);
+    if (!job) return null;
+    const request = this.partsRequests.get(requestId);
+    if (!request || request.jobId !== jobId) return null;
+    // Only PENDING and NEEDS_INFO requests are reviewable — every other
+    // state (incl. a second APPROVE) is rejected, never silently applied.
+    if (request.status !== 'PENDING' && request.status !== 'NEEDS_INFO') {
+      throw new PartsRequestNotActionableError(
+        `This parts request has already been ${request.status === 'APPROVED' ? 'approved' : request.status === 'REJECTED' ? 'rejected' : 'actioned'}.`,
+      );
+    }
+    if (request.requesterId === input.reviewerId) {
+      throw new PartsRequestNotActionableError('You cannot review your own parts request.');
+    }
+    // Approvals only run on live execution jobs that are actually
+    // assigned — approving parts for a cancelled/completed/closed or
+    // unassigned job is meaningless.
+    if (job.status !== 'IN_PROGRESS' && job.status !== 'AWAITING_PARTS') {
+      throw new PartsRequestNotActionableError('Parts can only be reviewed while the job is in progress.');
+    }
+    if (!this.activeAssignmentForJob(jobId)) {
+      throw new PartsRequestNotActionableError('Parts can only be reviewed for an assigned job.');
+    }
+    const now = nowIso();
+    const nextStatus: PartsRequestStatus =
+      input.decision === 'APPROVE' ? 'APPROVED' : input.decision === 'REJECT' ? 'REJECTED' : 'NEEDS_INFO';
+    const approvalStatus: PartsApprovalRow['status'] =
+      input.decision === 'APPROVE' ? 'APPROVED' : input.decision === 'REJECT' ? 'REJECTED' : 'NEEDS_INFO';
+    // All checks passed before any mutation (atomic): request, approval
+    // row and any job move below are written together.
+    const updatedRequest: PartsRequestRow = {
+      ...request,
+      status: nextStatus,
+      reviewedBy: input.reviewerId,
+      reviewedAt: now,
+      reviewNotes: input.comment,
+      updatedAt: now,
+    };
+    this.partsRequests.set(requestId, updatedRequest);
+    const approval = this.recordPartsApproval({
+      jobId,
+      requestId,
+      requestedBy: request.requesterId,
+      reviewedBy: input.reviewerId,
+      status: approvalStatus,
+      comments: input.comment,
+      reviewedAt: now,
+    });
+    let nextJob = this.internalJobs.get(jobId);
+    if (input.decision === 'APPROVE' && nextJob && nextJob.status === 'IN_PROGRESS') {
+      const moved: InternalJobRow = { ...nextJob, status: 'AWAITING_PARTS', updatedAt: now };
+      this.internalJobs.set(jobId, moved);
+      this.internalHistory.push({
+        jobId,
+        previousStatus: 'IN_PROGRESS',
+        status: 'AWAITING_PARTS',
+        reason: 'Parts request approved — awaiting parts',
+        createdAt: now,
+      });
+      nextJob = moved;
+    }
+    const dto = nextJob ? this.toJobDto(nextJob) : null;
+    if (!dto) throw new Error('Parts review failed: job not found after update.');
+    return {
+      request: this.toPartsRequestDto(updatedRequest),
+      approval: this.toPartsApprovalDto(approval),
+      job: dto,
+      technicianUserId: request.requesterId,
+    };
+  }
+
+  async markPartsAvailable(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+    input: { comment: string | null; markedBy: string },
+  ): Promise<{ request: PartsRequestDto; job: InternalJobDto; jobResumed: boolean; technicianUserId: string } | null> {
+    void input.markedBy;
+    void input.comment;
+    const job = this.ownedInternalJobRow(businessId, jobId);
+    if (!job) return null;
+    const request = this.partsRequests.get(requestId);
+    if (!request || request.jobId !== jobId) return null;
+    // Only APPROVED requests can become available — PENDING must be
+    // approved first, and terminal states never move again.
+    if (request.status !== 'APPROVED') {
+      throw new PartsRequestNotActionableError(
+        request.status === 'PARTS_AVAILABLE'
+          ? 'These parts have already been marked as available.'
+          : 'Only approved parts requests can be marked as available.',
+      );
+    }
+    if (job.status !== 'AWAITING_PARTS' && job.status !== 'IN_PROGRESS') {
+      throw new PartsRequestNotActionableError('Parts availability can only be recorded while the job is awaiting parts.');
+    }
+    const now = nowIso();
+    // All checks passed before any mutation (atomic).
+    const updatedRequest: PartsRequestRow = { ...request, status: 'PARTS_AVAILABLE', updatedAt: now };
+    this.partsRequests.set(requestId, updatedRequest);
+    // Multiple-request rule: resume only when no APPROVED request
+    // remains outstanding for the job.
+    let jobResumed = false;
+    let nextJob = this.internalJobs.get(jobId);
+    if (nextJob && nextJob.status === 'AWAITING_PARTS' && !this.hasOutstandingApprovedParts(jobId, requestId)) {
+      const resumed: InternalJobRow = { ...nextJob, status: 'IN_PROGRESS', updatedAt: now };
+      this.internalJobs.set(jobId, resumed);
+      this.internalHistory.push({
+        jobId,
+        previousStatus: 'AWAITING_PARTS',
+        status: 'IN_PROGRESS',
+        reason: 'Parts available — job ready to continue',
+        createdAt: now,
+      });
+      nextJob = resumed;
+      jobResumed = true;
+    }
+    const dto = nextJob ? this.toJobDto(nextJob) : null;
+    if (!dto) throw new Error('Parts availability failed: job not found after update.');
+    return {
+      request: this.toPartsRequestDto(updatedRequest),
+      job: dto,
+      jobResumed,
+      technicianUserId: request.requesterId,
+    };
+  }
+
+  async respondToPartsRequest(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+    input: { note: string | null; responderId: string },
+  ): Promise<PartsRequestDto | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    if (!this.internalJobs.get(jobId)) return null;
+    const request = this.partsRequests.get(requestId);
+    if (!request || request.jobId !== jobId) return null;
+    if (request.status !== 'NEEDS_INFO') {
+      throw new PartsRequestNotActionableError('This parts request is not waiting for more information.');
+    }
+    const now = nowIso();
+    // All checks passed before any mutation (atomic): the request
+    // returns to PENDING and the technician's note is preserved as a
+    // PENDING approval row for the manager's next review.
+    const updatedRequest: PartsRequestRow = { ...request, status: 'PENDING', updatedAt: now };
+    this.partsRequests.set(requestId, updatedRequest);
+    this.recordPartsApproval({
+      jobId,
+      requestId,
+      requestedBy: input.responderId,
+      reviewedBy: null,
+      status: 'PENDING',
+      comments: input.note,
+      reviewedAt: null,
+    });
+    return this.toPartsRequestDto(updatedRequest);
+  }
+
+  async resumeTechnicianJob(
+    technicianId: string,
+    jobId: string,
+    input: { resumedBy: string },
+  ): Promise<InternalJobDto | null> {
+    void input.resumedBy;
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const job = this.internalJobs.get(jobId);
+    if (!job) return null;
+    if (job.status !== 'AWAITING_PARTS') {
+      throw new PartsRequestNotActionableError('Only jobs awaiting parts can be resumed.');
+    }
+    // The technician may continue only when every approved request has
+    // its parts available — an outstanding APPROVED request blocks.
+    if (this.hasOutstandingApprovedParts(jobId)) {
+      throw new PartsRequestNotActionableError('Some approved parts are still outstanding.');
+    }
+    const now = nowIso();
+    const resumed: InternalJobRow = { ...job, status: 'IN_PROGRESS', updatedAt: now };
+    this.internalJobs.set(jobId, resumed);
+    this.internalHistory.push({
+      jobId,
+      previousStatus: 'AWAITING_PARTS',
+      status: 'IN_PROGRESS',
+      reason: 'Technician resumed job — parts available',
+      createdAt: now,
+    });
+    const dto = this.toJobDto(resumed);
+    if (!dto) throw new Error('Job resume failed: job not found after update.');
+    return dto;
   }
 
   private toAssignmentDto(row: AssignmentRow): JobAssignmentDto | null {

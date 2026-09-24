@@ -7,7 +7,7 @@ import { BusinessJobDetailComponent } from './business-job-detail';
 import { BusinessService } from '../../core/services/business.service';
 import type { BusinessJobDetail } from '../../core/models/business.model';
 
-function makeDetail(status: 'REQUESTED' | 'CANCELLED' | 'IN_PROGRESS' | 'COMPLETED'): BusinessJobDetail {
+function makeDetail(status: 'REQUESTED' | 'CANCELLED' | 'IN_PROGRESS' | 'AWAITING_PARTS' | 'COMPLETED'): BusinessJobDetail {
   const base: BusinessJobDetail = {
     job: {
       id: '5',
@@ -75,6 +75,10 @@ describe('BusinessJobDetailComponent', () => {
     getBusinessExecutionTimeline?: ReturnType<typeof vi.fn>;
     listBusinessJobPartsRequests?: ReturnType<typeof vi.fn>;
     fetchBusinessJobPartsPhotoBlob?: ReturnType<typeof vi.fn>;
+    approveJobPartsRequest?: ReturnType<typeof vi.fn>;
+    rejectJobPartsRequest?: ReturnType<typeof vi.fn>;
+    requestJobPartsInfo?: ReturnType<typeof vi.fn>;
+    markJobPartsAvailable?: ReturnType<typeof vi.fn>;
   }): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [BusinessJobDetailComponent],
@@ -97,6 +101,10 @@ describe('BusinessJobDetailComponent', () => {
             getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: null, events: [] })),
             listBusinessJobPartsRequests: vi.fn().mockReturnValue(of([])),
             fetchBusinessJobPartsPhotoBlob: vi.fn().mockReturnValue(of(new Blob())),
+            approveJobPartsRequest: vi.fn(),
+            rejectJobPartsRequest: vi.fn(),
+            requestJobPartsInfo: vi.fn(),
+            markJobPartsAvailable: vi.fn(),
             ...api,
           },
         },
@@ -277,38 +285,14 @@ describe('BusinessJobDetailComponent', () => {
     expect((fixture.nativeElement.textContent as string)).not.toContain('Work documentation');
   });
 
-  it('shows submitted parts requests read-only for IN_PROGRESS jobs', async () => {
+  it('shows submitted parts requests with approval controls for IN_PROGRESS jobs', async () => {
     const detail = makeDetail('IN_PROGRESS');
     await setup({
       getBusinessJob: vi.fn().mockReturnValue(of(detail)),
       listBusinessJobImages: vi.fn().mockReturnValue(of([])),
       listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
       listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
-      listBusinessJobPartsRequests: vi.fn().mockReturnValue(
-        of([
-          {
-            id: '11',
-            jobId: '5',
-            businessId: '1',
-            requestedBy: { technicianId: '2', displayName: 'Bongani Zulu' },
-            status: 'PENDING',
-            reason: 'Required to complete the repair',
-            createdAt: '2026-09-21T12:30:00.000Z',
-            updatedAt: '2026-09-21T12:30:00.000Z',
-            items: [
-              {
-                id: '21',
-                partName: 'Brake fluid',
-                quantity: 2,
-                notes: null,
-                hasPhoto: false,
-                photoMime: null,
-                createdAt: '2026-09-21T12:30:00.000Z',
-              },
-            ],
-          },
-        ]),
-      ),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(of([makePartsRequest({ status: 'PENDING' })])),
       getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
     });
     const text = fixture.nativeElement.textContent as string;
@@ -318,8 +302,176 @@ describe('BusinessJobDetailComponent', () => {
     expect(text).toContain('Required to complete the repair');
     expect(text).toContain('Bongani Zulu');
     expect(text).toContain('Pending');
-    // Stage 7E is view-only: no approval controls until Stage 7F.
+    // Stage 7F: PENDING requests offer the manager decision controls.
+    expect(text).toContain('Approve');
+    expect(text).toContain('Reject');
+    expect(text).toContain('Request More Info');
+    expect(text).not.toContain('Mark Parts Available');
+  });
+
+  it('shows the manager decision, comment and timestamp for reviewed requests', async () => {
+    const detail = makeDetail('AWAITING_PARTS');
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(detail)),
+      listBusinessJobImages: vi.fn().mockReturnValue(of([])),
+      listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
+      listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(
+        of([makePartsRequest({ status: 'APPROVED' })]),
+      ),
+      getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Approved');
+    expect(text).toContain('Decision: Approved by Manager');
+    expect(text).toContain('Genuine part required');
+    expect(text).toContain('Mark Parts Available');
+    expect(text).not.toContain('Request More Info');
+  });
+
+  it('offers no actions for terminal requests', async () => {
+    const detail = makeDetail('IN_PROGRESS');
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(detail)),
+      listBusinessJobImages: vi.fn().mockReturnValue(of([])),
+      listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
+      listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(
+        of([
+          makePartsRequest({ id: '11', status: 'REJECTED' }),
+          makePartsRequest({ id: '12', status: 'PARTS_AVAILABLE' }),
+        ]),
+      ),
+      getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Rejected');
+    expect(text).toContain('Parts available');
     expect(text).not.toContain('Approve');
-    expect(text).not.toContain('Reject');
+    expect(text).not.toContain('Request More Info');
+    expect(text).not.toContain('Mark Parts Available');
+  });
+
+  it('approves a PENDING request through the service', async () => {
+    const detail = makeDetail('IN_PROGRESS');
+    const approved = makePartsRequest({ status: 'APPROVED' });
+    const approveJobPartsRequest = vi
+      .fn()
+      .mockReturnValue(
+        of({
+          request: approved,
+          approval: (approved['approvals'] as Array<Record<string, unknown>>)[0],
+          job: { ...detail.job, status: 'AWAITING_PARTS' },
+        }),
+      );
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(detail)),
+      listBusinessJobImages: vi.fn().mockReturnValue(of([])),
+      listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
+      listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(of([makePartsRequest({ status: 'PENDING' })])),
+      getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+      approveJobPartsRequest,
+    });
+    const component = fixture.componentInstance as unknown as {
+      startDecision(requestId: string, action: 'approve' | 'reject' | 'request-info'): void;
+      confirmDecision(requestId: string): void;
+    };
+    component.startDecision('11', 'approve');
+    fixture.detectChanges();
+    expect((fixture.nativeElement.textContent as string)).toContain('Confirm Approval');
+    component.confirmDecision('11');
+    expect(approveJobPartsRequest).toHaveBeenCalledWith('5', '11', { comment: '' });
+  });
+
+  it('requires a comment for rejection', async () => {
+    const detail = makeDetail('IN_PROGRESS');
+    const rejectJobPartsRequest = vi.fn();
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(detail)),
+      listBusinessJobImages: vi.fn().mockReturnValue(of([])),
+      listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
+      listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(of([makePartsRequest({ status: 'PENDING' })])),
+      getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+      rejectJobPartsRequest,
+    });
+    const component = fixture.componentInstance as unknown as {
+      startDecision(requestId: string, action: 'approve' | 'reject' | 'request-info'): void;
+      confirmDecision(requestId: string): void;
+    };
+    component.startDecision('11', 'reject');
+    fixture.detectChanges();
+    component.confirmDecision('11');
+    expect(rejectJobPartsRequest).not.toHaveBeenCalled();
+    fixture.detectChanges();
+    expect((fixture.nativeElement.textContent as string)).toContain('rejection reason is required');
+  });
+
+  it('marks an APPROVED request as available through the service', async () => {
+    const detail = makeDetail('AWAITING_PARTS');
+    const markJobPartsAvailable = vi.fn().mockReturnValue(
+      of({
+        request: makePartsRequest({ status: 'PARTS_AVAILABLE' }),
+        job: { ...detail.job, status: 'IN_PROGRESS' },
+        jobResumed: true,
+      }),
+    );
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(detail)),
+      listBusinessJobImages: vi.fn().mockReturnValue(of([])),
+      listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
+      listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(of([makePartsRequest({ status: 'APPROVED' })])),
+      getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+      markJobPartsAvailable,
+    });
+    const component = fixture.componentInstance as unknown as { markAvailable(requestId: string): void };
+    component.markAvailable('11');
+    expect(markJobPartsAvailable).toHaveBeenCalledWith('5', '11');
   });
 });
+
+function makePartsRequest(overrides: { id?: string; status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PARTS_AVAILABLE' } = {}): Record<string, unknown> {
+  const status = overrides.status ?? 'PENDING';
+  const reviewed = status !== 'PENDING';
+  return {
+    id: overrides.id ?? '11',
+    jobId: '5',
+    businessId: '1',
+    requestedBy: { technicianId: '2', displayName: 'Bongani Zulu' },
+    status,
+    reason: 'Required to complete the repair',
+    createdAt: '2026-09-21T12:30:00.000Z',
+    updatedAt: '2026-09-21T12:30:00.000Z',
+    items: [
+      {
+        id: '21',
+        partName: 'Brake fluid',
+        quantity: 2,
+        notes: null,
+        hasPhoto: false,
+        photoMime: null,
+        createdAt: '2026-09-21T12:30:00.000Z',
+      },
+    ],
+    reviewedBy: reviewed ? '9' : null,
+    reviewedAt: reviewed ? '2026-09-21T13:00:00.000Z' : null,
+    reviewNotes: reviewed ? 'Genuine part required — approved.' : null,
+    approvals: reviewed
+      ? [
+          {
+            id: '31',
+            jobId: '5',
+            partsRequestId: overrides.id ?? '11',
+            requestedBy: '7',
+            reviewedBy: '9',
+            status: status === 'PARTS_AVAILABLE' ? 'APPROVED' : status,
+            comments: 'Genuine part required — approved.',
+            reviewedAt: '2026-09-21T13:00:00.000Z',
+            createdAt: '2026-09-21T13:00:00.000Z',
+          },
+        ]
+      : [],
+  };
+}

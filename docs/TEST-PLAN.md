@@ -565,3 +565,80 @@ Frontend (`apps/web`, `npx ng test --watch=false` — 29 files,
 No migration in Stage 7E — `parts_requests` /
 `parts_request_items` (migration 006) already support
 this stage.
+
+## Stage 7F — Manager Approvals + Awaiting Parts
+
+Backend (`backend/tests/parts-approvals.test.ts`, 17 cases,
+in-memory business store + isolated storage tmp dir +
+shared `PartsRequestEventBus` threaded through `createApp`
+deps — run with `npm test` from `backend/`; full suite
+331/331 green):
+
+- Owner approve (PENDING → APPROVED, IN_PROGRESS →
+  AWAITING_PARTS, approval record with reviewer/comment/
+  timestamp, `job_approvals` row, history reason, timeline
+  `parts`/status events); manager approve on own business.
+- Reject (→ REJECTED, reason required — `{}`/blank →
+  `422` with state untouched, job stays IN_PROGRESS,
+  decision in timeline, no AWAITING_PARTS move).
+- Request-info (comment required → `422` when missing,
+  → NEEDS_INFO, job stays IN_PROGRESS, technician sees
+  status + comment); technician respond (NEEDS_INFO →
+  PENDING, note kept as a PENDING approval row, second
+  manager review → APPROVED → AWAITING_PARTS).
+- Parts available (APPROVED → PARTS_AVAILABLE, resume →
+  IN_PROGRESS with history; `jobResumed` flag); the
+  two-request rule (one available keeps AWAITING_PARTS,
+  technician resume blocked `422` while APPROVED remains,
+  second available resumes).
+- Idempotency: APPROVED → approve/reject/request-info
+  `422`; PARTS_AVAILABLE → available `422`; REJECTED →
+  approve `422`; NEEDS_INFO → available `422`.
+- Roles: anonymous → `401`; technician/customer/
+  professional on decision routes → `403`;
+  owner/manager on technician respond/resume → `403`;
+  cross-business → `404` (all four actions);
+  marketplace id → `404`; malformed ids → `400`,
+  unknown request → `404`.
+- Rollback: failed duplicate approve changes neither
+  request, job nor history (single AWAITING_PARTS event).
+- Notification seam: NEEDS_INFO → RESPONDED → APPROVED →
+  AVAILABLE → JOB_READY + REJECTED events drained in
+  order with job/actor/technician/title/message payloads;
+  bus drains consumptively; nothing persisted to
+  `notifications`.
+- Timelines (technician + business) carry PENDING,
+  NEEDS_INFO, APPROVED `parts` events plus the
+  AWAITING_PARTS status move; technician respond to
+  PENDING and resume of IN_PROGRESS → `422`.
+
+Frontend (`apps/web`, `npm test` — 29 files, 231 tests,
+all green):
+
+- `business-job-detail.spec.ts` (updated + new): PENDING
+  requests show Approve/Reject/Request More Info (no Mark
+  Available); APPROVED shows the decision (status, manager,
+  comment, timestamp) + Mark Parts Available; terminal
+  (REJECTED/PARTS_AVAILABLE) shows no actions; approve
+  dispatches `approveJobPartsRequest('5', '11', …)`;
+  reject without a comment is blocked client-side with the
+  required-reason message; mark-available dispatches
+  `markJobPartsAvailable('5', '11')`.
+- `technician-job-detail.spec.ts` (updated + new):
+  approved decision display + `Job Status: Awaiting
+  Parts`; NEEDS_INFO shows the manager comment with a
+  Respond form dispatching
+  `respondToMyJobPartsRequest('5', '11', note)`; awaiting
+  parts with everything available shows `Parts Available —
+  Job ready to continue` + Continue Job dispatching
+  `resumeMyJob('5')`; outstanding APPROVED shows the
+  waiting message with no resume button; no Approve/
+  Reject/Request-More-Info/Mark-Available controls
+  anywhere on the technician surface.
+- Full suite green with no pre-existing test removed or
+  weakened.
+
+Migration 011 extends `parts_requests.status` with
+`PARTS_AVAILABLE` (Up/Down); `job_approvals`, `jobs`,
+`job_status_history` reused unchanged — no new tables, no
+duplicate job architecture.

@@ -835,3 +835,14 @@ columns — no new tables, no data rewrite, earlier stages unaffected:
 
 `jobs.completed_at`/`confirmed_at`/`closed_at` (migration 004) record
 the Stage 6F terminal transitions; no job-table change was required.
+
+### 40.12 Stage 7F parts-availability state (migration 011)
+
+`database/migrations/011_parts_available.sql` extends
+`parts_requests.status` with `PARTS_AVAILABLE` — one ENUM value, no
+new tables, no new columns, no data rewrite. Rows written before
+this migration keep their existing PENDING / APPROVED / REJECTED /
+NEEDS_INFO / CANCELLED values. `job_approvals` (migration 006) is
+reused unchanged for the Stage 7F decision records
+(`request_type = PARTS`); `jobs` / `job_status_history` carry the
+IN_PROGRESS → AWAITING_PARTS → IN_PROGRESS moves.

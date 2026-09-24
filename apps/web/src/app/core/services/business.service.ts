@@ -18,8 +18,11 @@ import type {
   CreateTechnicianRequest,
   JobAssignment,
   JobAssignmentDetail,
+  PartsAvailableResult,
+  PartsDecisionRequest,
   PartsRequest,
   PartsRequestList,
+  PartsReviewResult,
   Technician,
   TechnicianExecutionTimeline,
   TechnicianJobImage,
@@ -40,12 +43,12 @@ import type {
  * technician management) + Stage 7B (business-managed customers and
  * internal jobs) + Stage 7C (technician assignment) + Stage 7D
  * (read-only execution visibility: photos, notes, voice notes,
- * timeline) + Stage 7E (read-only parts-request visibility).
+ * timeline) + Stage 7E (read-only parts-request visibility) + Stage 7F
+ * (manager approvals: approve/reject/request-info/available).
  *
  * Single owner of business calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); the business is derived
  * by the backend from the session membership, never from these payloads.
- * Approvals arrive in Stage 7F.
  */
 @Injectable({ providedIn: 'root' })
 export class BusinessService {
@@ -339,5 +342,61 @@ export class BusinessService {
   /** Stage 7E — fetch authorized photo-evidence bytes as a Blob. */
   fetchBusinessJobPartsPhotoBlob(jobId: string, requestId: string): Observable<Blob> {
     return this.http.get(this.businessJobPartsPhotoFileUrl(jobId, requestId), { responseType: 'blob' });
+  }
+
+  /**
+   * Stage 7F — manager decisions on a parts request (owner/manager
+   * only; the backend enforces the state machine and business
+   * isolation). Approve moves the job IN_PROGRESS → AWAITING_PARTS;
+   * reject and request-info leave it in progress. Reject and
+   * request-info require a comment/reason for the technician.
+   */
+  private decideJobPartsRequest(
+    jobId: string,
+    requestId: string,
+    action: 'approve' | 'reject' | 'request-info',
+    payload: PartsDecisionRequest = {},
+  ): Observable<PartsReviewResult> {
+    const body: Record<string, string> = {};
+    const comment = payload.comment?.trim() || payload.reason?.trim();
+    if (comment) body['comment'] = comment;
+    return this.http
+      .post<ApiSuccess<PartsReviewResult>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}/${action}`,
+        body,
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /** Stage 7F — approve a PENDING (or NEEDS_INFO) parts request. */
+  approveJobPartsRequest(jobId: string, requestId: string, payload: PartsDecisionRequest = {}): Observable<PartsReviewResult> {
+    return this.decideJobPartsRequest(jobId, requestId, 'approve', payload);
+  }
+
+  /** Stage 7F — reject a parts request (reason required, job stays in progress). */
+  rejectJobPartsRequest(jobId: string, requestId: string, payload: PartsDecisionRequest): Observable<PartsReviewResult> {
+    return this.decideJobPartsRequest(jobId, requestId, 'reject', payload);
+  }
+
+  /** Stage 7F — ask the technician for more information (comment required). */
+  requestJobPartsInfo(jobId: string, requestId: string, payload: PartsDecisionRequest): Observable<PartsReviewResult> {
+    return this.decideJobPartsRequest(jobId, requestId, 'request-info', payload);
+  }
+
+  /**
+   * Stage 7F — mark an APPROVED request as fulfilled (APPROVED →
+   * PARTS_AVAILABLE). The job resumes (AWAITING_PARTS → IN_PROGRESS)
+   * only when no APPROVED request remains outstanding.
+   */
+  markJobPartsAvailable(jobId: string, requestId: string, payload: PartsDecisionRequest = {}): Observable<PartsAvailableResult> {
+    const body: Record<string, string> = {};
+    const comment = payload.comment?.trim() || payload.reason?.trim();
+    if (comment) body['comment'] = comment;
+    return this.http
+      .post<ApiSuccess<PartsAvailableResult>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}/available`,
+        body,
+      )
+      .pipe(map((res) => res.data));
   }
 }

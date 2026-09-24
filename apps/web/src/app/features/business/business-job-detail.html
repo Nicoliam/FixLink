@@ -243,8 +243,80 @@
                   <p class="fl-card-text">Reason: {{ partsRequest.reason }}</p>
                   <p class="fl-card-text">Requested by {{ partsRequest.requestedBy.displayName }} · {{ partsRequest.createdAt }}</p>
                   <p class="fl-card-text">Status: {{ partsStatusText(partsRequest.status) }}</p>
+                  @if (partsRequest.reviewedAt) {
+                    <p class="fl-card-text">
+                      Decision: {{ partsStatusText(partsRequest.status) }} by Manager · {{ partsRequest.reviewedAt }}
+                    </p>
+                    @if (partsRequest.reviewNotes) {
+                      <p class="fl-card-text">{{ partsRequest.reviewNotes }}</p>
+                    }
+                  }
                   @if (execPartsPhotoUrl(partsRequest.id)) {
                     <img class="fl-photo" [src]="execPartsPhotoUrl(partsRequest.id)" alt="Parts request photo evidence" loading="lazy" />
+                  }
+                  @if (canDecide(partsRequest)) {
+                    @if (actingRequestId() === partsRequest.id && actingAction()) {
+                      <form class="fl-form" [formGroup]="decisionForm" (ngSubmit)="confirmDecision(partsRequest.id)" novalidate>
+                        <div class="fl-field">
+                          <label class="fl-label" [for]="'decision-comment-' + partsRequest.id">
+                            @if (actingAction() === 'approve') {
+                              Comment (optional)
+                            } @else if (actingAction() === 'reject') {
+                              Rejection reason
+                            } @else {
+                              What information do you need?
+                            }
+                          </label>
+                          <textarea
+                            [id]="'decision-comment-' + partsRequest.id"
+                            class="fl-input"
+                            rows="2"
+                            formControlName="comment"
+                            maxlength="1000"
+                          ></textarea>
+                        </div>
+                        @if (decisionError()) {
+                          <p class="fl-alert-error" role="alert">{{ decisionError() }}</p>
+                        }
+                        <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="cancelDecision()" [disabled]="acting()">
+                          Cancel
+                        </button>
+                        <button type="submit" class="fl-btn fl-btn-primary fl-btn-sm" [disabled]="acting()">
+                          @if (acting()) {
+                            Saving…
+                          } @else if (actingAction() === 'approve') {
+                            Confirm Approval
+                          } @else if (actingAction() === 'reject') {
+                            Confirm Rejection
+                          } @else {
+                            Send Request
+                          }
+                        </button>
+                      </form>
+                    } @else {
+                      <button type="button" class="fl-btn fl-btn-primary fl-btn-sm" (click)="startDecision(partsRequest.id, 'approve')">
+                        Approve
+                      </button>
+                      <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="startDecision(partsRequest.id, 'reject')">
+                        Reject
+                      </button>
+                      <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="startDecision(partsRequest.id, 'request-info')">
+                        Request More Info
+                      </button>
+                    }
+                  }
+                  @if (canMarkAvailable(partsRequest)) {
+                    <button
+                      type="button"
+                      class="fl-btn fl-btn-primary fl-btn-sm"
+                      (click)="markAvailable(partsRequest.id)"
+                      [disabled]="markingAvailableId() === partsRequest.id"
+                    >
+                      {{ markingAvailableId() === partsRequest.id ? 'Marking…' : 'Mark Parts Available' }}
+                    </button>
+                    @if (availableError() && availableErrorId() === partsRequest.id) {
+                      <p class="fl-alert-error" role="alert">{{ availableError() }}</p>
+                    }
                   }
                 </li>
               }

@@ -41,10 +41,13 @@ type ExecStatus = 'idle' | 'loading' | 'ready' | 'error';
  * cancellation; status itself is never set directly. Stage 7D adds a
  * read-only work-documentation section (technician photos, notes,
  * voice notes, execution timeline) once work has started. Stage 7E
- * adds read-only parts-request visibility (requested part, quantity,
- * reason, technician, date, status, photo) in the same section;
- * approve/reject arrives in Stage 7F. Notifications arrive in later
- * stages and are not shown.
+ * adds parts-request visibility (requested part, quantity, reason,
+ * technician, date, status, photo) in the same section. Stage 7F adds
+ * the manager decision controls (approve / reject / request more info
+ * for PENDING and NEEDS_INFO requests, mark parts available for
+ * APPROVED requests) with the recorded decision, comment and
+ * timestamp per request. Notifications arrive in later stages and are
+ * not shown.
  */
 @Component({
   selector: 'app-business-job-detail',
@@ -102,12 +105,31 @@ export class BusinessJobDetailComponent implements OnInit, OnDestroy {
   protected readonly execPhotoUrls = signal<Record<string, string>>({});
   protected readonly execVoiceUrls = signal<Record<string, string>>({});
   /**
-   * Stage 7E read-only parts requests for the owned job (requested
-   * part, quantity, reason, technician, date, status, photo).
-   * Approval actions arrive in Stage 7F.
+   * Stage 7E parts requests for the owned job (requested part,
+   * quantity, reason, technician, date, status, photo) with the
+   * Stage 7F manager decision (decision, comment, timestamp) and
+   * decision controls for actionable requests.
    */
   protected readonly execParts = signal<PartsRequest[]>([]);
   protected readonly execPartsPhotoUrls = signal<Record<string, string>>({});
+
+  /**
+   * Stage 7F manager decision state. Only one decision form is open at
+   * a time (`actingRequestId` + `actingAction`); the comment is
+   * required for reject/request-info and optional otherwise. Terminal
+   * requests never offer actions (see `canDecide` / `canMarkAvailable`).
+   */
+  protected readonly actingRequestId = signal<string | null>(null);
+  protected readonly actingAction = signal<'approve' | 'reject' | 'request-info' | null>(null);
+  protected readonly acting = signal(false);
+  protected readonly decisionError = signal('');
+  protected readonly markingAvailableId = signal<string | null>(null);
+  protected readonly availableError = signal('');
+  protected readonly availableErrorId = signal<string | null>(null);
+
+  protected readonly decisionForm = this.fb.group({
+    comment: ['', [Validators.maxLength(1000)]],
+  });
 
   ngOnInit(): void {
     this.load();
@@ -348,6 +370,95 @@ export class BusinessJobDetailComponent implements OnInit, OnDestroy {
         error: (error: unknown) => {
           this.assignError.set(getApiErrorMessage(error, 'Could not assign the technician. Please try again.'));
           this.assigning.set(false);
+        },
+      });
+  }
+
+  // ---------------------------------------------------------------
+  // Stage 7F — manager decisions on parts requests. PENDING and
+  // NEEDS_INFO requests offer approve / reject / request-more-info;
+  // APPROVED requests offer mark-parts-available; every other state is
+  // terminal and offers no action. The backend enforces the state
+  // machine and business isolation — these controls are UX only.
+  // ---------------------------------------------------------------
+
+  /** Review actions are offered only for PENDING and NEEDS_INFO requests. */
+  protected canDecide(request: PartsRequest): boolean {
+    return request.status === 'PENDING' || request.status === 'NEEDS_INFO';
+  }
+
+  /** Parts-availability is offered only for APPROVED requests. */
+  protected canMarkAvailable(request: PartsRequest): boolean {
+    return request.status === 'APPROVED';
+  }
+
+  protected startDecision(requestId: string, action: 'approve' | 'reject' | 'request-info'): void {
+    this.actingRequestId.set(requestId);
+    this.actingAction.set(action);
+    this.decisionError.set('');
+    this.decisionForm.reset({ comment: '' });
+  }
+
+  protected cancelDecision(): void {
+    if (this.acting()) return;
+    this.actingRequestId.set(null);
+    this.actingAction.set(null);
+    this.decisionError.set('');
+  }
+
+  protected confirmDecision(requestId: string): void {
+    const job = this.detail()?.job;
+    const action = this.actingAction();
+    if (!job || !action || this.acting() || this.actingRequestId() !== requestId) return;
+    const comment = (this.decisionForm.get('comment')?.value ?? '').trim();
+    if ((action === 'reject' || action === 'request-info') && !comment) {
+      this.decisionError.set(
+        action === 'reject'
+          ? 'A rejection reason is required so the technician knows what to do next.'
+          : 'Please explain what information the technician should provide.',
+      );
+      return;
+    }
+    this.acting.set(true);
+    this.decisionError.set('');
+    const call =
+      action === 'approve'
+        ? this.api.approveJobPartsRequest(job.id, requestId, { comment })
+        : action === 'reject'
+          ? this.api.rejectJobPartsRequest(job.id, requestId, { comment })
+          : this.api.requestJobPartsInfo(job.id, requestId, { comment });
+    call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.acting.set(false);
+        this.actingRequestId.set(null);
+        this.actingAction.set(null);
+        this.load();
+      },
+      error: (error: unknown) => {
+        this.acting.set(false);
+        this.decisionError.set(getApiErrorMessage(error, 'Could not record the decision. Please try again.'));
+      },
+    });
+  }
+
+  protected markAvailable(requestId: string): void {
+    const job = this.detail()?.job;
+    if (!job || this.markingAvailableId()) return;
+    this.markingAvailableId.set(requestId);
+    this.availableError.set('');
+    this.availableErrorId.set(null);
+    this.api
+      .markJobPartsAvailable(job.id, requestId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.markingAvailableId.set(null);
+          this.load();
+        },
+        error: (error: unknown) => {
+          this.markingAvailableId.set(null);
+          this.availableError.set(getApiErrorMessage(error, 'Could not mark the parts as available. Please try again.'));
+          this.availableErrorId.set(requestId);
         },
       });
   }

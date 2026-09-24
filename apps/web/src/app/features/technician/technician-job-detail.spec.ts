@@ -11,7 +11,9 @@ function makeDetail(): BusinessJobDetail {
   return makeDetailWithStatus('REQUESTED');
 }
 
-function makeDetailWithStatus(status: 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'): BusinessJobDetail {
+function makeDetailWithStatus(
+  status: 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'AWAITING_PARTS' | 'COMPLETED',
+): BusinessJobDetail {
   return {
     job: {
       id: '5',
@@ -75,6 +77,8 @@ describe('TechnicianJobDetailComponent', () => {
       listMyJobPartsRequests: vi.fn().mockReturnValue(of([])),
       getMyJobPartsRequest: vi.fn(),
       fetchMyJobPartsPhotoBlob: vi.fn().mockReturnValue(of(new Blob())),
+      respondToMyJobPartsRequest: vi.fn(),
+      resumeMyJob: vi.fn(),
       ...overrides,
     };
   }
@@ -255,13 +259,21 @@ describe('TechnicianJobDetailComponent', () => {
     expect(text).toContain('Valve replaced and tested.');
   });
 
-  function makePartsRequest(): Record<string, unknown> {
+  function makePartsRequest(
+    overrides: {
+      id?: string;
+      status?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO' | 'PARTS_AVAILABLE';
+      reviewNotes?: string | null;
+    } = {},
+  ): Record<string, unknown> {
+    const status = overrides.status ?? 'PENDING';
+    const reviewed = status !== 'PENDING';
     return {
-      id: '11',
+      id: overrides.id ?? '11',
       jobId: '5',
       businessId: '1',
       requestedBy: { technicianId: '2', displayName: 'Tech Parts' },
-      status: 'PENDING',
+      status,
       reason: 'Required to complete the repair',
       createdAt: '2026-09-21T12:30:00.000Z',
       updatedAt: '2026-09-21T12:30:00.000Z',
@@ -276,6 +288,10 @@ describe('TechnicianJobDetailComponent', () => {
           createdAt: '2026-09-21T12:30:00.000Z',
         },
       ],
+      reviewedBy: reviewed ? '9' : null,
+      reviewedAt: reviewed ? '2026-09-21T13:00:00.000Z' : null,
+      reviewNotes: reviewed ? (overrides.reviewNotes ?? 'Manager decision note.') : null,
+      approvals: [],
     };
   }
 
@@ -369,8 +385,95 @@ describe('TechnicianJobDetailComponent', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Brake fluid');
     expect(text).toContain('Pending');
-    // Approval belongs to Stage 7F — the technician never sees it.
+    // Stage 7F: the technician sees decisions but never decision controls.
     expect(text).not.toContain('Approve');
     expect(text).not.toContain('Reject');
+    expect(text).not.toContain('Request More Info');
+    expect(text).not.toContain('Mark Parts Available');
+  });
+
+  it('shows the manager approval decision with comment', async () => {
+    const detail = makeDetailWithStatus('AWAITING_PARTS');
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listMyJobPartsRequests: vi.fn().mockReturnValue(
+        of([makePartsRequest({ status: 'APPROVED', reviewNotes: 'Genuine part required.' })]),
+      ),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Decision: Approved by Manager');
+    expect(text).toContain('Genuine part required.');
+    expect(text).toContain('Job Status: Awaiting Parts');
+  });
+
+  it('offers a response form for NEEDS_INFO requests and submits it', async () => {
+    const detail = makeDetailWithStatus('IN_PROGRESS');
+    const updated = makePartsRequest({ status: 'PENDING' });
+    const respondToMyJobPartsRequest = vi.fn().mockReturnValue(of(updated));
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listMyJobPartsRequests: vi.fn().mockReturnValue(
+        of([makePartsRequest({ status: 'NEEDS_INFO', reviewNotes: 'Which brand?' })]),
+      ),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+      respondToMyJobPartsRequest,
+    });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent as string).toContain('More information requested by Manager');
+    expect(fixture.nativeElement.textContent as string).toContain('Which brand?');
+    expect(fixture.nativeElement.textContent as string).toContain('Respond with More Info');
+    const component = fixture.componentInstance as unknown as {
+      startRespond(requestId: string): void;
+      confirmRespond(requestId: string): void;
+      respondForm: { controls: { note: { setValue(value: string): void } } };
+    };
+    component.startRespond('11');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent as string).toContain('Submit Response');
+    component.respondForm.controls.note.setValue('Castrol DOT4.');
+    component.confirmRespond('11');
+    expect(respondToMyJobPartsRequest).toHaveBeenCalledWith('5', '11', 'Castrol DOT4.');
+  });
+
+  it('shows parts-available and resumes the job when ready', async () => {
+    const detail = makeDetailWithStatus('AWAITING_PARTS');
+    const resumeMyJob = vi.fn().mockReturnValue(of({ ...detail.job, status: 'IN_PROGRESS' }));
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listMyJobPartsRequests: vi.fn().mockReturnValue(of([makePartsRequest({ status: 'PARTS_AVAILABLE' })])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+      resumeMyJob,
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Parts Available');
+    expect(text).toContain('Job ready to continue');
+    expect(text).toContain('Continue Job');
+    const component = fixture.componentInstance as unknown as { resumeJob(): void };
+    component.resumeJob();
+    expect(resumeMyJob).toHaveBeenCalledWith('5');
+  });
+
+  it('waits for outstanding parts without a resume action', async () => {
+    const detail = makeDetailWithStatus('AWAITING_PARTS');
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listMyJobPartsRequests: vi.fn().mockReturnValue(of([makePartsRequest({ status: 'APPROVED' })])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Waiting for the business');
+    expect(text).not.toContain('Continue Job');
   });
 });

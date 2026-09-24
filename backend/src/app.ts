@@ -27,6 +27,7 @@ import { makeBusinessRoutes } from './modules/business/business.routes';
 import { MemoryBusinessStore } from './modules/business/memory-business.store';
 import { MysqlBusinessStore } from './modules/business/mysql-business.store';
 import type { BusinessStore } from './modules/business/business.store';
+import { PartsRequestEventBus } from './modules/business/parts-request-events';
 import { LocalFileStorage, type FileStorage } from './services/file-storage';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
@@ -45,6 +46,13 @@ export interface AppDeps {
   business?: BusinessStore;
   /** Optional file storage; defaults to the local MVP adapter. */
   storage?: FileStorage;
+  /**
+   * Stage 7F notification seam. Optional so pre-7F constructions keep
+   * compiling; defaults to a fresh bus. Tests supply one to drain the
+   * parts-approval events; Stage 8 will persist them into the
+   * `notifications` table.
+   */
+  events?: PartsRequestEventBus;
 }
 
 export function resolveDeps(): AppDeps {
@@ -120,7 +128,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   // jobs (Stage 7B) validate services against the same catalogue, plus
   // the shared file storage so technician execution (Stage 7D) stores
   // photos and voice notes through the same adapter as marketplace work.
-  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs, storage));
+  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs, storage, deps.events));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {
