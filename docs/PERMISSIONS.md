@@ -871,7 +871,67 @@ voice-note upload, unauthorized voice/image/update/complete
 delivery, voice-file authorization (`401`/`404`),
 cross-business voice access (`404`), completion history,
 timeline events, audio validation (`422`), size validation
-(`422`), unsafe storage-key rejection; business visibility
-(owner/manager reads, foreign business `404`, technician
-`403`). Stages 7C/6F/marketplace remain covered by their
-untouched suites in the same `npm test` run.
+ (`422`), unsafe storage-key rejection; business visibility
+ (owner/manager reads, foreign business `404`, technician
+ `403`). Stages 7C/6F/marketplace remain covered by their
+ untouched suites in the same `npm test` run.
+
+# 30. Stage 7E Implementation Notes — Technician Parts Requests
+
+Implemented 2026-09-24 (`backend/src/modules/business/` — same
+router, new `business-parts.validation.ts`, no migration:
+`parts_requests` / `parts_request_items` from migration 006).
+
+- Only the actively assigned TECHNICIAN may submit a parts
+  request, and only for an INTERNAL job in IN_PROGRESS or
+  AWAITING_PARTS (identity, business, job ownership and state
+  derived server-side — never from the request). `CUSTOMER`,
+  `PROFESSIONAL`, `BUSINESS_OWNER`, `BUSINESS_MANAGER` and
+  `ADMIN` receive `403 FORBIDDEN_ROLE` on the technician
+  submission surface; unauthenticated → `401`.
+- Another technician's job (same business or not), another
+  business's job, or any marketplace id reads as `404
+  NOT_FOUND` (never `403`), so job and request ids cannot be
+  probed across technicians or businesses. Malformed ids →
+  `400`. Wrong execution state (REQUESTED, CANCELLED,
+  COMPLETED, …) → `422`.
+- Submission never changes job status and never trusts
+  client-provided ownership, price or status: new rows are
+  always `PENDING` with the single submitted item, and the job
+  stays IN_PROGRESS until the Stage 7F approval workflow moves
+  it. The optional photo reuses the FileStorage image pipeline
+  (magic-byte sniffed JPEG/PNG/WebP, 5MB, opaque key, bytes
+  only through authorized endpoints).
+- Business visibility is read-only: `BUSINESS_OWNER` /
+  `BUSINESS_MANAGER` may read (not approve/reject) requests,
+  items and evidence photos of their own INTERNAL jobs;
+  another business's job reads as `404`. Technicians receive
+  `403` on the business visibility surface. No approve,
+  reject, needs-info or AWAITING_PARTS transition exists in
+  this stage (Stage 7F).
+
+Role summary for Stage 7E (additions to §27–29):
+
+BUSINESS_OWNER / BUSINESS_MANAGER:
+- view parts requests (part, quantity, reason, technician,
+  date, status, photo) on own INTERNAL jobs
+- still cannot approve/reject/request-info (Stage 7F)
+
+TECHNICIAN:
+- submit parts requests (part, quantity, reason, optional
+  photo) on own IN_PROGRESS/AWAITING_PARTS jobs
+- list/read own job parts requests + evidence photos
+- still cannot approve their own parts requests (see §29
+  line 163 — unchanged) and cannot reach other jobs
+
+Permission tests added
+(`backend/tests/parts-requests.test.ts`, 16 cases):
+assigned submission (`201`, PENDING, correct business/
+technician, job stays IN_PROGRESS), unassigned/another-
+technician/cross-business/marketplace `404`, pre-start/
+cancelled/completed `422`, part-name/quantity/reason
+validation (`422`), technician list/get, owner + manager
+reads, cross-business owner `404`, role/anonymous rejection
+(`401`/`403` both surfaces), timeline inclusion (technician
++ business), photo upload + authorized delivery (`404`
+for foreign/no-photo), invalid file + invalid ids.

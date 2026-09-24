@@ -488,6 +488,19 @@ Submit
 ↓
 AWAITING_PARTS where appropriate
 
+Stage 7E implementation note (2026-09-24): submission is
+implemented for assigned IN_PROGRESS jobs (AWAITING_PARTS is
+accepted by the same endpoint once reachable) — part name,
+quantity 1–10000, reason 10–1000 chars, optional photo
+evidence — and the request is stored PENDING with the
+technician-visible status. The job stays IN_PROGRESS; the
+"AWAITING_PARTS where appropriate" move above happens in
+Stage 7F when the manager approves (see 5.6). Owners/
+managers can already view the request (part, quantity,
+reason, technician, date, status, photo) on the business
+job detail; approve/reject/request-info controls arrive in
+Stage 7F.
+
 
 ## 5.6 Manager Approves Parts
 

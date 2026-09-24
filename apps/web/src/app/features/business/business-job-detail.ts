@@ -9,12 +9,14 @@ import { getApiErrorMessage } from '../../core/models/api.model';
 import {
   businessJobPriorityLabel,
   businessJobStatusLabel,
+  partsRequestStatusLabel,
   technicianWorkPhaseLabel,
 } from '../../core/models/business.model';
 import type {
   BusinessJob,
   BusinessJobDetail,
   JobAssignmentDetail,
+  PartsRequest,
   Technician,
   TechnicianExecutionEvent,
   TechnicianJobImage,
@@ -38,9 +40,11 @@ type ExecStatus = 'idle' | 'loading' | 'ready' | 'error';
  * assign/reassign controls. REQUESTED jobs offer a field editor and
  * cancellation; status itself is never set directly. Stage 7D adds a
  * read-only work-documentation section (technician photos, notes,
- * voice notes, execution timeline) once work has started. Parts,
- * approvals and notifications arrive in later stages and are not
- * shown.
+ * voice notes, execution timeline) once work has started. Stage 7E
+ * adds read-only parts-request visibility (requested part, quantity,
+ * reason, technician, date, status, photo) in the same section;
+ * approve/reject arrives in Stage 7F. Notifications arrive in later
+ * stages and are not shown.
  */
 @Component({
   selector: 'app-business-job-detail',
@@ -83,6 +87,7 @@ export class BusinessJobDetailComponent implements OnInit, OnDestroy {
   protected readonly statusText = businessJobStatusLabel;
   protected readonly priorityText = businessJobPriorityLabel;
   protected readonly phaseLabel = technicianWorkPhaseLabel;
+  protected readonly partsStatusText = partsRequestStatusLabel;
 
   /**
    * Stage 7D read-only work documentation (technician BEFORE/DURING/
@@ -96,6 +101,13 @@ export class BusinessJobDetailComponent implements OnInit, OnDestroy {
   protected readonly execEvents = signal<TechnicianExecutionEvent[]>([]);
   protected readonly execPhotoUrls = signal<Record<string, string>>({});
   protected readonly execVoiceUrls = signal<Record<string, string>>({});
+  /**
+   * Stage 7E read-only parts requests for the owned job (requested
+   * part, quantity, reason, technician, date, status, photo).
+   * Approval actions arrive in Stage 7F.
+   */
+  protected readonly execParts = signal<PartsRequest[]>([]);
+  protected readonly execPartsPhotoUrls = signal<Record<string, string>>({});
 
   ngOnInit(): void {
     this.load();
@@ -106,6 +118,9 @@ export class BusinessJobDetailComponent implements OnInit, OnDestroy {
       URL.revokeObjectURL(url);
     }
     for (const url of Object.values(this.execVoiceUrls())) {
+      URL.revokeObjectURL(url);
+    }
+    for (const url of Object.values(this.execPartsPhotoUrls())) {
       URL.revokeObjectURL(url);
     }
   }
@@ -154,21 +169,53 @@ export class BusinessJobDetailComponent implements OnInit, OnDestroy {
       images: this.api.listBusinessJobImages(job.id).pipe(catchError(() => of(null))),
       updates: this.api.listBusinessJobUpdates(job.id).pipe(catchError(() => of(null))),
       voiceNotes: this.api.listBusinessVoiceNotes(job.id).pipe(catchError(() => of(null))),
+      parts: this.api.listBusinessJobPartsRequests(job.id).pipe(catchError(() => of(null))),
       timeline: this.api.getBusinessExecutionTimeline(job.id).pipe(catchError(() => of(null))),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((result) => {
-        if (result.images === null || result.updates === null || result.voiceNotes === null || result.timeline === null) {
+        if (
+          result.images === null ||
+          result.updates === null ||
+          result.voiceNotes === null ||
+          result.parts === null ||
+          result.timeline === null
+        ) {
           this.execStatus.set('error');
           return;
         }
         this.execImages.set(result.images);
         this.execUpdates.set(result.updates);
         this.execVoiceNotes.set(result.voiceNotes);
+        this.execParts.set(result.parts);
         this.execEvents.set(result.timeline.events);
         this.execStatus.set('ready');
         this.loadExecBlobs(job.id, result.images, result.voiceNotes);
+        this.loadExecPartsPhotoBlobs(job.id, result.parts);
       });
+  }
+
+  protected execPartsPhotoUrl(requestId: string): string {
+    return this.execPartsPhotoUrls()[requestId] ?? '';
+  }
+
+  /** Stage 7E: fetch authorized photo evidence for requests that carry it. */
+  private loadExecPartsPhotoBlobs(jobId: string, requests: PartsRequest[]): void {
+    for (const item of requests) {
+      if (!item.items.some((entry) => entry.hasPhoto)) continue;
+      if (this.execPartsPhotoUrls()[item.id]) continue;
+      this.api
+        .fetchBusinessJobPartsPhotoBlob(jobId, item.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (blob) => {
+            this.execPartsPhotoUrls.update((current) => ({ ...current, [item.id]: URL.createObjectURL(blob) }));
+          },
+          error: () => {
+            // A single unreadable evidence photo must not break the section.
+          },
+        });
+    }
   }
 
   protected execPhotoUrl(imageId: string): string {

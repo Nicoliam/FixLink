@@ -346,7 +346,7 @@ export interface TechnicianVoiceNoteDto {
   createdAt: string;
 }
 
-export type TechnicianExecutionEventKind = 'status' | 'assignment' | 'update' | 'image' | 'voice';
+export type TechnicianExecutionEventKind = 'status' | 'assignment' | 'update' | 'image' | 'voice' | 'parts';
 
 /**
  * One entry of the technician execution timeline (status transitions,
@@ -369,10 +369,81 @@ export interface TechnicianExecutionEventDto {
   voiceNoteId?: string;
   mimeType?: string;
   durationSeconds?: number | null;
+  /** Parts events only: the request, its first item and its status. */
+  partsRequestId?: string;
+  partName?: string;
+  quantity?: number;
+  partsStatus?: PartsRequestStatus;
 }
 
 /** Technician execution timeline: the job plus chronological events. */
 export interface TechnicianExecutionTimelineDto {
   job: InternalJobDto;
   events: TechnicianExecutionEventDto[];
+}
+
+/**
+ * FixLink Stage 7E — technician parts requests.
+ *
+ * Reuses the existing `parts_requests` / `parts_request_items` tables
+ * (migration 006) on the ONE shared job engine — no new tables were
+ * created for this stage. A request is a header (`parts_requests`:
+ * reason + PENDING status) with exactly one item in Stage 7E
+ * (`parts_request_items`: part name, quantity, optional notes, optional
+ * photo evidence). Multi-item requests are a documented future
+ * extension the schema already supports.
+ *
+ * Business scoping is derived server-side from `jobs.business_id`
+ * (the `parts_requests` table itself carries no business column); the
+ * requesting technician is resolved from `requester_id` via the
+ * business roster. Binary bytes are never stored in MySQL — a photo
+ * is an opaque FileStorage key in `photo_reference` with metadata
+ * columns, delivered only through authorized file endpoints.
+ *
+ * Status vocabulary reuses the table ENUM: PENDING, APPROVED,
+ * REJECTED, NEEDS_INFO, CANCELLED. Stage 7E only ever creates
+ * PENDING rows; APPROVED / REJECTED / NEEDS_INFO arrive with the
+ * Stage 7F manager-approval workflow.
+ */
+
+/** Lifecycle state of a parts request (mirrors the table ENUM). */
+export type PartsRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO' | 'CANCELLED';
+
+/** One requested part/material (a `parts_request_items` row projection). */
+export interface PartsRequestItemDto {
+  id: string;
+  partName: string;
+  quantity: number;
+  notes: string | null;
+  /** True when photo evidence was attached (bytes via the file endpoint). */
+  hasPhoto: boolean;
+  photoMime: string | null;
+  createdAt: string;
+}
+
+/** The roster technician who submitted the request (contact info only). */
+export interface PartsRequestRequesterSummary {
+  technicianId: string;
+  displayName: string;
+}
+
+/** A parts request with its items (a `parts_requests` row projection). */
+export interface PartsRequestDto {
+  id: string;
+  jobId: string;
+  businessId: string;
+  requestedBy: PartsRequestRequesterSummary;
+  status: PartsRequestStatus;
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+  items: PartsRequestItemDto[];
+}
+
+/** Validated parts-request creation body (single item — see note above). */
+export interface CreatePartsRequestInput {
+  partName: string;
+  quantity: number;
+  reason: string;
+  notes: string | null;
 }

@@ -17,6 +17,7 @@ import {
   TechnicianJobNotCompletableError,
   TechnicianJobNotExecutableError,
   type BusinessStore,
+  type CreatePartsRequestPersistInput,
   type CreateTechnicianImageInput,
   type CreateTechnicianUpdateInput,
   type CreateTechnicianVoiceNoteInput,
@@ -41,6 +42,9 @@ import type {
   JobAssignmentDetailDto,
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
+  PartsRequestDto,
+  PartsRequestItemDto,
+  PartsRequestStatus,
   TechnicianDto,
   TechnicianJobImageDto,
   TechnicianJobUpdateDto,
@@ -168,6 +172,35 @@ interface TechnicianVoiceRow {
   createdAt: string;
 }
 
+/** Stage 7E — mirrors one `parts_requests` row (shared table). */
+interface PartsRequestRow {
+  id: string;
+  jobId: string;
+  /** Authenticated user id (`parts_requests.requester_id`). */
+  requesterId: string;
+  technicianId: string;
+  technicianName: string;
+  status: PartsRequestStatus;
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Stage 7E — mirrors one `parts_request_items` row (shared table). */
+interface PartsRequestItemRow {
+  id: string;
+  requestId: string;
+  partName: string;
+  quantity: number;
+  notes: string | null;
+  /** Opaque FileStorage key (`photo_reference`); null when no photo. */
+  photoStorageKey: string | null;
+  photoOriginalFilename: string | null;
+  photoMime: string | null;
+  photoSize: number | null;
+  createdAt: string;
+}
+
 export interface SeedBusinessInput {
   ownerUserId: string;
   businessName?: string;
@@ -202,6 +235,10 @@ export class MemoryBusinessStore implements BusinessStore {
   private readonly techUpdates: TechnicianUpdateRow[] = [];
   private voiceSeq = 0;
   private readonly voiceNotes = new Map<string, TechnicianVoiceRow>();
+  private partsRequestSeq = 0;
+  private readonly partsRequests = new Map<string, PartsRequestRow>();
+  private partsItemSeq = 0;
+  private readonly partsItems = new Map<string, PartsRequestItemRow>();
 
   /** Test setup: provision a business owned by the given user. */
   seedBusiness(input: SeedBusinessInput): BusinessRow {
@@ -990,6 +1027,170 @@ export class MemoryBusinessStore implements BusinessStore {
     const row = this.voiceNotes.get(voiceNoteId);
     if (!row || row.jobId !== jobId) return null;
     return { voiceNote: stripVoiceKey(row), storageKey: row.storageKey };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7E — technician parts requests (memory implementation).
+  //
+  // Mirrors the shared `parts_requests` / `parts_request_items` tables
+  // with the same rules as the MySQL implementation: active-assignment
+  // scoping, IN_PROGRESS / AWAITING_PARTS gating, PENDING on creation
+  // and no job-status change. Timeline inclusion is read-time (see the
+  // shared `buildTechnicianExecutionEvents` helper) — no history row
+  // is written when a request is created.
+  // ------------------------------------------------------------------
+
+  /** Guard shared by the 7E write: assignment + execution state. */
+  private requireAssignedForParts(technicianId: string, jobId: string): InternalJobRow {
+    if (!this.activeAssignment(technicianId, jobId)) {
+      throw new TechnicianJobNotExecutableError('Job not found.');
+    }
+    const row = this.internalJobs.get(jobId);
+    if (!row) throw new TechnicianJobNotExecutableError('Job not found.');
+    if (row.status !== 'IN_PROGRESS' && row.status !== 'AWAITING_PARTS') {
+      throw new TechnicianJobNotExecutableError('Parts can only be requested while the job is in progress.');
+    }
+    return row;
+  }
+
+  async createPartsRequest(input: CreatePartsRequestPersistInput): Promise<PartsRequestDto> {
+    this.requireAssignedForParts(input.technicianId, input.jobId);
+    const technician = this.technicians.get(input.technicianId);
+    if (!technician) throw new TechnicianJobNotExecutableError('Job not found.');
+    // All checks passed before any mutation: a failed insert cannot
+    // leave a header without its item (or vice versa).
+    const now = nowIso();
+    this.partsRequestSeq += 1;
+    const request: PartsRequestRow = {
+      id: String(this.partsRequestSeq),
+      jobId: input.jobId,
+      requesterId: input.requestedBy,
+      technicianId: input.technicianId,
+      technicianName: technician.displayName,
+      status: 'PENDING',
+      reason: input.reason,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.partsRequests.set(request.id, request);
+    this.partsItemSeq += 1;
+    const item: PartsRequestItemRow = {
+      id: String(this.partsItemSeq),
+      requestId: request.id,
+      partName: input.partName,
+      quantity: input.quantity,
+      notes: input.notes,
+      photoStorageKey: input.photoStorageKey,
+      photoOriginalFilename: input.photoOriginalFilename,
+      photoMime: input.photoMime,
+      photoSize: input.photoSize,
+      createdAt: now,
+    };
+    this.partsItems.set(item.id, item);
+    return this.toPartsRequestDto(request);
+  }
+
+  async listTechnicianPartsRequests(technicianId: string, jobId: string): Promise<PartsRequestDto[] | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    if (!this.internalJobs.get(jobId)) return null;
+    return [...this.partsRequests.values()]
+      .filter((request) => request.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((request) => this.toPartsRequestDto(request));
+  }
+
+  async getTechnicianPartsRequest(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<PartsRequestDto | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const row = this.partsRequests.get(requestId);
+    if (!row || row.jobId !== jobId) return null;
+    return this.toPartsRequestDto(row);
+  }
+
+  async getTechnicianPartsRequestPhotoFile(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    return this.partsPhotoFor(jobId, requestId);
+  }
+
+  async listBusinessPartsRequests(businessId: string, jobId: string): Promise<PartsRequestDto[] | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    return [...this.partsRequests.values()]
+      .filter((request) => request.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((request) => this.toPartsRequestDto(request));
+  }
+
+  async getBusinessPartsRequest(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<PartsRequestDto | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    const row = this.partsRequests.get(requestId);
+    if (!row || row.jobId !== jobId) return null;
+    return this.toPartsRequestDto(row);
+  }
+
+  async getBusinessPartsRequestPhotoFile(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    return this.partsPhotoFor(jobId, requestId);
+  }
+
+  /** Shared photo lookup: the request's first item carrying a photo key. */
+  private partsPhotoFor(
+    jobId: string,
+    requestId: string,
+  ): { request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null {
+    const row = this.partsRequests.get(requestId);
+    if (!row || row.jobId !== jobId) return null;
+    const item = [...this.partsItems.values()].find(
+      (entry) => entry.requestId === requestId && entry.photoStorageKey !== null,
+    );
+    if (!item || !item.photoStorageKey || !item.photoMime) return null;
+    return {
+      request: this.toPartsRequestDto(row),
+      mimeType: item.photoMime,
+      filename: item.photoOriginalFilename,
+      storageKey: item.photoStorageKey,
+    };
+  }
+
+  private toPartsRequestDto(row: PartsRequestRow): PartsRequestDto {
+    const items: PartsRequestItemDto[] = [...this.partsItems.values()]
+      .filter((item) => item.requestId === row.id)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((item) => ({
+        id: item.id,
+        partName: item.partName,
+        quantity: item.quantity,
+        notes: item.notes,
+        hasPhoto: item.photoStorageKey !== null,
+        photoMime: item.photoMime,
+        createdAt: item.createdAt,
+      }));
+    const job = this.internalJobs.get(row.jobId);
+    return {
+      id: row.id,
+      jobId: row.jobId,
+      businessId: job?.businessId ?? '',
+      requestedBy: { technicianId: row.technicianId, displayName: row.technicianName },
+      status: row.status,
+      reason: row.reason,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      items,
+    };
   }
 
   private toAssignmentDto(row: AssignmentRow): JobAssignmentDto | null {

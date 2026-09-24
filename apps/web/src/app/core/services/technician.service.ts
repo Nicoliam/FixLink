@@ -9,6 +9,9 @@ import type {
   BusinessJobList,
   BusinessJobListParams,
   CompleteTechnicianJobResult,
+  CreatePartsRequest,
+  PartsRequest,
+  PartsRequestList,
   TechnicianExecutionTimeline,
   TechnicianJobImage,
   TechnicianJobImageList,
@@ -22,13 +25,14 @@ import type {
 /**
  * FixLink technician API client — Stage 7C (My Jobs) + Stage 7D
  * (execution: start, BEFORE/DURING/AFTER photos and notes, voice
- * notes, timeline, completion).
+ * notes, timeline, completion) + Stage 7E (parts requests: submit,
+ * list, read, photo evidence).
  *
  * Single owner of technician calls. All endpoints require
  * authentication; the technician identity is derived by the backend
  * from the session user, never from these payloads. Only jobs with
  * an active TECHNICIAN assignment to the caller are visible.
- * Parts, approvals and notifications arrive in later stages.
+ * Approvals and notifications arrive in later stages.
  */
 @Injectable({ providedIn: 'root' })
 export class TechnicianService {
@@ -183,5 +187,65 @@ export class TechnicianService {
         { note: note.trim() },
       )
       .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Stage 7E — submit a parts request for an assigned IN_PROGRESS
+   * (or AWAITING_PARTS) job. Sent as JSON, or as multipart FormData
+   * (part fields + optional `photo` evidence file) when a photo is
+   * provided. Resolves with the PENDING request; the job stays in
+   * its current state until the Stage 7F approval workflow.
+   */
+  createMyJobPartsRequest(jobId: string, payload: CreatePartsRequest, photo?: File): Observable<PartsRequest> {
+    if (photo) {
+      const form = new FormData();
+      form.append('partName', payload.partName.trim());
+      form.append('quantity', String(payload.quantity));
+      form.append('reason', payload.reason.trim());
+      if (payload.notes?.trim()) form.append('notes', payload.notes.trim());
+      form.append('photo', photo, photo.name);
+      return this.http
+        .post<ApiSuccess<PartsRequest>>(
+          `${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/parts`,
+          form,
+        )
+        .pipe(map((res) => res.data));
+    }
+    return this.http
+      .post<ApiSuccess<PartsRequest>>(`${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/parts`, {
+        partName: payload.partName.trim(),
+        quantity: payload.quantity,
+        reason: payload.reason.trim(),
+        ...(payload.notes?.trim() ? { notes: payload.notes.trim() } : {}),
+      })
+      .pipe(map((res) => res.data));
+  }
+
+  /** Stage 7E — list submitted parts requests for an assigned job. */
+  listMyJobPartsRequests(jobId: string): Observable<PartsRequest[]> {
+    return this.http
+      .get<ApiSuccess<PartsRequestList>>(
+        `${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/parts`,
+      )
+      .pipe(map((res) => res.data.items));
+  }
+
+  /** Stage 7E — retrieve one submitted parts request. */
+  getMyJobPartsRequest(jobId: string, requestId: string): Observable<PartsRequest> {
+    return this.http
+      .get<ApiSuccess<PartsRequest>>(
+        `${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}`,
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /** Stage 7E — authorized URL for parts photo-evidence bytes. */
+  myJobPartsPhotoFileUrl(jobId: string, requestId: string): string {
+    return `${this.baseUrl}/technician/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}/photo/file`;
+  }
+
+  /** Stage 7E — fetch authorized photo-evidence bytes as a Blob. */
+  fetchMyJobPartsPhotoBlob(jobId: string, requestId: string): Observable<Blob> {
+    return this.http.get(this.myJobPartsPhotoFileUrl(jobId, requestId), { responseType: 'blob' });
   }
 }

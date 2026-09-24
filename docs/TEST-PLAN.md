@@ -510,3 +510,58 @@ Migration 010 adds nullable
 shared `jobs` / `job_images` / `job_updates` /
 `job_voice_notes` / `job_status_history` tables are otherwise
 unchanged.
+
+## Stage 7E — Technician Parts Requests
+
+Backend (`backend/tests/parts-requests.test.ts`, 16 cases,
+in-memory business store + isolated storage tmp dir —
+run with `npm test` from `backend/`; full suite 313/313
+green):
+
+- Assigned technician submits on an IN_PROGRESS job
+  (`201`, PENDING, correct business/technician linkage,
+  single item, no storage-key leak) and the job stays
+  IN_PROGRESS; unassigned technician, another technician's
+  job, cross-business job and marketplace id → `404`;
+  REQUESTED (pre-start), CANCELLED and COMPLETED jobs →
+  `422`.
+- Validation (`422`): missing/blank/overlong part name,
+  zero/negative/fractional/non-numeric/missing quantity,
+  missing/short reason.
+- Technician list/get own requests (`total`, off-job id →
+  `404`); owner + manager list/get on owned jobs (part,
+  quantity, reason, technician, status); cross-business
+  owner → `404`.
+- Roles: anonymous → `401` both surfaces; customer /
+  professional / owner / manager on the technician
+  submission surface → `403`; customer / professional /
+  technician on the business surface → `403`.
+- Timelines (technician + business) carry the `parts`
+  event (request id, part, quantity, PENDING) after
+  submission.
+- Optional photo evidence: multipart upload → `201` with
+  `hasPhoto`, technician + owner byte delivery (`200`,
+  `image/png`, `inline`); foreign technician → `404`;
+  photo-less request has no file (`404`); text upload
+  rejected (`422`); malformed job/request ids → `400`.
+
+Frontend (`apps/web`, `npx ng test --watch=false` — 29 files,
+222 tests, all green):
+
+- `technician-job-detail.spec.ts` (updated): Request Parts
+  action for IN_PROGRESS jobs; form validation blocks the
+  submit call; successful submit dispatches
+  `createMyJobPartsRequest` and renders part/quantity/
+  reason/“Status: Pending”; submitted list shows the
+  status with no Approve/Reject controls; all earlier
+  tests intact (REQUESTED jobs still expose no parts UI).
+- `business-job-detail.spec.ts` (updated): read-only
+  parts section (part, quantity, reason, technician,
+  Pending) with no approval controls; all earlier tests
+  intact.
+- Full suite green with no pre-existing test removed or
+  weakened.
+
+No migration in Stage 7E — `parts_requests` /
+`parts_request_items` (migration 006) already support
+this stage.

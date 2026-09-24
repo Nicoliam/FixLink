@@ -364,6 +364,77 @@
           }
         </div>
 
+        <div aria-label="Parts required">
+          <p class="fl-card-title">Parts Required</p>
+          @if (canRequestParts()) {
+            <form class="fl-form" [formGroup]="partsForm" (ngSubmit)="submitPartsRequest()" novalidate>
+              <div class="fl-field">
+                <label class="fl-label" for="parts-name">Part/material</label>
+                <input id="parts-name" class="fl-input" type="text" formControlName="partName" maxlength="255" />
+                @if (partsForm.controls.partName.invalid && partsForm.controls.partName.touched) {
+                  <p class="fl-field-error" role="alert">Enter the part or material name.</p>
+                }
+              </div>
+              <div class="fl-field">
+                <label class="fl-label" for="parts-quantity">Quantity</label>
+                <input id="parts-quantity" class="fl-input" type="number" formControlName="quantity" min="1" max="10000" step="1" />
+                @if (partsForm.controls.quantity.invalid && partsForm.controls.quantity.touched) {
+                  <p class="fl-field-error" role="alert">Quantity must be a whole number between 1 and 10000.</p>
+                }
+              </div>
+              <div class="fl-field">
+                <label class="fl-label" for="parts-reason">Reason</label>
+                <textarea id="parts-reason" class="fl-input" rows="3" formControlName="reason" maxlength="1000"></textarea>
+                @if (partsForm.controls.reason.invalid && partsForm.controls.reason.touched) {
+                  <p class="fl-field-error" role="alert">Explain why the part is needed (at least 10 characters).</p>
+                }
+              </div>
+              <div class="fl-field">
+                <label class="fl-label" for="parts-photo">Photo evidence (optional)</label>
+                <input
+                  id="parts-photo"
+                  class="fl-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  (change)="onPartsPhotoSelected($event)"
+                  [disabled]="submittingParts()"
+                />
+                @if (partsPhotoName()) {
+                  <p class="fl-card-text">Selected: {{ partsPhotoName() }}</p>
+                }
+              </div>
+              @if (partsSubmitError()) {
+                <p class="fl-alert-error" role="alert">{{ partsSubmitError() }}</p>
+              }
+              <button type="submit" class="fl-btn fl-btn-primary" [disabled]="submittingParts()">
+                {{ submittingParts() ? 'Submitting…' : 'Request Parts' }}
+              </button>
+            </form>
+          }
+          @if (partsRequests().length === 0) {
+            <p class="fl-card-text">No parts requested yet.</p>
+          } @else {
+            <ul>
+              @for (partsRequest of partsRequests(); track partsRequest.id) {
+                <li>
+                  @for (item of partsRequest.items; track item.id) {
+                    <p class="fl-card-text"><strong>{{ item.partName }}</strong></p>
+                    <p class="fl-card-text">Quantity: {{ item.quantity }}</p>
+                    @if (item.notes) {
+                      <p class="fl-card-text">{{ item.notes }}</p>
+                    }
+                  }
+                  <p class="fl-card-text">Reason: {{ partsRequest.reason }}</p>
+                  <p class="fl-card-text">Status: {{ partsStatusText(partsRequest.status) }} · {{ partsRequest.createdAt }}</p>
+                  @if (partsPhotoUrl(partsRequest.id)) {
+                    <img class="fl-photo" [src]="partsPhotoUrl(partsRequest.id)" alt="Parts request photo evidence" loading="lazy" />
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
         @if (events().length > 0) {
           <div aria-label="Execution timeline">
             <p class="fl-card-title">Execution timeline</p>
@@ -395,6 +466,14 @@
                         }
                         · {{ event.createdAt }}
                       </p>
+                    }
+                    @case ('parts') {
+                      <p class="fl-card-text">
+                        Parts requested{{ event.partName ? ': ' + event.partName : '' }}{{ event.quantity ? ' (Quantity: ' + event.quantity + ')' : '' }} · {{ partsStatusText(event.partsStatus ?? 'PENDING') }} · {{ event.createdAt }}
+                      </p>
+                      @if (event.reason) {
+                        <p class="fl-card-text">{{ event.reason }}</p>
+                      }
                     }
                   }
                 </li>

@@ -18,6 +18,8 @@ import type {
   CreateTechnicianRequest,
   JobAssignment,
   JobAssignmentDetail,
+  PartsRequest,
+  PartsRequestList,
   Technician,
   TechnicianExecutionTimeline,
   TechnicianJobImage,
@@ -38,12 +40,12 @@ import type {
  * technician management) + Stage 7B (business-managed customers and
  * internal jobs) + Stage 7C (technician assignment) + Stage 7D
  * (read-only execution visibility: photos, notes, voice notes,
- * timeline).
+ * timeline) + Stage 7E (read-only parts-request visibility).
  *
  * Single owner of business calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); the business is derived
  * by the backend from the session membership, never from these payloads.
- * Parts and approvals arrive in later stages.
+ * Approvals arrive in Stage 7F.
  */
 @Injectable({ providedIn: 'root' })
 export class BusinessService {
@@ -305,5 +307,37 @@ export class BusinessService {
         `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/timeline`,
       )
       .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Stage 7E — read-only parts-request visibility for owner/manager.
+   * The technician's submitted requests for an owned job (newest
+   * workflow state included). Approval actions arrive in Stage 7F.
+   */
+  listBusinessJobPartsRequests(jobId: string): Observable<PartsRequest[]> {
+    return this.http
+      .get<ApiSuccess<PartsRequestList>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/parts`,
+      )
+      .pipe(map((res) => res.data.items));
+  }
+
+  /** Stage 7E — retrieve one parts request for an owned job (read-only). */
+  getBusinessJobPartsRequest(jobId: string, requestId: string): Observable<PartsRequest> {
+    return this.http
+      .get<ApiSuccess<PartsRequest>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}`,
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /** Stage 7E — authorized URL for parts photo-evidence bytes. */
+  businessJobPartsPhotoFileUrl(jobId: string, requestId: string): string {
+    return `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/parts/${encodeURIComponent(requestId)}/photo/file`;
+  }
+
+  /** Stage 7E — fetch authorized photo-evidence bytes as a Blob. */
+  fetchBusinessJobPartsPhotoBlob(jobId: string, requestId: string): Observable<Blob> {
+    return this.http.get(this.businessJobPartsPhotoFileUrl(jobId, requestId), { responseType: 'blob' });
   }
 }

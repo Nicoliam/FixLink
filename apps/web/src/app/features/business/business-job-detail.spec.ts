@@ -73,6 +73,8 @@ describe('BusinessJobDetailComponent', () => {
     listBusinessVoiceNotes?: ReturnType<typeof vi.fn>;
     fetchBusinessJobVoiceNoteBlob?: ReturnType<typeof vi.fn>;
     getBusinessExecutionTimeline?: ReturnType<typeof vi.fn>;
+    listBusinessJobPartsRequests?: ReturnType<typeof vi.fn>;
+    fetchBusinessJobPartsPhotoBlob?: ReturnType<typeof vi.fn>;
   }): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [BusinessJobDetailComponent],
@@ -93,6 +95,8 @@ describe('BusinessJobDetailComponent', () => {
             listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
             fetchBusinessJobVoiceNoteBlob: vi.fn().mockReturnValue(of(new Blob())),
             getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: null, events: [] })),
+            listBusinessJobPartsRequests: vi.fn().mockReturnValue(of([])),
+            fetchBusinessJobPartsPhotoBlob: vi.fn().mockReturnValue(of(new Blob())),
             ...api,
           },
         },
@@ -271,5 +275,51 @@ describe('BusinessJobDetailComponent', () => {
   it('hides the execution record for REQUESTED jobs', async () => {
     await setup({ getBusinessJob: vi.fn().mockReturnValue(of(makeDetail('REQUESTED'))) });
     expect((fixture.nativeElement.textContent as string)).not.toContain('Work documentation');
+  });
+
+  it('shows submitted parts requests read-only for IN_PROGRESS jobs', async () => {
+    const detail = makeDetail('IN_PROGRESS');
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(detail)),
+      listBusinessJobImages: vi.fn().mockReturnValue(of([])),
+      listBusinessJobUpdates: vi.fn().mockReturnValue(of([])),
+      listBusinessVoiceNotes: vi.fn().mockReturnValue(of([])),
+      listBusinessJobPartsRequests: vi.fn().mockReturnValue(
+        of([
+          {
+            id: '11',
+            jobId: '5',
+            businessId: '1',
+            requestedBy: { technicianId: '2', displayName: 'Bongani Zulu' },
+            status: 'PENDING',
+            reason: 'Required to complete the repair',
+            createdAt: '2026-09-21T12:30:00.000Z',
+            updatedAt: '2026-09-21T12:30:00.000Z',
+            items: [
+              {
+                id: '21',
+                partName: 'Brake fluid',
+                quantity: 2,
+                notes: null,
+                hasPhoto: false,
+                photoMime: null,
+                createdAt: '2026-09-21T12:30:00.000Z',
+              },
+            ],
+          },
+        ]),
+      ),
+      getBusinessExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Parts Required');
+    expect(text).toContain('Brake fluid');
+    expect(text).toContain('Quantity: 2');
+    expect(text).toContain('Required to complete the repair');
+    expect(text).toContain('Bongani Zulu');
+    expect(text).toContain('Pending');
+    // Stage 7E is view-only: no approval controls until Stage 7F.
+    expect(text).not.toContain('Approve');
+    expect(text).not.toContain('Reject');
   });
 });

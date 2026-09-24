@@ -19,6 +19,7 @@ import type {
   BusinessIdentity,
   CreateBusinessCustomerInput,
   CreateInternalJobInput,
+  CreatePartsRequestInput,
   InternalJobDetailDto,
   InternalJobDto,
   InternalJobsSummary,
@@ -27,6 +28,7 @@ import type {
   JobAssignmentDetailDto,
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
+  PartsRequestDto,
   TechnicianDto,
   TechnicianExecutionEventDto,
   TechnicianJobImageDto,
@@ -295,6 +297,61 @@ export interface BusinessStore {
     jobId: string,
     voiceNoteId: string,
   ): Promise<{ voiceNote: TechnicianVoiceNoteDto; storageKey: string } | null>;
+  // ------------------------------------------------------------------
+  // Stage 7E — technician parts requests (existing `parts_requests` /
+  // `parts_request_items` tables on the ONE shared job engine — no new
+  // tables). Creation never changes job status: the job stays
+  // IN_PROGRESS (or AWAITING_PARTS) until the Stage 7F approval
+  // workflow moves it. Technician reads are scoped by the active
+  // TECHNICIAN assignment (without one the job reads as null —
+  // NOT_FOUND upstream); business reads are scoped by ownership of
+  // the INTERNAL job. The photo storage key is never in API
+  // responses — only in the file-download results below.
+  // ------------------------------------------------------------------
+  /**
+   * Insert a PENDING parts request with its single item. The caller
+   * guarantees the job is INTERNAL, assigned to this technician and
+   * in an execution state; the store re-checks inside its write and
+   * throws TechnicianJobNotExecutableError when the job is unknown /
+   * unassigned ('Job not found.') or not accepting requests (default
+   * message). Returns the created request with its item.
+   */
+  createPartsRequest(input: CreatePartsRequestPersistInput): Promise<PartsRequestDto>;
+  /** Parts requests for an assigned job, oldest first (null when not assigned). */
+  listTechnicianPartsRequests(technicianId: string, jobId: string): Promise<PartsRequestDto[] | null>;
+  /** One parts request on an assigned job (null when not assigned or off-job). */
+  getTechnicianPartsRequest(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<PartsRequestDto | null>;
+  /**
+   * One request item plus its protected photo storage key for
+   * authorized downloads (null when not assigned, off-job, or the
+   * item carries no photo).
+   */
+  getTechnicianPartsRequestPhotoFile(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null>;
+  /** Parts requests for an owned INTERNAL job, oldest first (null when foreign). */
+  listBusinessPartsRequests(businessId: string, jobId: string): Promise<PartsRequestDto[] | null>;
+  /** One parts request on an owned INTERNAL job (null when foreign/off-job). */
+  getBusinessPartsRequest(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<PartsRequestDto | null>;
+  /**
+   * One request item plus its protected photo storage key for
+   * authorized downloads (null when foreign, off-job, or no photo).
+   */
+  getBusinessPartsRequestPhotoFile(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null>;
 }
 
 /** The job is not in a cancellable state (only REQUESTED may cancel in Stage 7B). */
@@ -379,6 +436,21 @@ export interface CreateTechnicianVoiceNoteInput {
   durationSeconds: number | null;
 }
 
+/** Persist input for a technician parts request (assignment already verified). */
+export interface CreatePartsRequestPersistInput extends CreatePartsRequestInput {
+  /** Roster technician row id (server-derived from the session user). */
+  technicianId: string;
+  jobId: string;
+  /** Authenticated user id — recorded in `parts_requests.requester_id`. */
+  requestedBy: string;
+  /** Opaque key from FileStorage for the optional photo evidence (stored
+   * in `parts_request_items.photo_reference`); null when no photo. */
+  photoStorageKey: string | null;
+  photoOriginalFilename: string | null;
+  photoMime: string | null;
+  photoSize: number | null;
+}
+
 /** Build the chronological execution timeline from its parts (shared helper). */
 export function buildTechnicianExecutionEvents(
   history: InternalJobTimelineEntry[],
@@ -386,6 +458,8 @@ export function buildTechnicianExecutionEvents(
   updates: TechnicianJobUpdateDto[],
   images: TechnicianJobImageDto[],
   voiceNotes: TechnicianVoiceNoteDto[],
+  /** Stage 7E parts requests (read-time inclusion — no history row is written on request). */
+  parts: PartsRequestDto[] = [],
 ): TechnicianExecutionEventDto[] {
   const events: TechnicianExecutionEventDto[] = [];
   for (const entry of history) {
@@ -436,12 +510,26 @@ export function buildTechnicianExecutionEvents(
       durationSeconds: voice.durationSeconds,
     });
   }
+  for (const request of parts) {
+    const first = request.items[0];
+    events.push({
+      kind: 'parts',
+      createdAt: request.createdAt,
+      actor: 'technician',
+      partsRequestId: request.id,
+      partName: first?.partName,
+      quantity: first?.quantity,
+      partsStatus: request.status,
+      reason: request.reason,
+    });
+  }
   const kindOrder: Record<TechnicianExecutionEventDto['kind'], number> = {
     status: 0,
     assignment: 1,
     update: 2,
     image: 3,
     voice: 4,
+    parts: 5,
   };
   events.sort((a, b) =>
     a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : kindOrder[a.kind] - kindOrder[b.kind],

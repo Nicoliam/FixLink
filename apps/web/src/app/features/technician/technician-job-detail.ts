@@ -11,13 +11,14 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TechnicianService } from '../../core/services/technician.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
-import { businessJobPriorityLabel, businessJobStatusLabel, technicianWorkPhaseLabel } from '../../core/models/business.model';
+import { businessJobPriorityLabel, businessJobStatusLabel, partsRequestStatusLabel, technicianWorkPhaseLabel } from '../../core/models/business.model';
 import type {
   BusinessJobDetail,
+  PartsRequest,
   TechnicianExecutionEvent,
   TechnicianJobImage,
   TechnicianJobUpdate,
@@ -45,8 +46,10 @@ type RecordingState = 'idle' | 'requesting' | 'recording';
  * Start Work action (→ IN_PROGRESS); an in-progress job shows the
  * execution workspace with per-phase photos, notes, voice recording
  * and a completion section where the required completion note enables
- * Complete Job (→ COMPLETED). Parts, approvals and notifications
- * arrive in later stages and are not shown.
+ * Complete Job (→ COMPLETED). Stage 7E adds Request Parts
+ * (IN_PROGRESS/AWAITING_PARTS → PENDING request, job state unchanged)
+ * with the submitted requests listed under Parts Required. Approvals
+ * and notifications arrive in later stages and are not shown.
  */
 @Component({
   selector: 'app-technician-job-detail',
@@ -67,6 +70,7 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
   protected readonly statusText = businessJobStatusLabel;
   protected readonly priorityText = businessJobPriorityLabel;
   protected readonly phaseLabel = technicianWorkPhaseLabel;
+  protected readonly partsStatusText = partsRequestStatusLabel;
 
   /** The Start Work action is shown only for REQUESTED/SCHEDULED jobs. */
   protected readonly canStart = computed<boolean>(() => {
@@ -125,6 +129,25 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
 
   protected readonly isWorkEditable = computed<boolean>(() => this.detail()?.job.status === 'IN_PROGRESS');
 
+  /**
+   * Stage 7E — Request Parts is offered while the job accepts parts
+   * requests (IN_PROGRESS now; AWAITING_PARTS once the Stage 7F
+   * approval workflow can move jobs there).
+   */
+  protected readonly canRequestParts = computed<boolean>(() => {
+    const jobStatus = this.detail()?.job.status;
+    return jobStatus === 'IN_PROGRESS' || jobStatus === 'AWAITING_PARTS';
+  });
+
+  /** Stage 7E submitted parts requests (read-only once the job leaves execution). */
+  protected readonly partsRequests = signal<PartsRequest[]>([]);
+  protected readonly submittingParts = signal(false);
+  protected readonly partsSubmitError = signal<string | null>(null);
+  protected readonly partsPhotoName = signal<string | null>(null);
+  protected readonly partsPhotoUrls = signal<Record<string, string>>({});
+
+  private partsPhotoFile: File | null = null;
+
   /** Stage 7D progress-note forms (BEFORE/DURING notes, AFTER completion note). */
   readonly beforeForm = this.fb.group({
     note: ['', []],
@@ -136,6 +159,13 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
 
   readonly completionForm = this.fb.group({
     note: ['', []],
+  });
+
+  /** Stage 7E parts-request form (part, quantity, reason, optional photo). */
+  readonly partsForm = this.fb.group({
+    partName: ['', [Validators.required, Validators.maxLength(255)]],
+    quantity: [1, [Validators.required, Validators.min(1), Validators.max(10000)]],
+    reason: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(1000)]],
   });
 
   // ---------------------------------------------------------------
@@ -183,6 +213,9 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
       URL.revokeObjectURL(url);
     }
     for (const url of Object.values(this.voiceUrls())) {
+      URL.revokeObjectURL(url);
+    }
+    for (const url of Object.values(this.partsPhotoUrls())) {
       URL.revokeObjectURL(url);
     }
     const recorded = this.recordedAudioUrl();
@@ -274,7 +307,13 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
   /** Load the work record for IN_PROGRESS jobs and later stages. */
   protected loadWork(detail: BusinessJobDetail): void {
     const jobStatus = detail.job.status;
-    if (jobStatus !== 'IN_PROGRESS' && jobStatus !== 'COMPLETED' && jobStatus !== 'CONFIRMED' && jobStatus !== 'CLOSED') {
+    if (
+      jobStatus !== 'IN_PROGRESS' &&
+      jobStatus !== 'AWAITING_PARTS' &&
+      jobStatus !== 'COMPLETED' &&
+      jobStatus !== 'CONFIRMED' &&
+      jobStatus !== 'CLOSED'
+    ) {
       this.workStatus.set('idle');
       return;
     }
@@ -284,11 +323,18 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
       images: this.api.listMyJobImages(detail.job.id).pipe(catchError(() => of(null))),
       updates: this.api.listMyJobUpdates(detail.job.id).pipe(catchError(() => of(null))),
       voiceNotes: this.api.listMyJobVoiceNotes(detail.job.id).pipe(catchError(() => of(null))),
+      parts: this.api.listMyJobPartsRequests(detail.job.id).pipe(catchError(() => of(null))),
       timeline: this.api.getMyJobExecutionTimeline(detail.job.id).pipe(catchError(() => of(null))),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((result) => {
-        if (result.images === null || result.updates === null || result.voiceNotes === null || result.timeline === null) {
+        if (
+          result.images === null ||
+          result.updates === null ||
+          result.voiceNotes === null ||
+          result.parts === null ||
+          result.timeline === null
+        ) {
           this.workError.set('Could not load the work record. Please try again.');
           this.workStatus.set('error');
           return;
@@ -296,10 +342,12 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
         this.images.set(result.images);
         this.updates.set(result.updates);
         this.voiceNotes.set(result.voiceNotes);
+        this.partsRequests.set(result.parts);
         this.events.set(result.timeline.events);
         this.workStatus.set('ready');
         this.loadPhotoBlobs(detail.job.id, result.images);
         this.loadVoiceBlobs(detail.job.id, result.voiceNotes);
+        this.loadPartsPhotoBlobs(detail.job.id, result.parts);
       });
   }
 
@@ -588,6 +636,87 @@ export class TechnicianJobDetailComponent implements OnInit, OnDestroy {
           this.completeError.set(getApiErrorMessage(error, 'Could not complete the job. Please try again.'));
         },
       });
+  }
+
+  // ---------------------------------------------------------------
+  // Stage 7E — parts requests (IN_PROGRESS/AWAITING_PARTS → PENDING,
+  // job state unchanged). The form posts part, quantity, reason and
+  // an optional evidence photo; submitted requests render below with
+  // their backend-derived status.
+  // ---------------------------------------------------------------
+
+  protected partsPhotoUrl(requestId: string): string {
+    return this.partsPhotoUrls()[requestId] ?? '';
+  }
+
+  /** Remember the optional evidence photo (sent with the request). */
+  protected onPartsPhotoSelected(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    this.partsPhotoFile = file;
+    this.partsPhotoName.set(file ? file.name : null);
+  }
+
+  /** Submit a parts request for the assigned job. */
+  protected submitPartsRequest(): void {
+    const job = this.detail()?.job;
+    if (!job || this.submittingParts() || !this.canRequestParts()) return;
+    this.partsForm.markAllAsTouched();
+    if (this.partsForm.invalid) {
+      this.partsSubmitError.set('Please complete the part name, quantity and reason.');
+      return;
+    }
+    const value = this.partsForm.getRawValue();
+    const quantity = Number(value.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10000) {
+      this.partsSubmitError.set('Quantity must be a whole number between 1 and 10000.');
+      return;
+    }
+    this.submittingParts.set(true);
+    this.partsSubmitError.set(null);
+    this.api
+      .createMyJobPartsRequest(
+        job.id,
+        {
+          partName: (value.partName ?? '').trim(),
+          quantity,
+          reason: (value.reason ?? '').trim(),
+        },
+        this.partsPhotoFile ?? undefined,
+      )
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (created) => {
+          this.submittingParts.set(false);
+          this.partsRequests.update((current) => [...current, created]);
+          this.loadPartsPhotoBlobs(job.id, [created]);
+          this.partsForm.reset({ partName: '', quantity: 1, reason: '' });
+          this.partsPhotoFile = null;
+          this.partsPhotoName.set(null);
+        },
+        error: (error: unknown) => {
+          this.submittingParts.set(false);
+          this.partsSubmitError.set(getApiErrorMessage(error, 'Could not submit the parts request. Please try again.'));
+        },
+      });
+  }
+
+  private loadPartsPhotoBlobs(jobId: string, requests: PartsRequest[]): void {
+    for (const item of requests) {
+      if (!item.items.some((entry) => entry.hasPhoto)) continue;
+      if (this.partsPhotoUrls()[item.id]) continue;
+      this.api
+        .fetchMyJobPartsPhotoBlob(jobId, item.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (blob) => {
+            this.partsPhotoUrls.update((current) => ({ ...current, [item.id]: URL.createObjectURL(blob) }));
+          },
+          error: () => {
+            // A single unreadable evidence photo must not break the section.
+          },
+        });
+    }
   }
 }
 

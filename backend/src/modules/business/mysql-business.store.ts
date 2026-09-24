@@ -20,6 +20,7 @@ import {
   TechnicianJobNotCompletableError,
   TechnicianJobNotExecutableError,
   type BusinessStore,
+  type CreatePartsRequestPersistInput,
   type CreateTechnicianImageInput,
   type CreateTechnicianUpdateInput,
   type CreateTechnicianVoiceNoteInput,
@@ -44,6 +45,9 @@ import type {
   JobAssignmentDetailDto,
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
+  PartsRequestDto,
+  PartsRequestItemDto,
+  PartsRequestStatus,
   TechnicianDto,
   TechnicianJobImageDto,
   TechnicianJobUpdateDto,
@@ -262,6 +266,73 @@ function stripVoiceKey(record: TechnicianVoiceNoteDto & { storageKey: string }):
   const { storageKey: _storageKey, ...dto } = record;
   return dto;
 }
+
+/** Stage 7E — one `parts_requests` row joined to its job + requesting technician. */
+interface PartsRequestRow extends RowDataPacket {
+  id: number;
+  job_id: number;
+  requester_id: number | null;
+  status: string;
+  reason: string;
+  business_id: number;
+  technician_id: number | null;
+  technician_name: string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+/** Stage 7E — one `parts_request_items` row. */
+interface PartsRequestItemRow extends RowDataPacket {
+  id: number;
+  parts_request_id: number;
+  part_name: string;
+  quantity: number | string;
+  notes: string | null;
+  photo_reference: string | null;
+  photo_mime: string | null;
+  photo_size: number | string | null;
+  created_at: Date | string;
+}
+
+function toPartsStatus(value: string): PartsRequestStatus {
+  if (
+    value === 'PENDING' ||
+    value === 'APPROVED' ||
+    value === 'REJECTED' ||
+    value === 'NEEDS_INFO' ||
+    value === 'CANCELLED'
+  ) {
+    return value;
+  }
+  throw new Error(`Unknown parts request status: ${value}`);
+}
+
+function mapPartsRequestItem(row: PartsRequestItemRow): PartsRequestItemDto {
+  return {
+    id: toStringId(row.id),
+    partName: row.part_name,
+    quantity: toNumber(row.quantity),
+    notes: row.notes,
+    hasPhoto: row.photo_reference !== null,
+    photoMime: row.photo_mime,
+    createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+  };
+}
+
+const PARTS_REQUEST_SELECT = `
+  SELECT pr.\`id\`, pr.\`job_id\`, pr.\`requester_id\`, pr.\`status\`, pr.\`reason\`,
+         j.\`business_id\`,
+         t.\`id\` AS \`technician_id\`, t.\`display_name\` AS \`technician_name\`,
+         pr.\`created_at\`, pr.\`updated_at\`
+    FROM \`parts_requests\` pr
+    INNER JOIN \`jobs\` j ON j.\`id\` = pr.\`job_id\`
+    LEFT JOIN \`technicians\` t
+      ON t.\`user_id\` = pr.\`requester_id\` AND t.\`business_id\` = j.\`business_id\``;
+
+const PARTS_ITEM_SELECT = `
+  SELECT \`id\`, \`parts_request_id\`, \`part_name\`, \`quantity\`, \`notes\`,
+         \`photo_reference\`, \`photo_mime\`, \`photo_size\`, \`created_at\`
+    FROM \`parts_request_items\``;
 
 const TECH_IMAGE_SELECT = `
   SELECT \`id\`, \`job_id\`, \`uploader_id\`, \`phase\`, \`file_reference\`,
@@ -1606,6 +1677,216 @@ export class MysqlBusinessStore implements BusinessStore {
     if (!row || String(row.job_id) !== String(jobId)) return null;
     const mapped = mapTechnicianVoice(row);
     return { voiceNote: stripVoiceKey(mapped), storageKey: mapped.storageKey };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7E — technician parts requests (MySQL implementation).
+  //
+  // Reuses the existing `parts_requests` / `parts_request_items`
+  // tables (migration 006) on the ONE shared job engine — no new
+  // tables. The write runs in one transaction with the same
+  // active-assignment + INTERNAL status guards as the 7D writes; it
+  // never changes job status (that waits for the Stage 7F approval
+  // workflow). Business scoping joins `jobs.business_id` because the
+  // `parts_requests` table carries no business column. Every value is
+  // a bound parameter.
+  // ------------------------------------------------------------------
+
+  /** Hydrate one request row with its items (photo keys stay server-side). */
+  private async mapPartsRequest(row: PartsRequestRow): Promise<PartsRequestDto> {
+    const [itemRows] = await this.pool.query<PartsRequestItemRow[]>(
+      `${PARTS_ITEM_SELECT} WHERE \`parts_request_id\` = ? ORDER BY \`created_at\` ASC, \`id\` ASC`,
+      [row.id],
+    );
+    return {
+      id: toStringId(row.id),
+      jobId: toStringId(row.job_id),
+      businessId: toStringId(row.business_id),
+      requestedBy: {
+        technicianId: row.technician_id === null ? '' : toStringId(row.technician_id),
+        displayName: row.technician_name ?? '',
+      },
+      status: toPartsStatus(row.status),
+      reason: row.reason,
+      createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+      updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
+      items: (itemRows as PartsRequestItemRow[]).map(mapPartsRequestItem),
+    };
+  }
+
+  /** Hydrate every request for a job (oldest first) with a single item query. */
+  private async mapPartsRequestsForJob(jobId: string): Promise<PartsRequestDto[]> {
+    const [requestRows] = await this.pool.query<PartsRequestRow[]>(
+      `${PARTS_REQUEST_SELECT} WHERE pr.\`job_id\` = ? ORDER BY pr.\`created_at\` ASC, pr.\`id\` ASC`,
+      [jobId],
+    );
+    const requests = requestRows as PartsRequestRow[];
+    if (requests.length === 0) return [];
+    const [itemRows] = await this.pool.query<PartsRequestItemRow[]>(
+      `${PARTS_ITEM_SELECT} WHERE \`parts_request_id\` IN (SELECT \`id\` FROM \`parts_requests\` WHERE \`job_id\` = ?) ORDER BY \`created_at\` ASC, \`id\` ASC`,
+      [jobId],
+    );
+    const itemsByRequest = new Map<string, PartsRequestItemDto[]>();
+    for (const item of itemRows as PartsRequestItemRow[]) {
+      const key = toStringId(item.parts_request_id);
+      const list = itemsByRequest.get(key) ?? [];
+      list.push(mapPartsRequestItem(item));
+      itemsByRequest.set(key, list);
+    }
+    return requests.map((row) => ({
+      id: toStringId(row.id),
+      jobId: toStringId(row.job_id),
+      businessId: toStringId(row.business_id),
+      requestedBy: {
+        technicianId: row.technician_id === null ? '' : toStringId(row.technician_id),
+        displayName: row.technician_name ?? '',
+      },
+      status: toPartsStatus(row.status),
+      reason: row.reason,
+      createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+      updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
+      items: itemsByRequest.get(toStringId(row.id)) ?? [],
+    }));
+  }
+
+  async createPartsRequest(input: CreatePartsRequestPersistInput): Promise<PartsRequestDto> {
+    if (!/^[1-9][0-9]*$/.test(input.technicianId) || !/^[1-9][0-9]*$/.test(input.jobId)) {
+      throw new TechnicianJobNotExecutableError('Job not found.');
+    }
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      if (!(await this.hasActiveAssignment(conn, input.technicianId, input.jobId))) {
+        throw new TechnicianJobNotExecutableError('Job not found.');
+      }
+      const [jobRows] = await conn.query<RowDataPacket[]>(
+        "SELECT `status` FROM `jobs` WHERE `id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL FOR UPDATE",
+        [input.jobId],
+      );
+      const job = (jobRows as Array<{ status: InternalJobStatus }>)[0];
+      if (!job) throw new TechnicianJobNotExecutableError('Job not found.');
+      if (job.status !== 'IN_PROGRESS' && job.status !== 'AWAITING_PARTS') {
+        throw new TechnicianJobNotExecutableError('Parts can only be requested while the job is in progress.');
+      }
+      const [requestResult] = await conn.query<ResultSetHeader>(
+        "INSERT INTO `parts_requests` (`job_id`, `requester_id`, `status`, `reason`) VALUES (?, ?, 'PENDING', ?)",
+        [input.jobId, input.requestedBy, input.reason],
+      );
+      const requestId = Number(requestResult.insertId);
+      await conn.query(
+        'INSERT INTO `parts_request_items` (`parts_request_id`, `part_name`, `quantity`, `notes`, `photo_reference`, `photo_mime`, `photo_size`) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          requestId,
+          input.partName,
+          input.quantity,
+          input.notes,
+          input.photoStorageKey,
+          input.photoMime,
+          input.photoSize,
+        ],
+      );
+      await conn.commit();
+      const [rows] = await this.pool.query<PartsRequestRow[]>(`${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`, [
+        requestId,
+      ]);
+      const created = (rows as PartsRequestRow[])[0];
+      if (!created) throw new Error('Parts request creation failed: row not found after insert.');
+      return this.mapPartsRequest(created);
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async listTechnicianPartsRequests(technicianId: string, jobId: string): Promise<PartsRequestDto[] | null> {
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    return this.mapPartsRequestsForJob(jobId);
+  }
+
+  async getTechnicianPartsRequest(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<PartsRequestDto | null> {
+    if (!/^[1-9][0-9]*$/.test(requestId)) return null;
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    const [rows] = await this.pool.query<PartsRequestRow[]>(`${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`, [
+      requestId,
+    ]);
+    const row = (rows as PartsRequestRow[])[0];
+    if (!row || String(row.job_id) !== String(jobId)) return null;
+    return this.mapPartsRequest(row);
+  }
+
+  async getTechnicianPartsRequestPhotoFile(
+    technicianId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null> {
+    if (!/^[1-9][0-9]*$/.test(requestId)) return null;
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    return this.partsPhotoFor(jobId, requestId);
+  }
+
+  async listBusinessPartsRequests(businessId: string, jobId: string): Promise<PartsRequestDto[] | null> {
+    if (!(await this.ownedInternalJobId(businessId, jobId))) return null;
+    return this.mapPartsRequestsForJob(jobId);
+  }
+
+  async getBusinessPartsRequest(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<PartsRequestDto | null> {
+    if (!/^[1-9][0-9]*$/.test(requestId)) return null;
+    if (!(await this.ownedInternalJobId(businessId, jobId))) return null;
+    const [rows] = await this.pool.query<PartsRequestRow[]>(`${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`, [
+      requestId,
+    ]);
+    const row = (rows as PartsRequestRow[])[0];
+    if (!row || String(row.job_id) !== String(jobId)) return null;
+    return this.mapPartsRequest(row);
+  }
+
+  async getBusinessPartsRequestPhotoFile(
+    businessId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null> {
+    if (!/^[1-9][0-9]*$/.test(requestId)) return null;
+    if (!(await this.ownedInternalJobId(businessId, jobId))) return null;
+    return this.partsPhotoFor(jobId, requestId);
+  }
+
+  /** Shared photo lookup: the request's first item carrying a photo key. */
+  private async partsPhotoFor(
+    jobId: string,
+    requestId: string,
+  ): Promise<{ request: PartsRequestDto; mimeType: string; filename: string | null; storageKey: string } | null> {
+    const [rows] = await this.pool.query<PartsRequestRow[]>(`${PARTS_REQUEST_SELECT} WHERE pr.\`id\` = ? LIMIT 1`, [
+      requestId,
+    ]);
+    const row = (rows as PartsRequestRow[])[0];
+    if (!row || String(row.job_id) !== String(jobId)) return null;
+    const [itemRows] = await this.pool.query<PartsRequestItemRow[]>(
+      `${PARTS_ITEM_SELECT} WHERE \`parts_request_id\` = ? AND \`photo_reference\` IS NOT NULL ORDER BY \`id\` ASC LIMIT 1`,
+      [requestId],
+    );
+    const item = (itemRows as PartsRequestItemRow[])[0];
+    if (!item || !item.photo_reference || !item.photo_mime) return null;
+    // Note: `parts_request_items` carries no original-filename column
+    // (migration 006) — the service derives the download name.
+    return {
+      request: await this.mapPartsRequest(row),
+      mimeType: item.photo_mime,
+      filename: null,
+      storageKey: item.photo_reference,
+    };
   }
 }
 

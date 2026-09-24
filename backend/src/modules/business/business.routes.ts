@@ -48,8 +48,20 @@
  * GET   /api/v1/business/jobs/:id/voice-notes/:voiceNoteId/file  voice-note bytes (owner/manager)
  * GET   /api/v1/business/jobs/:id/timeline                  execution timeline (owner/manager, read-only)
  *
- * Parts, manager approvals and notifications belong to later stages
- * and are intentionally absent.
+ * Stage 7E (technician parts requests + business visibility):
+ * POST  /api/v1/technician/jobs/:id/parts                   submit a parts request (IN_PROGRESS/AWAITING_PARTS)
+ * GET   /api/v1/technician/jobs/:id/parts                   submitted requests for the assigned job
+ * GET   /api/v1/technician/jobs/:id/parts/:requestId        one submitted request
+ * GET   /api/v1/technician/jobs/:id/parts/:requestId/photo/file  photo evidence bytes (authorized)
+ * GET   /api/v1/business/jobs/:id/parts                     requests for an owned job (owner/manager, read-only)
+ * GET   /api/v1/business/jobs/:id/parts/:requestId          one request (owner/manager, read-only)
+ * GET   /api/v1/business/jobs/:id/parts/:requestId/photo/file  photo evidence bytes (owner/manager)
+ *
+ * Parts requests are the job-scoped /jobs/:jobId/parts surface applied
+ * to the existing technician/business surfaces so business isolation
+ * holds; creating a request never changes job status. Manager
+ * approvals (approve/reject/needs-info, IN_PROGRESS → AWAITING_PARTS)
+ * and notifications belong to Stage 7F and are intentionally absent.
  */
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
@@ -145,6 +157,18 @@ export function makeBusinessRoutes(
   router.get('/business/jobs/:jobId/voice-notes', controller.listBusinessVoiceNotes);
   router.get('/business/jobs/:jobId/voice-notes/:voiceNoteId/file', controller.getBusinessVoiceNoteFile);
   router.get('/business/jobs/:jobId/timeline', controller.getBusinessExecutionTimeline);
+
+  // Stage 7E — parts requests. POST accepts JSON (no photo) or
+  // multipart FormData (part fields + optional `photo` file); the
+  // same 10MB execution upload adapter covers the optional evidence
+  // photo (the service enforces the 5MB image cap).
+  router.post('/technician/jobs/:jobId/parts', executionUpload.single('photo'), controller.createTechnicianPartsRequest);
+  router.get('/technician/jobs/:jobId/parts', controller.listTechnicianPartsRequests);
+  router.get('/technician/jobs/:jobId/parts/:requestId', controller.getTechnicianPartsRequest);
+  router.get('/technician/jobs/:jobId/parts/:requestId/photo/file', controller.getTechnicianPartsPhotoFile);
+  router.get('/business/jobs/:jobId/parts', controller.listBusinessPartsRequests);
+  router.get('/business/jobs/:jobId/parts/:requestId', controller.getBusinessPartsRequest);
+  router.get('/business/jobs/:jobId/parts/:requestId/photo/file', controller.getBusinessPartsPhotoFile);
 
   // Multer errors surface here (before the controller): map size/field
   // violations to the standard 422 envelope instead of a 500.

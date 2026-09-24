@@ -1,6 +1,48 @@
 # FixLink — Changelog
 
-## Stage 7D — Technician Execution + Voice Notes (2026-09-24)
+## Stage 7E — Technician Parts Requests (2026-09-24)
+
+- Technician parts-request foundation on the existing
+  `parts_requests` / `parts_request_items` tables (migration
+  006) — no migration, no new tables, no duplicate job
+  tables. Technician submission surface
+  (`backend/src/modules/business/` — same router, new
+  `business-parts.validation.ts`, identity/ownership/state
+  derived server-side): `POST
+  /api/v1/technician/jobs/:jobId/parts` (JSON or multipart
+  with optional `photo`; part name ≤255, quantity 1–10000,
+  reason 10–1000 chars; IN_PROGRESS/AWAITING_PARTS only)
+  returns `201` PENDING with items and never changes job
+  status; `GET .../parts` / `GET .../parts/:requestId` /
+  `GET .../parts/:requestId/photo/file` (authorized bytes,
+  `404` when photo-less). Read-only business visibility:
+  `GET /api/v1/business/jobs/:jobId/parts` (+ single +
+  photo file). Both timelines gain read-time `parts` events
+  (no history-row write). Status ENUM reused (PENDING only
+  in this stage); no estimated-cost field (not in schema).
+- Authorization: unauthenticated → `401`; wrong roles →
+  `403` on both surfaces; unassigned/cross-business/
+  cross-technician/marketplace access → `404` (no probing);
+  wrong state → `422`; malformed ids → `400`. Photo
+  reuses the shared FileStorage image pipeline (sniffed
+  JPEG/PNG/WebP, 5MB, opaque key, metadata only in
+  responses).
+- Angular: `/technician/jobs/:id` gains the Request Parts
+  form (part, quantity, reason, optional photo) plus the
+  Parts Required list with status, gated to eligible
+  states; `/business/jobs/:id` gains the read-only parts
+  section (part, quantity, reason, technician, date,
+  status, photo); both timelines render `parts` events.
+  No approval controls anywhere (Stage 7F).
+- Tests: `backend/tests/parts-requests.test.ts` (16 cases:
+  submission, isolation, states, validation, list/get,
+  owner/manager reads, roles, timelines, photo auth) plus
+  updated/new frontend specs. Full backend suite green:
+  313/313; frontend suite green: 29 files, 222 tests;
+  `tsc --noEmit` (backend + web) and both builds pass.
+- Out of scope (Stage 7F next): approve/reject/needs-info
+  endpoints, `job_approvals` workflow, IN_PROGRESS →
+  AWAITING_PARTS transition, notifications, payments.
 
 - Technician execution on the shared architecture — no second
   job-execution system: `jobs` (`source = INTERNAL`), `job_images`

@@ -49,6 +49,7 @@ import type {
   InternalJobsSummary,
   JobAssignmentDetailDto,
   JobAssignmentDto,
+  PartsRequestDto,
   TechnicianDto,
   TechnicianExecutionTimelineDto,
   TechnicianJobImageDto,
@@ -63,6 +64,7 @@ import {
 } from './business.validation';
 import { validateBusinessCustomerCreate, validateBusinessCustomerPatch } from './business-customers.validation';
 import { validateAssignmentCreate } from './business-assignment.validation';
+import { validatePartsRequestCreate } from './business-parts.validation';
 import {
   validateInternalJobCancel,
   validateInternalJobCreate,
@@ -1106,12 +1108,13 @@ export class BusinessService {
     if (scoped.technicianId === null) {
       return fail(scoped.status, scoped.code, scoped.message);
     }
-    const [history, assignments, updates, images, voiceNotes] = await Promise.all([
+    const [history, assignments, updates, images, voiceNotes, parts] = await Promise.all([
       this.business.listTechnicianJobHistory(scoped.technicianId, scoped.job.id),
       this.business.listTechnicianJobAssignmentEvents(scoped.technicianId, scoped.job.id),
       this.business.listTechnicianJobUpdates(scoped.technicianId, scoped.job.id),
       this.business.listTechnicianJobImages(scoped.technicianId, scoped.job.id),
       this.business.listTechnicianVoiceNotes(scoped.technicianId, scoped.job.id),
+      this.business.listTechnicianPartsRequests(scoped.technicianId, scoped.job.id),
     ]);
     const events = buildTechnicianExecutionEvents(
       history ?? [],
@@ -1119,6 +1122,7 @@ export class BusinessService {
       updates ?? [],
       images ?? [],
       voiceNotes ?? [],
+      parts ?? [],
     );
     return { status: 200, data: { job: scoped.job, events } };
   }
@@ -1284,11 +1288,12 @@ export class BusinessService {
     }
     const detail = await this.business.getInternalJobDetail(access.businessId, jobId.trim());
     if (!detail) return fail(404, 'NOT_FOUND', 'Job not found.');
-    const [assignments, updates, images, voiceNotes] = await Promise.all([
+    const [assignments, updates, images, voiceNotes, parts] = await Promise.all([
       this.business.listJobAssignmentHistory(access.businessId, jobId.trim()),
       this.business.listBusinessJobUpdates(access.businessId, jobId.trim()),
       this.business.listBusinessJobImages(access.businessId, jobId.trim()),
       this.business.listBusinessVoiceNotes(access.businessId, jobId.trim()),
+      this.business.listBusinessPartsRequests(access.businessId, jobId.trim()),
     ]);
     const events = buildTechnicianExecutionEvents(
       detail.timeline,
@@ -1296,8 +1301,217 @@ export class BusinessService {
       updates ?? [],
       images ?? [],
       voiceNotes ?? [],
+      parts ?? [],
     );
     return { status: 200, data: { job: detail.job, events } };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7E — technician parts requests + business visibility.
+  //
+  // The technician identity is derived server-side from the
+  // authenticated user (membership + technician row); a technician_id
+  // from the request is never trusted. Only jobs with an active
+  // TECHNICIAN assignment to this technician are reachable — every
+  // other job reads as 404 NOT_FOUND, never 403. Requests are allowed
+  // only while IN_PROGRESS or AWAITING_PARTS; creating a request
+  // never changes job status (the IN_PROGRESS → AWAITING_PARTS move
+  // waits for the Stage 7F manager-approval workflow). The optional
+  // photo reuses the shared FileStorage pipeline (content sniffing,
+  // size limits, opaque server-side keys, authorized byte delivery).
+  // Owner/manager reads are scoped to owned INTERNAL jobs
+  // (read-only in this stage — approve/reject arrives in Stage 7F).
+  // ------------------------------------------------------------------
+
+  /** States in which a technician may submit a parts request. */
+  private static readonly PARTS_REQUESTABLE: readonly string[] = ['IN_PROGRESS', 'AWAITING_PARTS'];
+
+  async createTechnicianPartsRequest(
+    authUserId: string,
+    jobId: string,
+    body: unknown,
+    file: UploadedFile | null | undefined,
+  ): Promise<ServiceResult<PartsRequestDto>> {
+    const scoped = await this.technicianJob(authUserId, jobId);
+    if (scoped.technicianId === null) {
+      return fail(scoped.status, scoped.code, scoped.message);
+    }
+    if (!BusinessService.PARTS_REQUESTABLE.includes(scoped.job.status)) {
+      return fail(422, 'VALIDATION_ERROR', 'Parts can only be requested while the job is in progress.');
+    }
+    const { input, error } = validatePartsRequestCreate(body);
+    if (!input || error) {
+      return fail(error?.status ?? 422, error?.code ?? 'VALIDATION_ERROR', error?.message ?? 'Invalid parts request.');
+    }
+    let photo: { storageKey: string; size: number; mime: string; filename: string | null } | null = null;
+    if (file && file.buffer.length > 0) {
+      const checked = this.validateImageFile(file);
+      if ('error' in checked) return fail(422, 'VALIDATION_ERROR', checked.error);
+      try {
+        const stored = await this.storage.save(scoped.job.id, file.buffer, checked.extension);
+        photo = {
+          storageKey: stored.storageKey,
+          size: stored.size,
+          mime: checked.mime,
+          filename: sanitizeOriginalFilename(file.originalname),
+        };
+      } catch {
+        return fail(500, 'INTERNAL_ERROR', 'Could not store the photo. Please try again.');
+      }
+    }
+    try {
+      const request = await this.business.createPartsRequest({
+        ...input,
+        technicianId: scoped.technicianId,
+        jobId: scoped.job.id,
+        requestedBy: authUserId,
+        photoStorageKey: photo?.storageKey ?? null,
+        photoOriginalFilename: photo?.filename ?? null,
+        photoMime: photo?.mime ?? null,
+        photoSize: photo?.size ?? null,
+      });
+      return { status: 201, data: request };
+    } catch (err) {
+      if (photo) await this.storage.remove(photo.storageKey);
+      if (err instanceof TechnicianJobNotExecutableError) {
+        return fail(
+          err.message === 'Job not found.' ? 404 : 422,
+          err.message === 'Job not found.' ? 'NOT_FOUND' : 'VALIDATION_ERROR',
+          err.message,
+        );
+      }
+      throw err;
+    }
+  }
+
+  async listTechnicianPartsRequests(
+    authUserId: string,
+    jobId: string,
+  ): Promise<ServiceResult<{ items: PartsRequestDto[]; total: number }>> {
+    const scoped = await this.technicianJob(authUserId, jobId);
+    if (scoped.technicianId === null) {
+      return fail(scoped.status, scoped.code, scoped.message);
+    }
+    const items = (await this.business.listTechnicianPartsRequests(scoped.technicianId, scoped.job.id)) ?? [];
+    return { status: 200, data: { items, total: items.length } };
+  }
+
+  async getTechnicianPartsRequest(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<ServiceResult<PartsRequestDto>> {
+    if (!isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid parts request id.');
+    }
+    const scoped = await this.technicianJob(authUserId, jobId);
+    if (scoped.technicianId === null) {
+      return fail(scoped.status, scoped.code, scoped.message);
+    }
+    const request = await this.business.getTechnicianPartsRequest(
+      scoped.technicianId,
+      scoped.job.id,
+      requestId.trim(),
+    );
+    if (!request) return fail(404, 'NOT_FOUND', 'Parts request not found.');
+    return { status: 200, data: request };
+  }
+
+  async getTechnicianPartsPhotoFile(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<ServiceResult<{ buffer: Buffer; mimeType: string; filename: string }>> {
+    if (!isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid parts request id.');
+    }
+    const scoped = await this.technicianJob(authUserId, jobId);
+    if (scoped.technicianId === null) {
+      return fail(scoped.status, scoped.code, scoped.message);
+    }
+    const found = await this.business.getTechnicianPartsRequestPhotoFile(
+      scoped.technicianId,
+      scoped.job.id,
+      requestId.trim(),
+    );
+    if (!found) return fail(404, 'NOT_FOUND', 'Photo not found.');
+    const buffer = await this.storage.read(found.storageKey);
+    if (!buffer) return fail(404, 'NOT_FOUND', 'Photo not found.');
+    return {
+      status: 200,
+      data: {
+        buffer,
+        mimeType: found.mimeType,
+        filename: found.filename ?? `job-${scoped.job.id}-part-photo`,
+      },
+    };
+  }
+
+  async listBusinessPartsRequests(
+    authUserId: string,
+    jobId: string,
+  ): Promise<ServiceResult<{ items: PartsRequestDto[]; total: number }>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const items = (await this.business.listBusinessPartsRequests(access.businessId, jobId.trim())) ?? null;
+    if (items === null) return fail(404, 'NOT_FOUND', 'Job not found.');
+    return { status: 200, data: { items, total: items.length } };
+  }
+
+  async getBusinessPartsRequest(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<ServiceResult<PartsRequestDto>> {
+    if (!isNumericId(jobId) || !isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const request = await this.business.getBusinessPartsRequest(
+      access.businessId,
+      jobId.trim(),
+      requestId.trim(),
+    );
+    if (!request) return fail(404, 'NOT_FOUND', 'Parts request not found.');
+    return { status: 200, data: request };
+  }
+
+  async getBusinessPartsPhotoFile(
+    authUserId: string,
+    jobId: string,
+    requestId: string,
+  ): Promise<ServiceResult<{ buffer: Buffer; mimeType: string; filename: string }>> {
+    if (!isNumericId(jobId) || !isNumericId(requestId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const found = await this.business.getBusinessPartsRequestPhotoFile(
+      access.businessId,
+      jobId.trim(),
+      requestId.trim(),
+    );
+    if (!found) return fail(404, 'NOT_FOUND', 'Photo not found.');
+    const buffer = await this.storage.read(found.storageKey);
+    if (!buffer) return fail(404, 'NOT_FOUND', 'Photo not found.');
+    return {
+      status: 200,
+      data: {
+        buffer,
+        mimeType: found.mimeType,
+        filename: found.filename ?? `job-${jobId.trim()}-part-photo`,
+      },
+    };
   }
 }
 

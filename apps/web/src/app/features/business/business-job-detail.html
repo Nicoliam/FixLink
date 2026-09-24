@@ -225,6 +225,32 @@
             <audio controls [src]="execVoiceUrl(voice.id)" preload="metadata"></audio>
           }
         }
+        <div aria-label="Parts requests">
+          <p class="fl-card-title">Parts Required</p>
+          @if (execParts().length === 0) {
+            <p class="fl-card-text">No parts requested yet.</p>
+          } @else {
+            <ul>
+              @for (partsRequest of execParts(); track partsRequest.id) {
+                <li>
+                  @for (item of partsRequest.items; track item.id) {
+                    <p class="fl-card-text"><strong>{{ item.partName }}</strong></p>
+                    <p class="fl-card-text">Quantity: {{ item.quantity }}</p>
+                    @if (item.notes) {
+                      <p class="fl-card-text">{{ item.notes }}</p>
+                    }
+                  }
+                  <p class="fl-card-text">Reason: {{ partsRequest.reason }}</p>
+                  <p class="fl-card-text">Requested by {{ partsRequest.requestedBy.displayName }} · {{ partsRequest.createdAt }}</p>
+                  <p class="fl-card-text">Status: {{ partsStatusText(partsRequest.status) }}</p>
+                  @if (execPartsPhotoUrl(partsRequest.id)) {
+                    <img class="fl-photo" [src]="execPartsPhotoUrl(partsRequest.id)" alt="Parts request photo evidence" loading="lazy" />
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </div>
         @if (execEvents().length > 0) {
           <div aria-label="Execution timeline">
             <p class="fl-card-title">Execution timeline</p>
@@ -246,6 +272,11 @@
                     }
                     @case ('voice') {
                       <p class="fl-card-text">Voice note · {{ event.createdAt }}</p>
+                    }
+                    @case ('parts') {
+                      <p class="fl-card-text">
+                        Parts requested{{ event.partName ? ': ' + event.partName : '' }} · {{ partsStatusText(event.partsStatus ?? 'PENDING') }} · {{ event.createdAt }}
+                      </p>
                     }
                   }
                 </li>

@@ -477,6 +477,110 @@ export function makeBusinessController(service: BusinessService) {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the timeline. Please try again.', 500);
       }
     },
+
+    // --------------------------------------------------------------
+    // Stage 7E — technician parts requests (submit + review) and
+    // read-only business visibility. Photo evidence streams back with
+    // its stored MIME type; storage keys are never exposed.
+    // --------------------------------------------------------------
+
+    async createTechnicianPartsRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.createTechnicianPartsRequest(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.body,
+          uploadedFile(req),
+        );
+        send(res, result, 'Parts request submitted.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not submit the parts request. Please try again.', 500);
+      }
+    },
+
+    async listTechnicianPartsRequests(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listTechnicianPartsRequests(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Parts requests retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve parts requests. Please try again.', 500);
+      }
+    },
+
+    async getTechnicianPartsRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getTechnicianPartsRequest(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+        );
+        send(res, result, 'Parts request retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the parts request. Please try again.', 500);
+      }
+    },
+
+    async getTechnicianPartsPhotoFile(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getTechnicianPartsPhotoFile(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+        );
+        if (result.data === undefined) {
+          send(res, result, 'Photo retrieved.');
+          return;
+        }
+        res.setHeader('Content-Type', result.data.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.status(200).send(result.data.buffer);
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
+      }
+    },
+
+    async listBusinessPartsRequests(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listBusinessPartsRequests(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Parts requests retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve parts requests. Please try again.', 500);
+      }
+    },
+
+    async getBusinessPartsRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBusinessPartsRequest(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+        );
+        send(res, result, 'Parts request retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the parts request. Please try again.', 500);
+      }
+    },
+
+    async getBusinessPartsPhotoFile(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBusinessPartsPhotoFile(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['requestId'] ?? '',
+        );
+        if (result.data === undefined) {
+          send(res, result, 'Photo retrieved.');
+          return;
+        }
+        res.setHeader('Content-Type', result.data.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.status(200).send(result.data.buffer);
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
+      }
+    },
   };
 }
 

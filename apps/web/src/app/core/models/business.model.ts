@@ -442,7 +442,7 @@ export interface TechnicianVoiceNoteList {
   total: number;
 }
 
-export type TechnicianExecutionEventKind = 'status' | 'assignment' | 'update' | 'image' | 'voice';
+export type TechnicianExecutionEventKind = 'status' | 'assignment' | 'update' | 'image' | 'voice' | 'parts';
 
 /** One entry of the technician execution timeline. */
 export interface TechnicianExecutionEvent {
@@ -459,6 +459,11 @@ export interface TechnicianExecutionEvent {
   voiceNoteId?: string;
   mimeType?: string;
   durationSeconds?: number | null;
+  /** Parts events only: the request, its first item and its status. */
+  partsRequestId?: string;
+  partName?: string;
+  quantity?: number;
+  partsStatus?: PartsRequestStatus;
 }
 
 /** Technician execution timeline: the job plus chronological events. */
@@ -471,4 +476,82 @@ export interface TechnicianExecutionTimeline {
 export interface CompleteTechnicianJobResult {
   job: BusinessJob;
   update: TechnicianJobUpdate;
+}
+
+/**
+ * Technician parts-request contracts for Stage 7E.
+ *
+ * Mirrors the technician submission endpoints
+ * (POST/GET /technician/jobs/:id/parts) and the read-only business
+ * visibility endpoints (GET /business/jobs/:id/parts). Requests reuse
+ * the shared `parts_requests` / `parts_request_items` tables — the API
+ * returns the request with its items (never storage keys or binaries;
+ * photo evidence loads through the authorized file endpoint). New
+ * requests are always PENDING; approve/reject/needs-info arrives with
+ * the Stage 7F manager-approval workflow.
+ */
+
+/** Lifecycle state of a parts request (mirrors the backend ENUM). */
+export type PartsRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_INFO' | 'CANCELLED';
+
+/** One requested part/material. */
+export interface PartsRequestItem {
+  id: string;
+  partName: string;
+  quantity: number;
+  notes: string | null;
+  /** True when photo evidence was attached (bytes via the file endpoint). */
+  hasPhoto: boolean;
+  photoMime: string | null;
+  createdAt: string;
+}
+
+/** The roster technician who submitted the request. */
+export interface PartsRequestRequester {
+  technicianId: string;
+  displayName: string;
+}
+
+/** A parts request with its items. */
+export interface PartsRequest {
+  id: string;
+  jobId: string;
+  businessId: string;
+  requestedBy: PartsRequestRequester;
+  status: PartsRequestStatus;
+  reason: string;
+  createdAt: string;
+  updatedAt: string;
+  items: PartsRequestItem[];
+}
+
+export interface PartsRequestList {
+  items: PartsRequest[];
+  total: number;
+}
+
+/** Payload for POST …/parts (photo sent separately as a File). */
+export interface CreatePartsRequest {
+  partName: string;
+  quantity: number;
+  reason: string;
+  notes?: string;
+}
+
+/** Human-readable parts-request status for badges. */
+export function partsRequestStatusLabel(status: PartsRequestStatus): string {
+  switch (status) {
+    case 'PENDING':
+      return 'Pending';
+    case 'APPROVED':
+      return 'Approved';
+    case 'REJECTED':
+      return 'Rejected';
+    case 'NEEDS_INFO':
+      return 'Needs info';
+    case 'CANCELLED':
+      return 'Cancelled';
+    default:
+      return status;
+  }
 }

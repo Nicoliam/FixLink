@@ -549,6 +549,71 @@ row); a technician id is never accepted.
   `job_voice_notes.original_filename` column (mirroring
   migration 009 for images) — no new tables.
 
+## 8.5 Businesses — Stage 7E Implementation Notes (Technician Parts Requests)
+
+Stage 7E lets the assigned technician request parts/materials for an
+internal job (`backend/src/modules/business/` — same router, new
+`business-parts.validation.ts`, extended `business.store.ts` /
+memory + MySQL implementations). It reuses the existing
+`parts_requests` / `parts_request_items` tables (migration 006) on
+the ONE shared job engine — no new tables, no migration. A request
+is a header (`reason`, always `PENDING` on creation) with exactly
+one item in this stage (`part_name`, `quantity`, optional `notes`,
+optional photo evidence); multi-item requests are a documented
+future extension the schema already supports. The
+`parts_requests` table carries no business column — business
+scoping joins `jobs.business_id` server-side — and the requesting
+technician resolves from `requester_id` via the business roster.
+
+- `POST /api/v1/technician/jobs/:jobId/parts` (TECHNICIAN only)
+  accepts JSON (`{ partName, quantity, reason, notes? }`) or
+  multipart FormData (same fields + optional `photo` evidence
+  file). Validation: part name required (≤255 chars), quantity a
+  whole number 1–10000, reason required (10–1000 chars), notes
+  optional (≤500 chars). The job must be INTERNAL, assigned to the
+  caller and IN_PROGRESS or AWAITING_PARTS (REQUESTED/SCHEDULED/
+  CANCELLED/COMPLETED/… → `422 VALIDATION_ERROR`); unassigned,
+  cross-business or marketplace jobs → `404`. The photo reuses the
+  shared FileStorage image pipeline (JPEG/PNG/WebP, 5MB max,
+  magic-byte sniffed, opaque key in
+  `parts_request_items.photo_reference` with `photo_mime` /
+  `photo_size` metadata, bytes never in MySQL). Returns `201`
+  `{ id, jobId, businessId, requestedBy { technicianId,
+  displayName }, status: 'PENDING', reason, createdAt, updatedAt,
+  items: [{ id, partName, quantity, notes, hasPhoto, photoMime,
+  createdAt }] }` — storage keys are never exposed. Creating a
+  request never changes job `status` (no AWAITING_PARTS move and no
+  `job_status_history` write); that transition waits for the Stage
+  7F manager-approval workflow.
+- `GET /api/v1/technician/jobs/:jobId/parts` lists the caller's
+  requests for the assigned job (oldest first, `{ items, total
+  }`); `GET .../parts/:requestId` reads one (off-job → `404`);
+  `GET .../parts/:requestId/photo/file` streams the evidence
+  photo (`Content-Type` from storage, `inline`, `private` cache;
+  `404` when the request carries no photo). Malformed ids →
+  `400`.
+- Read-only business visibility (BUSINESS_OWNER/
+  BUSINESS_MANAGER, owned INTERNAL jobs only, foreign → `404`):
+  `GET /api/v1/business/jobs/:jobId/parts` (+
+  `.../parts/:requestId`, `.../parts/:requestId/photo/file`).
+  No approve/reject/needs-info capability is exposed here — that
+  arrives in Stage 7F (`job_approvals` table and the
+  IN_PROGRESS → AWAITING_PARTS transition are intentionally
+  untouched).
+- Both execution timelines (`GET .../technician/jobs/:jobId/
+  timeline`, `GET .../business/jobs/:jobId/timeline`) now include
+  `parts` events (`{ kind: 'parts', partsRequestId, partName,
+  quantity, partsStatus, reason }`, oldest first). Inclusion is
+  read-time — no history row is written when a request is created.
+- Status vocabulary reuses the table ENUM (PENDING, APPROVED,
+  REJECTED, NEEDS_INFO, CANCELLED). Stage 7E only ever creates
+  PENDING rows; there is deliberately no estimated-cost field
+  (migration 006 has no cost column — cost is a Stage 7F+
+  consideration).
+- Role matrix: managers/owners/customers/professionals →
+  `403 FORBIDDEN_ROLE` on the technician submission surface (and
+  vice versa on the business surface); unauthenticated → `401`.
+
 MVP payment position (unchanged): internal jobs never charge
 anyone; agreed amounts remain recorded prices paid directly
 outside the platform.
