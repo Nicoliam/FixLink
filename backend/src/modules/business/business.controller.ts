@@ -182,6 +182,42 @@ export function makeBusinessController(service: BusinessService) {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the job summary. Please try again.', 500);
       }
     },
+
+    async assignTechnician(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.assignTechnician(authUser(req).id, req.params['jobId'] ?? '', req.body);
+        send(res, result, 'Technician assigned.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not assign the technician. Please try again.', 500);
+      }
+    },
+
+    async getJobAssignment(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getJobAssignment(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Assignment retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the assignment. Please try again.', 500);
+      }
+    },
+
+    async listTechnicianJobs(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listTechnicianJobs(authUser(req).id, queryOf(req));
+        send(res, result, 'Jobs retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve jobs. Please try again.', 500);
+      }
+    },
+
+    async getTechnicianJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getTechnicianJob(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Job retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the job. Please try again.', 500);
+      }
+    },
   };
 }
 

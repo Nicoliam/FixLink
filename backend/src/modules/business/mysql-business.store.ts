@@ -20,6 +20,7 @@ import {
   type PersistInternalJobInput,
 } from './business.store';
 import type {
+  AssignTechnicianInput,
   BusinessCustomerContact,
   BusinessCustomerDto,
   BusinessDto,
@@ -32,6 +33,9 @@ import type {
   InternalJobsSummary,
   InternalJobStatus,
   InternalJobTimelineEntry,
+  JobAssignmentDetailDto,
+  JobAssignmentDto,
+  JobAssignmentHistoryEntry,
   TechnicianDto,
   UpdateBusinessCustomerInput,
   UpdateBusinessInput,
@@ -137,6 +141,20 @@ interface InternalHistoryRow extends RowDataPacket {
   new_status: InternalJobStatus;
   reason: string | null;
   created_at: Date | string;
+}
+
+interface AssignmentRow extends RowDataPacket {
+  id: number;
+  job_id: number;
+  business_id: number | null;
+  technician_id: number;
+  technician_display_name: string;
+  technician_email: string | null;
+  technician_phone: string | null;
+  technician_is_active: number;
+  assigned_by: number | null;
+  assigned_at: Date | string;
+  unassigned_at: Date | string | null;
 }
 
 const BUSINESS_SELECT = `
@@ -264,6 +282,68 @@ const INTERNAL_JOB_SELECT = `
     INNER JOIN \`customer_profiles\` cp ON cp.\`id\` = j.\`customer_id\`
     LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = j.\`business_id\`
     LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\``;
+
+const ASSIGNMENT_SELECT = `
+  SELECT a.\`id\`, a.\`job_id\`, a.\`business_id\`, a.\`technician_id\`,
+         t.\`display_name\` AS \`technician_display_name\`,
+         u.\`email\` AS \`technician_email\`, u.\`phone\` AS \`technician_phone\`,
+         t.\`is_active\` AS \`technician_is_active\`,
+         a.\`assigned_by\`, a.\`assigned_at\`, a.\`unassigned_at\`
+    FROM \`job_assignments\` a
+    INNER JOIN \`technicians\` t ON t.\`id\` = a.\`technician_id\`
+    INNER JOIN \`users\` u ON u.\`id\` = t.\`user_id\``;
+
+const ASSIGNMENT_ACTIVE_SCOPE = `a.\`job_id\` = ? AND a.\`assignment_type\` = 'TECHNICIAN' AND a.\`unassigned_at\` IS NULL`;
+
+const TECHNICIAN_JOB_SELECT = `
+  SELECT j.\`id\`, j.\`reference\`, j.\`source\`, j.\`status\`,
+         j.\`business_id\`, bp.\`business_name\`,
+         j.\`customer_id\`, cp.\`first_name\` AS \`customer_first_name\`,
+         cp.\`last_name\` AS \`customer_last_name\`,
+         cp.\`email\` AS \`customer_email\`, cp.\`phone\` AS \`customer_phone\`,
+         j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
+         j.\`title\`, j.\`description\`, j.\`address_line1\`, j.\`city\`,
+         j.\`province\`, j.\`postal_code\`, j.\`priority\`, j.\`scheduled_at\`,
+         j.\`created_at\`, j.\`updated_at\`
+    FROM \`job_assignments\` a
+    INNER JOIN \`jobs\` j ON j.\`id\` = a.\`job_id\`
+    INNER JOIN \`customer_profiles\` cp ON cp.\`id\` = j.\`customer_id\`
+    LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = j.\`business_id\`
+    LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\``;
+
+function mapAssignment(row: AssignmentRow, jobId: string, businessId: string): JobAssignmentDto {
+  return {
+    id: toStringId(row.id),
+    jobId,
+    businessId,
+    technician: {
+      id: toStringId(row.technician_id),
+      displayName: row.technician_display_name,
+      email: row.technician_email,
+      phone: row.technician_phone,
+      isActive: row.technician_is_active === 1,
+    },
+    assignedBy: row.assigned_by === null ? null : toStringId(row.assigned_by),
+    assignedAt: toIso(row.assigned_at) ?? new Date(0).toISOString(),
+  };
+}
+
+function mapAssignmentHistory(row: AssignmentRow): JobAssignmentHistoryEntry {
+  return {
+    id: toStringId(row.id),
+    technician: {
+      id: toStringId(row.technician_id),
+      displayName: row.technician_display_name,
+      email: row.technician_email,
+      phone: row.technician_phone,
+      isActive: row.technician_is_active === 1,
+    },
+    assignedBy: row.assigned_by === null ? null : toStringId(row.assigned_by),
+    assignedAt: toIso(row.assigned_at) ?? new Date(0).toISOString(),
+    unassignedAt: toIso(row.unassigned_at),
+    isActive: row.unassigned_at === null,
+  };
+}
 
 export class MysqlBusinessStore implements BusinessStore {
   constructor(private readonly pool: Pool) {}
@@ -833,6 +913,140 @@ export class MysqlBusinessStore implements BusinessStore {
     const job = await this.getInternalJob(businessId, jobId);
     if (!job) return null;
     const timeline = (await this.listInternalJobHistory(businessId, jobId)) ?? [];
+    return { job, timeline };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7C — technician assignment (MySQL implementation).
+  //
+  // Reuses `job_assignments` with `assignment_type = 'TECHNICIAN'`.
+  // The active row has `unassigned_at IS NULL`; reassignment closes it
+  // and inserts a new row in one transaction. Job status is never
+  // changed by assignment. Every read re-scopes to the caller's
+  // business + `source = INTERNAL` so foreign jobs read as NOT_FOUND.
+  // ------------------------------------------------------------------
+
+  async getActiveJobAssignment(businessId: string, jobId: string): Promise<JobAssignmentDto | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const owned = await this.getInternalJob(businessId, jobId);
+    if (!owned) return null;
+    const [rows] = await this.pool.query<AssignmentRow[]>(`${ASSIGNMENT_SELECT} WHERE ${ASSIGNMENT_ACTIVE_SCOPE} LIMIT 1`, [
+      jobId,
+    ]);
+    const list = rows as AssignmentRow[];
+    return list.length === 0 ? null : mapAssignment(list[0] as AssignmentRow, jobId, businessId);
+  }
+
+  async listJobAssignmentHistory(businessId: string, jobId: string): Promise<JobAssignmentHistoryEntry[] | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const owned = await this.getInternalJob(businessId, jobId);
+    if (!owned) return null;
+    const [rows] = await this.pool.query<AssignmentRow[]>(
+      `${ASSIGNMENT_SELECT} WHERE a.\`job_id\` = ? AND a.\`assignment_type\` = 'TECHNICIAN' ORDER BY a.\`assigned_at\` DESC, a.\`id\` DESC`,
+      [jobId],
+    );
+    return (rows as AssignmentRow[]).map(mapAssignmentHistory);
+  }
+
+  async getJobAssignmentDetail(businessId: string, jobId: string): Promise<JobAssignmentDetailDto | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const owned = await this.getInternalJob(businessId, jobId);
+    if (!owned) return null;
+    const assignment = await this.getActiveJobAssignment(businessId, jobId);
+    const history = (await this.listJobAssignmentHistory(businessId, jobId)) ?? [];
+    return { jobId, assignment, history };
+  }
+
+  async assignJobTechnician(
+    businessId: string,
+    jobId: string,
+    input: AssignTechnicianInput & { assignedBy: string },
+  ): Promise<JobAssignmentDto | null> {
+    if (!/^[1-9][0-9]*$/.test(jobId)) return null;
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [jobRows] = await conn.query<RowDataPacket[]>(
+        "SELECT `id` FROM `jobs` WHERE `id` = ? AND `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL FOR UPDATE",
+        [jobId, businessId],
+      );
+      if ((jobRows as RowDataPacket[]).length === 0) {
+        await conn.rollback();
+        return null;
+      }
+      await conn.query(
+        "UPDATE `job_assignments` SET `unassigned_at` = NOW() WHERE `job_id` = ? AND `assignment_type` = 'TECHNICIAN' AND `unassigned_at` IS NULL",
+        [jobId],
+      );
+      await conn.query(
+        "INSERT INTO `job_assignments` (`job_id`, `assignment_type`, `technician_id`, `business_id`, `assigned_by`) VALUES (?, 'TECHNICIAN', ?, ?, ?)",
+        [jobId, input.technicianId, businessId, input.assignedBy],
+      );
+      await conn.commit();
+      return this.getActiveJobAssignment(businessId, jobId);
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async listTechnicianJobs(
+    technicianId: string,
+    query: { status: InternalJobStatus | null; page: number; pageSize: number },
+  ): Promise<{ items: InternalJobDto[]; total: number }> {
+    if (!/^[1-9][0-9]*$/.test(technicianId)) return { items: [], total: 0 };
+    const scope = `a.\`technician_id\` = ? AND a.\`assignment_type\` = 'TECHNICIAN' AND a.\`unassigned_at\` IS NULL AND j.\`source\` = 'INTERNAL' AND j.\`deleted_at\` IS NULL`;
+    const params: Array<string> = [technicianId];
+    let filter = '';
+    if (query.status !== null) {
+      filter += ' AND j.`status` = ?';
+      params.push(query.status);
+    }
+    const [countRows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS \`total\` FROM \`job_assignments\` a INNER JOIN \`jobs\` j ON j.\`id\` = a.\`job_id\` WHERE ${scope}${filter}`,
+      params,
+    );
+    const total = Number((countRows as Array<{ total: number }>)[0]?.total ?? 0);
+    if (total === 0) return { items: [], total: 0 };
+    const offset = (query.page - 1) * query.pageSize;
+    const [rows] = await this.pool.query<InternalJobRow[]>(
+      `${TECHNICIAN_JOB_SELECT} WHERE ${scope}${filter} ORDER BY j.\`created_at\` DESC LIMIT ? OFFSET ?`,
+      [...params, query.pageSize, offset],
+    );
+    return { items: (rows as InternalJobRow[]).map(mapInternalJob), total };
+  }
+
+  async getTechnicianJob(technicianId: string, jobId: string): Promise<InternalJobDto | null> {
+    if (!/^[1-9][0-9]*$/.test(technicianId) || !/^[1-9][0-9]*$/.test(jobId)) return null;
+    const [rows] = await this.pool.query<InternalJobRow[]>(
+      `${TECHNICIAN_JOB_SELECT} WHERE a.\`technician_id\` = ? AND a.\`assignment_type\` = 'TECHNICIAN' AND a.\`unassigned_at\` IS NULL AND j.\`id\` = ? AND j.\`source\` = 'INTERNAL' AND j.\`deleted_at\` IS NULL LIMIT 1`,
+      [technicianId, jobId],
+    );
+    const list = rows as InternalJobRow[];
+    return list.length === 0 ? null : mapInternalJob(list[0] as InternalJobRow);
+  }
+
+  async listTechnicianJobHistory(technicianId: string, jobId: string): Promise<InternalJobTimelineEntry[] | null> {
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    const [rows] = await this.pool.query<InternalHistoryRow[]>(
+      'SELECT `previous_status`, `new_status`, `reason`, `created_at` FROM `job_status_history` WHERE `job_id` = ? ORDER BY `created_at` ASC, `id` ASC',
+      [jobId],
+    );
+    return (rows as InternalHistoryRow[]).map((row) => ({
+      previousStatus: row.previous_status,
+      status: row.new_status,
+      reason: row.reason,
+      createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
+    }));
+  }
+
+  async getTechnicianJobDetail(technicianId: string, jobId: string): Promise<InternalJobDetailDto | null> {
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    const timeline = (await this.listTechnicianJobHistory(technicianId, jobId)) ?? [];
     return { job, timeline };
   }
 }

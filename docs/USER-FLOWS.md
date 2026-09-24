@@ -1137,3 +1137,35 @@ technician assignment, technician My Jobs, technician
 execution, voice notes, parts requests, manager parts
 approval, notifications, the admin dashboard, payment
 processing, and marketplace quote/job changes.
+
+# 23. STAGE 7C IMPLEMENTATION NOTES — TECHNICIAN ASSIGNMENT + MY JOBS
+
+Implemented 2026-09-24. Connects internal jobs to technicians:
+Business creates internal job → REQUESTED → owner/manager
+assigns technician → technician sees the job in My Jobs → opens
+the assigned job. Assignment never changes job status.
+
+Business owner / manager:
+
+Jobs → Job detail now shows the current technician (name,
+contact where appropriate, assigned date) plus an Assign /
+Reassign control (active-technician selector). Assignment and
+reassignment are immediate; the previous assignment stays on
+record in the assignment history. Edit/cancel behaviour from
+Stage 7B is unchanged.
+
+Technician:
+
+Login → My Jobs (`/technician/jobs`: service, customer,
+address, scheduled date, priority, status; status filter and
+pagination) → Job detail (`/technician/jobs/:id`: service,
+customer + job contact details, description, address, priority,
+schedule, status, timeline). Only assigned jobs are visible;
+opening another job by URL reads as not found. Technician
+navigation reads My Jobs (Messages, Parts, Completed Jobs and
+Profile remain placeholders for later stages).
+
+Explicitly out of scope for Stage 7C (later stages):
+technician execution updates, voice notes, parts requests,
+manager approvals, notifications, the admin dashboard, payment
+processing, and marketplace quote/job changes.

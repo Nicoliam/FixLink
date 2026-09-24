@@ -13,6 +13,7 @@
  * created as marketplace professionals here.
  */
 import type {
+  AssignTechnicianInput,
   BusinessCustomerDto,
   BusinessDto,
   BusinessIdentity,
@@ -23,6 +24,9 @@ import type {
   InternalJobsSummary,
   InternalJobStatus,
   InternalJobTimelineEntry,
+  JobAssignmentDetailDto,
+  JobAssignmentDto,
+  JobAssignmentHistoryEntry,
   TechnicianDto,
   UpdateBusinessCustomerInput,
   UpdateBusinessInput,
@@ -147,6 +151,50 @@ export interface BusinessStore {
   countInternalJobsByStatus(businessId: string): Promise<InternalJobsSummary>;
   /** Full internal-job detail (job + timeline) for the detail endpoint. */
   getInternalJobDetail(businessId: string, jobId: string): Promise<InternalJobDetailDto | null>;
+  // ------------------------------------------------------------------
+  // Stage 7C — technician assignment (existing `job_assignments` table
+  // with `assignment_type = TECHNICIAN`). The active row has
+  // `unassigned_at IS NULL`; reassignment closes it and inserts a new
+  // row. Job status is never changed by assignment.
+  // ------------------------------------------------------------------
+  /**
+   * Active TECHNICIAN assignment for one INTERNAL job, or null when
+   * unassigned. Returns null when the job is unknown, foreign, or not
+   * INTERNAL (NOT_FOUND upstream — no cross-business probing).
+   */
+  getActiveJobAssignment(businessId: string, jobId: string): Promise<JobAssignmentDto | null>;
+  /** Assignment history for one INTERNAL job, newest first (null when foreign). */
+  listJobAssignmentHistory(businessId: string, jobId: string): Promise<JobAssignmentHistoryEntry[] | null>;
+  /** Full assignment detail (active + history) for the assignment endpoint. */
+  getJobAssignmentDetail(businessId: string, jobId: string): Promise<JobAssignmentDetailDto | null>;
+  /**
+   * Assign (or reassign) a technician: closes any active TECHNICIAN row
+   * for the job and inserts a new active row, atomically. The caller
+   * guarantees the job is INTERNAL and owned by the business and the
+   * technician is active in the same business. Returns null when the
+   * job is unknown/foreign (NOT_FOUND upstream).
+   */
+  assignJobTechnician(
+    businessId: string,
+    jobId: string,
+    input: AssignTechnicianInput & { assignedBy: string },
+  ): Promise<JobAssignmentDto | null>;
+  // ------------------------------------------------------------------
+  // Stage 7C — technician My Jobs. The technician identity is derived
+  // server-side from the authenticated user; a technician_id from the
+  // request is never trusted.
+  // ------------------------------------------------------------------
+  /** INTERNAL jobs actively assigned to one technician, newest first. */
+  listTechnicianJobs(
+    technicianId: string,
+    query: { status: InternalJobStatus | null; page: number; pageSize: number },
+  ): Promise<{ items: InternalJobDto[]; total: number }>;
+  /** One INTERNAL job actively assigned to the technician, or null. */
+  getTechnicianJob(technicianId: string, jobId: string): Promise<InternalJobDto | null>;
+  /** Status history for a technician-assigned job, oldest first (null when not assigned). */
+  listTechnicianJobHistory(technicianId: string, jobId: string): Promise<InternalJobTimelineEntry[] | null>;
+  /** Full technician job detail (job + timeline) for the detail endpoint. */
+  getTechnicianJobDetail(technicianId: string, jobId: string): Promise<InternalJobDetailDto | null>;
 }
 
 /** The job is not in a cancellable state (only REQUESTED may cancel in Stage 7B). */

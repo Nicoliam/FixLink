@@ -25,6 +25,8 @@ import type {
   InternalJobDetailDto,
   InternalJobDto,
   InternalJobsSummary,
+  JobAssignmentDetailDto,
+  JobAssignmentDto,
   TechnicianDto,
 } from './business.types';
 import {
@@ -33,6 +35,7 @@ import {
   validateTechnicianPatch,
 } from './business.validation';
 import { validateBusinessCustomerCreate, validateBusinessCustomerPatch } from './business-customers.validation';
+import { validateAssignmentCreate } from './business-assignment.validation';
 import {
   validateInternalJobCancel,
   validateInternalJobCreate,
@@ -541,5 +544,154 @@ export class BusinessService {
     }
     const summary = await this.business.countInternalJobsByStatus(access.businessId);
     return { status: 200, data: summary };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7C — technician assignment.
+  //
+  // Only BUSINESS_OWNER / BUSINESS_MANAGER (via resolveManagement) may
+  // assign. The job must be INTERNAL and owned by the caller's
+  // business; the technician must be an active roster row in the same
+  // business. Foreign job or technician ids read as 404 NOT_FOUND so
+  // ids cannot be probed across businesses. Assignment never changes
+  // job status — it is recorded in `job_assignments` with history.
+  // ------------------------------------------------------------------
+
+  async assignTechnician(
+    authUserId: string,
+    jobId: string,
+    body: unknown,
+  ): Promise<ServiceResult<JobAssignmentDto>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const { input, error } = validateAssignmentCreate(body);
+    if (!input || error) {
+      return fail(error?.status ?? 422, error?.code ?? 'VALIDATION_ERROR', error?.message ?? 'Invalid assignment.');
+    }
+    const job = await this.business.getInternalJob(access.businessId, jobId.trim());
+    if (!job) return fail(404, 'NOT_FOUND', 'Job not found.');
+    const technician = await this.business.getTechnicianById(input.technicianId);
+    if (!technician || technician.businessId !== access.businessId) {
+      return fail(404, 'NOT_FOUND', 'Technician not found.');
+    }
+    if (!technician.isActive) {
+      return fail(422, 'VALIDATION_ERROR', 'Only active technicians can be assigned to jobs.');
+    }
+    const assigned = await this.business.assignJobTechnician(access.businessId, jobId.trim(), {
+      technicianId: technician.id,
+      assignedBy: authUserId,
+    });
+    if (!assigned) return fail(404, 'NOT_FOUND', 'Job not found.');
+    return { status: 200, data: assigned };
+  }
+
+  async getJobAssignment(authUserId: string, jobId: string): Promise<ServiceResult<JobAssignmentDetailDto>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const detail = await this.business.getJobAssignmentDetail(access.businessId, jobId.trim());
+    if (!detail) return fail(404, 'NOT_FOUND', 'Job not found.');
+    return { status: 200, data: detail };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7C — technician My Jobs.
+  //
+  // The technician identity is derived server-side from the
+  // authenticated user (membership + technician row). A technician_id
+  // from the request is never trusted. Only jobs with an active
+  // TECHNICIAN assignment to this technician are visible.
+  // ------------------------------------------------------------------
+
+  private async resolveTechnician(
+    authUserId: string,
+  ): Promise<{ technicianId: string; businessId: string } | { technicianId: null; status: number; code: string; message: string }> {
+    const roles = await this.users.getRoles(authUserId);
+    if (!roles.includes('TECHNICIAN')) {
+      if (roles.some((role) => MANAGER_ROLES.includes(role))) {
+        return {
+          technicianId: null,
+          status: 403,
+          code: 'FORBIDDEN_ROLE',
+          message: 'Business managers use the business job surface, not technician jobs.',
+        };
+      }
+      if (roles.includes('CUSTOMER') || roles.includes('PROFESSIONAL')) {
+        return {
+          technicianId: null,
+          status: 403,
+          code: 'FORBIDDEN_ROLE',
+          message: 'Only technicians can access technician jobs.',
+        };
+      }
+      return {
+        technicianId: null,
+        status: 403,
+        code: 'FORBIDDEN_ROLE',
+        message: 'Your account cannot access technician jobs.',
+      };
+    }
+    const identities = await this.business.findBusinessesForUser(authUserId);
+    const membership = identities.find((entry) => entry.role === 'TECHNICIAN');
+    if (!membership) {
+      return { technicianId: null, status: 404, code: 'NOT_FOUND', message: 'Technician record not found.' };
+    }
+    const row = await this.business.findTechnicianByUserId(membership.businessId, authUserId);
+    if (!row || !row.isActive) {
+      return { technicianId: null, status: 404, code: 'NOT_FOUND', message: 'Technician record not found.' };
+    }
+    return { technicianId: row.id, businessId: membership.businessId };
+  }
+
+  async listTechnicianJobs(
+    authUserId: string,
+    query: Record<string, unknown>,
+  ): Promise<ServiceResult<{ items: InternalJobDto[]; total: number; page: number; pageSize: number }>> {
+    const identity = await this.resolveTechnician(authUserId);
+    if (identity.technicianId === null) {
+      return fail(identity.status, identity.code, identity.message);
+    }
+    const page = readPage(query['page'], 1, 1000);
+    const pageSize = readPage(query['pageSize'] ?? query['page_size'], 20, 50);
+    if (page === null || pageSize === null) {
+      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1–1000 and pageSize 1–50.');
+    }
+    const rawStatus = query['status'];
+    let status: InternalJobDto['status'] | null = null;
+    if (rawStatus !== undefined && rawStatus !== null && String(rawStatus).trim() !== '') {
+      const upper = String(rawStatus).trim().toUpperCase() as InternalJobDto['status'];
+      const allowed: readonly string[] = [
+        'REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS',
+        'AWAITING_PARTS', 'COMPLETED', 'CONFIRMED', 'CLOSED', 'CANCELLED', 'DISPUTED',
+      ];
+      if (!allowed.includes(upper)) {
+        return fail(422, 'VALIDATION_ERROR', 'Invalid status filter.');
+      }
+      status = upper;
+    }
+    const result = await this.business.listTechnicianJobs(identity.technicianId, { status, page, pageSize });
+    return { status: 200, data: { ...result, page, pageSize } };
+  }
+
+  async getTechnicianJob(authUserId: string, jobId: string): Promise<ServiceResult<InternalJobDetailDto>> {
+    if (!isNumericId(jobId)) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid job id.');
+    }
+    const identity = await this.resolveTechnician(authUserId);
+    if (identity.technicianId === null) {
+      return fail(identity.status, identity.code, identity.message);
+    }
+    const detail = await this.business.getTechnicianJobDetail(identity.technicianId, jobId.trim());
+    if (!detail) return fail(404, 'NOT_FOUND', 'Job not found.');
+    return { status: 200, data: detail };
   }
 }

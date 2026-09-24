@@ -243,3 +243,55 @@ export interface InternalJobsSummary {
   completed: number;
   cancelled: number;
 }
+
+/**
+ * FixLink Stage 7C — technician assignment.
+ *
+ * Assignments reuse the existing `job_assignments` table with
+ * `assignment_type = TECHNICIAN`. The active assignment is the row
+ * with `unassigned_at IS NULL`; reassignment closes the previous row
+ * (sets `unassigned_at`) and inserts a new active row, preserving
+ * full history. Job `status` is intentionally untouched by
+ * assignment — there is no ASSIGNED status in the lifecycle.
+ */
+
+/** Technician embedded in an assignment response (contact info only). */
+export interface JobAssignmentTechnicianSummary {
+  id: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
+}
+
+/** Active technician assignment for one internal job. */
+export interface JobAssignmentDto {
+  id: string;
+  jobId: string;
+  businessId: string;
+  technician: JobAssignmentTechnicianSummary;
+  assignedBy: string | null;
+  assignedAt: string;
+}
+
+/** One assignment history entry (active rows have `unassignedAt = null`). */
+export interface JobAssignmentHistoryEntry {
+  id: string;
+  technician: JobAssignmentTechnicianSummary;
+  assignedBy: string | null;
+  assignedAt: string;
+  unassignedAt: string | null;
+  isActive: boolean;
+}
+
+/** Assignment detail: active assignment plus full history. */
+export interface JobAssignmentDetailDto {
+  jobId: string;
+  assignment: JobAssignmentDto | null;
+  history: JobAssignmentHistoryEntry[];
+}
+
+/** Validated assignment body (technician id only — business/job derived server-side). */
+export interface AssignTechnicianInput {
+  technicianId: string;
+}

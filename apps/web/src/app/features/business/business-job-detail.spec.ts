@@ -62,8 +62,11 @@ describe('BusinessJobDetailComponent', () => {
 
   async function setup(api: {
     getBusinessJob: ReturnType<typeof vi.fn>;
+    getJobAssignment?: ReturnType<typeof vi.fn>;
+    listTechnicians?: ReturnType<typeof vi.fn>;
     updateBusinessJob?: ReturnType<typeof vi.fn>;
     cancelBusinessJob?: ReturnType<typeof vi.fn>;
+    assignTechnician?: ReturnType<typeof vi.fn>;
   }): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [BusinessJobDetailComponent],
@@ -72,7 +75,14 @@ describe('BusinessJobDetailComponent', () => {
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: (): string => '5' } } } },
         {
           provide: BusinessService,
-          useValue: { updateBusinessJob: vi.fn(), cancelBusinessJob: vi.fn(), ...api },
+          useValue: {
+            updateBusinessJob: vi.fn(),
+            cancelBusinessJob: vi.fn(),
+            assignTechnician: vi.fn(),
+            getJobAssignment: vi.fn().mockReturnValue(of({ jobId: '5', assignment: null, history: [] })),
+            listTechnicians: vi.fn().mockReturnValue(of({ items: [], total: 0 })),
+            ...api,
+          },
         },
       ],
     }).compileComponents();
@@ -124,11 +134,87 @@ describe('BusinessJobDetailComponent', () => {
     expect(text).not.toContain('Edit job');
   });
 
-  it('shows no technician assignment or parts controls', async () => {
+  it('shows no parts controls', async () => {
     await setup({ getBusinessJob: vi.fn().mockReturnValue(of(makeDetail('REQUESTED'))) });
     const text = (fixture.nativeElement.textContent as string).toLowerCase();
-    expect(text).not.toContain('assign');
-    expect(text).not.toContain('technician');
     expect(text).not.toContain('parts');
+  });
+
+  it('shows the assignment state when no technician is assigned', async () => {
+    await setup({ getBusinessJob: vi.fn().mockReturnValue(of(makeDetail('REQUESTED'))) });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('No technician assigned yet');
+    expect(text).toContain('Assign technician');
+  });
+
+  it('shows the current technician and reassignment control', async () => {
+    const assigned = {
+      jobId: '5',
+      assignment: {
+        id: '1',
+        jobId: '5',
+        businessId: '1',
+        technician: {
+          id: '2',
+          displayName: 'Bongani Zulu',
+          email: 'bongani.zulu@example.co.za',
+          phone: '+27825550333',
+          isActive: true,
+        },
+        assignedBy: '9',
+        assignedAt: '2026-09-22T09:00:00.000Z',
+      },
+      history: [],
+    };
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(makeDetail('REQUESTED'))),
+      getJobAssignment: vi.fn().mockReturnValue(of(assigned)),
+    });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Bongani Zulu');
+    expect(text).toContain('bongani.zulu@example.co.za');
+    expect(text).toContain('Reassign technician');
+  });
+
+  it('offers a technician selector and assigns on submit', async () => {
+    const assignTechnician = vi.fn().mockReturnValue(
+      of({
+        id: '1',
+        jobId: '5',
+        businessId: '1',
+        technician: { id: '2', displayName: 'Bongani Zulu', email: null, phone: null, isActive: true },
+        assignedBy: '9',
+        assignedAt: '2026-09-22T09:00:00.000Z',
+      }),
+    );
+    await setup({
+      getBusinessJob: vi.fn().mockReturnValue(of(makeDetail('REQUESTED'))),
+      listTechnicians: vi.fn().mockReturnValue(
+        of({
+          items: [
+            {
+              id: '2',
+              businessId: '1',
+              userId: '7',
+              displayName: 'Bongani Zulu',
+              email: null,
+              phone: null,
+              isActive: true,
+              createdAt: '2026-09-20T09:00:00.000Z',
+              updatedAt: '2026-09-20T09:00:00.000Z',
+            },
+          ],
+          total: 1,
+        }),
+      ),
+      assignTechnician,
+    });
+    const component = fixture.componentInstance as unknown as {
+      assignForm: { controls: { technicianId: { setValue(value: string): void } } };
+      assign(): void;
+    };
+    component.assignForm.controls.technicianId.setValue('2');
+    component.assign();
+    expect(assignTechnician).toHaveBeenCalledWith('5', { technicianId: '2' });
   });
 });

@@ -12,6 +12,8 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
  * Stage 7B adds business-managed customers (`/business/customers`),
  * internal jobs (`/business/jobs`, `/business/jobs/new`,
  * `/business/jobs/:id`) and the business profile (`/business/profile`).
+ * Stage 7C adds technician assignment (within `/business/jobs/:id`)
+ * and technician My Jobs (`/technician/jobs`, `/technician/jobs/:id`).
  * Role dashboards and the quote lifecycle arrive in later stages.
  */
 export const routes: Routes = [
@@ -103,6 +105,18 @@ export const routes: Routes = [
     path: 'business/profile',
     loadComponent: () =>
       import('./features/business/business-profile').then((m) => m.BusinessProfileComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'technician/jobs',
+    loadComponent: () =>
+      import('./features/technician/technician-jobs').then((m) => m.TechnicianJobsComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'technician/jobs/:id',
+    loadComponent: () =>
+      import('./features/technician/technician-job-detail').then((m) => m.TechnicianJobDetailComponent),
     canActivate: [authGuard],
   },
   {

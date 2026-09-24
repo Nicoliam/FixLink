@@ -4,6 +4,7 @@ import { map, Observable } from 'rxjs';
 import { API_BASE_URL } from '../config/api-config';
 import type { ApiSuccess } from '../models/api.model';
 import type {
+  AssignTechnicianRequest,
   Business,
   BusinessCustomer,
   BusinessCustomerList,
@@ -15,6 +16,8 @@ import type {
   CreateBusinessCustomerRequest,
   CreateBusinessJobRequest,
   CreateTechnicianRequest,
+  JobAssignment,
+  JobAssignmentDetail,
   Technician,
   TechnicianList,
   UpdateBusinessCustomerRequest,
@@ -26,12 +29,12 @@ import type {
 /**
  * FixLink business API client — Stage 7A (business foundation +
  * technician management) + Stage 7B (business-managed customers and
- * internal jobs).
+ * internal jobs) + Stage 7C (technician assignment).
  *
  * Single owner of business calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); the business is derived
  * by the backend from the session membership, never from these payloads.
- * Technician assignment arrives in a later stage.
+ * Technician execution, parts and approvals arrive in later stages.
  */
 @Injectable({ providedIn: 'root' })
 export class BusinessService {
@@ -214,6 +217,25 @@ export class BusinessService {
   getBusinessJobsSummary(): Observable<BusinessJobsSummary> {
     return this.http
       .get<ApiSuccess<BusinessJobsSummary>>(`${this.baseUrl}/business/jobs-summary`)
+      .pipe(map((res) => res.data));
+  }
+
+  /** Assign (or reassign) a technician to an INTERNAL job (owner/manager — backend enforces). */
+  assignTechnician(jobId: string, payload: AssignTechnicianRequest): Observable<JobAssignment> {
+    return this.http
+      .post<ApiSuccess<JobAssignment>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/assign`,
+        { technicianId: payload.technicianId },
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /** Retrieve the active assignment plus history for an INTERNAL job (owner/manager). */
+  getJobAssignment(jobId: string): Observable<JobAssignmentDetail> {
+    return this.http
+      .get<ApiSuccess<JobAssignmentDetail>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/assignment`,
+      )
       .pipe(map((res) => res.data));
   }
 }

@@ -390,3 +390,54 @@ No migration in Stage 7B — `customer_profiles.business_id`,
 `jobs.business_id`/`source`/`status`/`priority`/`scheduled_at`
 and `job_status_history` already support it; no database doc
 change was required.
+
+## Stage 7C — Technician Assignment + My Jobs
+
+Backend (`backend/tests/business-technician-assignment.test.ts`,
+20 cases, in-memory stores — run with `npm test` from
+`backend/`; full suite 265/265 green):
+
+- Owner can assign (1); manager can assign (2); technician
+  cannot assign (3, `403`); customer cannot assign (4, `403`);
+  professional cannot assign internal jobs (5, `403`).
+- Cross-business technician → `404` (6); inactive technician →
+  `422` (7); non-technician id → `404` (8); foreign-business job
+  → `404` (9); marketplace job via internal assignment → `404`
+  (10).
+- Assignment persisted + history recorded, job status untouched
+  at `REQUESTED` (11+18); reassignment via the PATCH alias with
+  two-entry history (active + closed) (12+18).
+- Technician lists own assigned jobs (13); cannot list another
+  technician's jobs (14); opens own assigned job + timeline (15);
+  another technician's job → `404` (16); unrelated business job
+  → `404` with empty list (17); other roles `403` + anonymous
+  `401` on the technician surface.
+- Stage 7B regression (19): list/detail/summary/cancel intact.
+  Marketplace regression (20): creation still yields
+  `MARKETPLACE`/`REQUESTED`; internal list stays empty.
+
+Frontend (`apps/web`, `npx ng test --watch=false` — 29 files,
+209 tests, all green):
+
+- `technician-assignment.service.spec.ts` (new): assign posts
+  only `{ technicianId }` (no business id/status), assignment
+  fetch with history, technician list/detail fetches.
+- `business-job-detail.spec.ts` (updated): unassigned state +
+  Assign control, current technician + Reassign control,
+  selector submit calls `assignTechnician(jobId,
+  { technicianId })`; the old "no assignment controls" test was
+  replaced (assignment is now expected); parts still absent.
+- `technician-jobs.spec.ts` (new): loading/empty/error states,
+  assigned cards (service/customer/address/status), status
+  filter dispatch, no marketplace/parts/approval controls.
+- `technician-job-detail.spec.ts` (new): full job display,
+  error state for unauthorized jobs, no assign/parts/manage
+  controls.
+- The sandbox vitest worker crash noted for Stage 7B did not
+  recur for the final run (one genuine assertion failure in a
+  new spec — the `AWAITING_PARTS` label containing "parts" —
+  was found and fixed first).
+
+No migration in Stage 7C — `job_assignments`
+(`assignment_type = TECHNICIAN`, `unassigned_at` history)
+already supports it; no database doc change was required.

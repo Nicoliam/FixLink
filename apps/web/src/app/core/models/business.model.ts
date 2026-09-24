@@ -270,6 +270,54 @@ export interface BusinessJobsSummary {
   cancelled: number;
 }
 
+/**
+ * Technician assignment contracts for Stage 7C.
+ *
+ * Mirrors POST/GET /api/v1/business/jobs/:id/assign(ment).
+ * Assignments reuse the shared `job_assignments` table; job status is
+ * never changed by assignment (there is no ASSIGNED status).
+ */
+
+/** Technician embedded in an assignment response (contact info only). */
+export interface JobAssignmentTechnician {
+  id: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
+}
+
+/** Active technician assignment for one internal job. */
+export interface JobAssignment {
+  id: string;
+  jobId: string;
+  businessId: string;
+  technician: JobAssignmentTechnician;
+  assignedBy: string | null;
+  assignedAt: string;
+}
+
+/** One assignment history entry (active rows have `unassignedAt = null`). */
+export interface JobAssignmentHistoryEntry {
+  id: string;
+  technician: JobAssignmentTechnician;
+  assignedBy: string | null;
+  assignedAt: string;
+  unassignedAt: string | null;
+  isActive: boolean;
+}
+
+/** Assignment detail: active assignment plus full history. */
+export interface JobAssignmentDetail {
+  jobId: string;
+  assignment: JobAssignment | null;
+  history: JobAssignmentHistoryEntry[];
+}
+
+export interface AssignTechnicianRequest {
+  technicianId: string;
+}
+
 /** Human-readable internal job status for badges and headings. */
 export function businessJobStatusLabel(status: BusinessJobStatus): string {
   switch (status) {

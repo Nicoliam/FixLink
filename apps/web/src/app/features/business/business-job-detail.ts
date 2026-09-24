@@ -2,23 +2,33 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { BusinessService } from '../../core/services/business.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
 import { businessJobPriorityLabel, businessJobStatusLabel } from '../../core/models/business.model';
-import type { BusinessJob, BusinessJobDetail } from '../../core/models/business.model';
+import type {
+  BusinessJob,
+  BusinessJobDetail,
+  JobAssignmentDetail,
+  Technician,
+} from '../../core/models/business.model';
 
 type DetailStatus = 'loading' | 'ready' | 'error';
 
 /**
  * FixLink internal job detail — Stage 7B (`/business/jobs/:id`,
- * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
+ * authenticated BUSINESS_OWNER / BUSINESS_MANAGER) + Stage 7C
+ * (technician assignment).
  *
  * Shows the customer, service, description, address, priority,
  * schedule, status, status-history timeline and business
  * information for one INTERNAL job belonging to the caller's
- * business. REQUESTED jobs offer a field editor and cancellation;
- * status itself is never set directly. Technician assignment and
- * parts controls arrive in later stages and are not shown.
+ * business, plus the current technician assignment with
+ * assign/reassign controls. REQUESTED jobs offer a field editor and
+ * cancellation; status itself is never set directly. Parts,
+ * approvals and notifications arrive in later stages and are not
+ * shown.
  */
 @Component({
   selector: 'app-business-job-detail',
@@ -40,6 +50,10 @@ export class BusinessJobDetailComponent implements OnInit {
   protected readonly saveError = signal('');
   protected readonly cancelling = signal(false);
   protected readonly cancelError = signal('');
+  protected readonly assignment = signal<JobAssignmentDetail | null>(null);
+  protected readonly technicians = signal<Technician[]>([]);
+  protected readonly assigning = signal(false);
+  protected readonly assignError = signal('');
 
   protected readonly form = this.fb.group({
     title: ['', [Validators.maxLength(255)]],
@@ -48,6 +62,10 @@ export class BusinessJobDetailComponent implements OnInit {
     city: ['', [Validators.maxLength(128)]],
     province: ['', [Validators.maxLength(128)]],
     priority: ['NORMAL'],
+  });
+
+  protected readonly assignForm = this.fb.group({
+    technicianId: ['', [Validators.required]],
   });
 
   protected readonly statusText = businessJobStatusLabel;
@@ -65,12 +83,17 @@ export class BusinessJobDetailComponent implements OnInit {
     this.status.set('loading');
     this.errorMessage.set('');
     this.cancelError.set('');
-    this.api
-      .getBusinessJob(this.jobId())
+    forkJoin({
+      detail: this.api.getBusinessJob(this.jobId()),
+      assignment: this.api.getJobAssignment(this.jobId()).pipe(catchError(() => of(null))),
+      technicians: this.api.listTechnicians().pipe(catchError(() => of({ items: [], total: 0 }))),
+    })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (detail) => {
+        next: ({ detail, assignment, technicians }) => {
           this.detail.set(detail);
+          this.assignment.set(assignment);
+          this.technicians.set(technicians.items.filter((tech) => tech.isActive));
           this.status.set('ready');
         },
         error: (error: unknown) => {
@@ -154,6 +177,27 @@ export class BusinessJobDetailComponent implements OnInit {
         error: (error: unknown) => {
           this.cancelError.set(getApiErrorMessage(error, 'Could not cancel the job. Please try again.'));
           this.cancelling.set(false);
+        },
+      });
+  }
+
+  protected assign(): void {
+    const job = this.detail()?.job;
+    const technicianId = this.assignForm.controls.technicianId.value?.trim();
+    if (!job || !technicianId || this.assigning()) return;
+    this.assigning.set(true);
+    this.assignError.set('');
+    this.api
+      .assignTechnician(job.id, { technicianId })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.assigning.set(false);
+          this.load();
+        },
+        error: (error: unknown) => {
+          this.assignError.set(getApiErrorMessage(error, 'Could not assign the technician. Please try again.'));
+          this.assigning.set(false);
         },
       });
   }

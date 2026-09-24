@@ -21,8 +21,15 @@
  * PATCH /api/v1/business/jobs/:id            update permitted fields (REQUESTED only)
  * POST  /api/v1/business/jobs/:id/cancel     cancel an eligible INTERNAL job
  *
- * Technician assignment, execution, parts and approvals belong to later
- * stages and are intentionally absent.
+ * Stage 7C (technician assignment + My Jobs):
+ * POST  /api/v1/business/jobs/:id/assign     assign/reassign a technician (owner/manager)
+ * PATCH /api/v1/business/jobs/:id/assignment assign/reassign alias (owner/manager)
+ * GET   /api/v1/business/jobs/:id/assignment active assignment + history (owner/manager)
+ * GET   /api/v1/technician/jobs              jobs assigned to the caller (technician)
+ * GET   /api/v1/technician/jobs/:id          one assigned job + timeline (technician)
+ *
+ * Execution, parts and approvals belong to later stages and are
+ * intentionally absent.
  */
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -74,6 +81,12 @@ export function makeBusinessRoutes(
   router.get('/business/jobs/:jobId', controller.getInternalJob);
   router.patch('/business/jobs/:jobId', controller.updateInternalJob);
   router.post('/business/jobs/:jobId/cancel', controller.cancelInternalJob);
+  router.post('/business/jobs/:jobId/assign', controller.assignTechnician);
+  router.patch('/business/jobs/:jobId/assignment', controller.assignTechnician);
+  router.get('/business/jobs/:jobId/assignment', controller.getJobAssignment);
+
+  router.get('/technician/jobs', controller.listTechnicianJobs);
+  router.get('/technician/jobs/:jobId', controller.getTechnicianJob);
 
   return router;
 }

@@ -1,0 +1,67 @@
+<div class="fl-page">
+  <p class="fl-eyebrow">My work</p>
+  <h1 class="fl-page-title">My jobs</h1>
+  <p class="fl-page-subtitle">Jobs your business has assigned to you.</p>
+
+  <section class="fl-card" aria-label="Filter jobs">
+    <form
+      class="fl-form"
+      (ngSubmit)="applyFilters()"
+      novalidate
+    >
+      <div class="fl-field">
+        <label for="tech-jobs-status">Status</label>
+        <select id="tech-jobs-status" class="fl-input" [(ngModel)]="statusFilter" name="status">
+          @for (option of statusOptions; track option) {
+            <option [value]="option">{{ statusFilterLabel(option) }}</option>
+          }
+        </select>
+      </div>
+      <button type="submit" class="fl-btn fl-btn-secondary fl-btn-sm">Apply filters</button>
+      <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="clearFilters()">Clear</button>
+    </form>
+  </section>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading jobs…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="load()">Try again</button>
+    </div>
+  } @else if (status() === 'empty') {
+    <div class="fl-state" role="status">
+      <h2 class="fl-state-title">No jobs assigned yet</h2>
+      <p class="fl-state-text">Jobs your business assigns to you will appear here.</p>
+    </div>
+  } @else {
+    <div class="fl-provider-grid">
+      @for (job of jobs(); track job.id) {
+        <article class="fl-card">
+          <p class="fl-card-label">{{ statusLabel(job.status) }} · {{ priorityLabel(job.priority) }}</p>
+          <h2 class="fl-card-title">
+            <a class="fl-link" [routerLink]="['/technician/jobs', job.id]">{{ job.reference }}</a>
+          </h2>
+          <p class="fl-card-text">{{ job.customer.displayName }} · {{ job.service.name }}</p>
+          <p class="fl-card-text">{{ job.addressLine1 ?? 'No address on file' }}</p>
+          <p class="fl-card-text">{{ dateLabel(job) }}</p>
+          <p class="fl-card-text">{{ job.description }}</p>
+        </article>
+      }
+    </div>
+    <p class="fl-card-text" role="status">
+      Showing {{ jobs().length }} of {{ total() }} jobs · Page {{ page() }}
+    </p>
+    <p>
+      <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="previousPage()" [disabled]="page() <= 1">
+        Previous
+      </button>
+      <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="nextPage()" [disabled]="!hasNextPage()">
+        Next
+      </button>
+    </p>
+  }
+</div>

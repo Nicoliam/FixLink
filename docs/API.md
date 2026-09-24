@@ -438,6 +438,51 @@ Stage 7B implements business-managed customers and internal jobs
   `jobs.business_id`/`source`/`status`/`priority`/`scheduled_at`
   and `job_status_history` already support this stage.
 
+## 8.3 Businesses — Stage 7C Implementation Notes (Technician Assignment + My Jobs)
+
+Stage 7C connects internal jobs to technicians
+(`backend/src/modules/business/` — same router,
+`POST /api/v1/business/jobs/:jobId/assign`,
+`PATCH /api/v1/business/jobs/:jobId/assignment` (alias),
+`GET /api/v1/business/jobs/:jobId/assignment`,
+`GET /api/v1/technician/jobs`,
+`GET /api/v1/technician/jobs/:jobId`).
+
+- Assignments reuse the existing `job_assignments` table with
+  `assignment_type = TECHNICIAN` (migration 004) — no
+  `technician_jobs` table was created. The active assignment is the
+  row with `unassigned_at IS NULL`; reassignment closes the previous
+  row and inserts a new one atomically, preserving full history.
+  Assignment never changes job `status` — there is no ASSIGNED
+  lifecycle value, and no `job_status_history` entry is written for
+  assignment.
+- `POST /business/jobs/:jobId/assign`
+  (`BUSINESS_OWNER`/`BUSINESS_MANAGER`) accepts `{ technicianId }`
+  (also `technician_id`) and returns the active assignment `200`
+  with the embedded technician summary (id/displayName/email/phone/
+  isActive). The job must be INTERNAL and owned by the caller's
+  business (foreign/unknown/marketplace → `404`); the technician
+  must be an active roster row in the same business (foreign →
+  `404`, inactive → `422 VALIDATION_ERROR`); malformed ids → `400`.
+  `business_id` and `status` are never honoured. `PATCH
+  /business/jobs/:jobId/assignment` behaves identically (reassign).
+- `GET /business/jobs/:jobId/assignment` returns
+  `{ jobId, assignment (active or null), history (newest first) }`
+  for the caller's INTERNAL jobs (`404` for foreign/marketplace).
+- `GET /api/v1/technician/jobs?status=&page=&pageSize=` (TECHNICIAN
+  only) returns INTERNAL jobs with an active assignment to the
+  caller (newest first, `status` must be a lifecycle value).
+  `GET /api/v1/technician/jobs/:jobId` returns
+  `{ job, timeline }` for assigned jobs only (`404` otherwise —
+  URL probing cannot reach other technicians' or other businesses'
+  jobs). The technician identity is derived server-side from the
+  session user; a technician id is never accepted. Managers,
+  customers, professionals and admins receive `403 FORBIDDEN_ROLE`
+  on the technician surface (and vice versa on the assignment
+  surface); unauthenticated → `401`.
+- No migration was required — `job_assignments` (TECHNICIAN type,
+  `unassigned_at` history) already supports this stage.
+
 MVP payment position (unchanged): internal jobs never charge
 anyone; agreed amounts remain recorded prices paid directly
 outside the platform.

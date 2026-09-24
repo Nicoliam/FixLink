@@ -1,0 +1,80 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/technician/jobs">← Back to my jobs</a>
+  </nav>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading job…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="load()">Try again</button>
+    </div>
+  } @else if (detail(); as detail) {
+    <p class="fl-eyebrow">Job {{ detail.job.reference }}</p>
+    <h1 class="fl-page-title">{{ detail.job.title || detail.job.service.name }}</h1>
+    <p class="fl-page-subtitle">{{ statusText(detail.job.status) }} · {{ priorityText(detail.job.priority) }}</p>
+
+    <div class="fl-provider-grid">
+      <article class="fl-card">
+        <p class="fl-card-label">Service</p>
+        <h2 class="fl-card-title">{{ detail.job.service.name }}</h2>
+        <p class="fl-card-text">{{ detail.job.description }}</p>
+      </article>
+
+      <article class="fl-card">
+        <p class="fl-card-label">Customer</p>
+        <h2 class="fl-card-title">{{ detail.job.customer.displayName }}</h2>
+        @if (detail.job.customer.email) {
+          <p class="fl-card-text">{{ detail.job.customer.email }}</p>
+        }
+        @if (detail.job.customer.phone) {
+          <p class="fl-card-text">{{ detail.job.customer.phone }}</p>
+        }
+      </article>
+
+      <article class="fl-card">
+        <p class="fl-card-label">Address</p>
+        <p class="fl-card-text">{{ detail.job.addressLine1 ?? 'No address on file' }}</p>
+        <p class="fl-card-text">{{ detail.job.city ?? 'No city on file' }}{{
+          detail.job.province ? ', ' + detail.job.province : ''
+        }}</p>
+        @if (detail.job.postalCode) {
+          <p class="fl-card-text">{{ detail.job.postalCode }}</p>
+        }
+      </article>
+
+      <article class="fl-card">
+        <p class="fl-card-label">Schedule</p>
+        <p class="fl-card-text">{{ detail.job.scheduledAt ?? 'Not scheduled yet' }}</p>
+        <p class="fl-card-text">Priority: {{ priorityText(detail.job.priority) }}</p>
+      </article>
+
+      <article class="fl-card">
+        <p class="fl-card-label">Business</p>
+        <h2 class="fl-card-title">{{ detail.job.business.businessName }}</h2>
+      </article>
+
+      <article class="fl-card">
+        <p class="fl-card-label">Timeline</p>
+        @if (detail.timeline.length === 0) {
+          <p class="fl-card-text">No history yet.</p>
+        } @else {
+          <ul>
+            @for (entry of detail.timeline; track entry.createdAt + entry.status) {
+              <li>
+                <p class="fl-card-text">{{ statusText(entry.status) }} · {{ entry.createdAt }}</p>
+                @if (entry.reason) {
+                  <p class="fl-card-text">{{ entry.reason }}</p>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </article>
+    </div>
+  }
+</div>

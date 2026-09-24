@@ -17,6 +17,7 @@ import {
   type PersistInternalJobInput,
 } from './business.store';
 import type {
+  AssignTechnicianInput,
   BusinessCustomerContact,
   BusinessCustomerDto,
   BusinessDto,
@@ -29,6 +30,9 @@ import type {
   InternalJobsSummary,
   InternalJobStatus,
   InternalJobTimelineEntry,
+  JobAssignmentDetailDto,
+  JobAssignmentDto,
+  JobAssignmentHistoryEntry,
   TechnicianDto,
   UpdateBusinessCustomerInput,
   UpdateBusinessInput,
@@ -106,6 +110,16 @@ interface HistoryRow {
   createdAt: string;
 }
 
+interface AssignmentRow {
+  id: string;
+  jobId: string;
+  businessId: string;
+  technicianId: string;
+  assignedBy: string | null;
+  assignedAt: string;
+  unassignedAt: string | null;
+}
+
 export interface SeedBusinessInput {
   ownerUserId: string;
   businessName?: string;
@@ -132,6 +146,8 @@ export class MemoryBusinessStore implements BusinessStore {
   private readonly businessCustomers = new Map<string, BusinessCustomerRow>();
   private readonly internalJobs = new Map<string, InternalJobRow>();
   private readonly internalHistory: HistoryRow[] = [];
+  private assignmentSeq = 0;
+  private readonly assignments: AssignmentRow[] = [];
 
   /** Test setup: provision a business owned by the given user. */
   seedBusiness(input: SeedBusinessInput): BusinessRow {
@@ -525,6 +541,155 @@ export class MemoryBusinessStore implements BusinessStore {
     if (!job) return null;
     const timeline = (await this.listInternalJobHistory(businessId, jobId)) ?? [];
     return { job, timeline };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7C — technician assignment (memory implementation).
+  //
+  // Mirrors `job_assignments` with `assignment_type = TECHNICIAN`:
+  // the active row has `unassignedAt = null`; reassignment closes it
+  // and appends a new row. Job status is never touched.
+  // ------------------------------------------------------------------
+
+  async getActiveJobAssignment(businessId: string, jobId: string): Promise<JobAssignmentDto | null> {
+    const job = this.internalJobs.get(jobId);
+    if (!job || job.businessId !== businessId) return null;
+    const active = this.assignments.find((a) => a.jobId === jobId && a.unassignedAt === null);
+    if (!active) return null;
+    return this.toAssignmentDto(active);
+  }
+
+  async listJobAssignmentHistory(businessId: string, jobId: string): Promise<JobAssignmentHistoryEntry[] | null> {
+    const job = this.internalJobs.get(jobId);
+    if (!job || job.businessId !== businessId) return null;
+    return this.assignments
+      .filter((a) => a.jobId === jobId)
+      .sort((a, b) => (a.assignedAt < b.assignedAt ? 1 : -1))
+      .map((a) => this.toAssignmentHistoryEntry(a))
+      .filter((entry): entry is JobAssignmentHistoryEntry => entry !== null);
+  }
+
+  async getJobAssignmentDetail(businessId: string, jobId: string): Promise<JobAssignmentDetailDto | null> {
+    const job = this.internalJobs.get(jobId);
+    if (!job || job.businessId !== businessId) return null;
+    const assignment = await this.getActiveJobAssignment(businessId, jobId);
+    const history = (await this.listJobAssignmentHistory(businessId, jobId)) ?? [];
+    return { jobId, assignment, history };
+  }
+
+  async assignJobTechnician(
+    businessId: string,
+    jobId: string,
+    input: AssignTechnicianInput & { assignedBy: string },
+  ): Promise<JobAssignmentDto | null> {
+    const job = this.internalJobs.get(jobId);
+    if (!job || job.businessId !== businessId) return null;
+    const now = nowIso();
+    for (const row of this.assignments) {
+      if (row.jobId === jobId && row.unassignedAt === null) {
+        row.unassignedAt = now;
+      }
+    }
+    this.assignmentSeq += 1;
+    const row: AssignmentRow = {
+      id: String(this.assignmentSeq),
+      jobId,
+      businessId,
+      technicianId: input.technicianId,
+      assignedBy: input.assignedBy,
+      assignedAt: now,
+      unassignedAt: null,
+    };
+    this.assignments.push(row);
+    const dto = this.toAssignmentDto(row);
+    if (!dto) throw new Error('Assignment failed: technician row not found after insert.');
+    return dto;
+  }
+
+  async listTechnicianJobs(
+    technicianId: string,
+    query: { status: InternalJobStatus | null; page: number; pageSize: number },
+  ): Promise<{ items: InternalJobDto[]; total: number }> {
+    const owned: InternalJobDto[] = [];
+    for (const assignment of this.assignments) {
+      if (assignment.technicianId !== technicianId || assignment.unassignedAt !== null) continue;
+      const row = this.internalJobs.get(assignment.jobId);
+      if (!row) continue;
+      if (query.status !== null && row.status !== query.status) continue;
+      const dto = this.toJobDto(row);
+      if (dto) owned.push(dto);
+    }
+    owned.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const start = (query.page - 1) * query.pageSize;
+    return { items: owned.slice(start, start + query.pageSize), total: owned.length };
+  }
+
+  async getTechnicianJob(technicianId: string, jobId: string): Promise<InternalJobDto | null> {
+    const active = this.assignments.find(
+      (a) => a.jobId === jobId && a.technicianId === technicianId && a.unassignedAt === null,
+    );
+    if (!active) return null;
+    const row = this.internalJobs.get(jobId);
+    if (!row) return null;
+    return this.toJobDto(row);
+  }
+
+  async listTechnicianJobHistory(technicianId: string, jobId: string): Promise<InternalJobTimelineEntry[] | null> {
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    return this.internalHistory
+      .filter((entry) => entry.jobId === jobId)
+      .map((entry) => ({
+        previousStatus: entry.previousStatus,
+        status: entry.status,
+        reason: entry.reason,
+        createdAt: entry.createdAt,
+      }));
+  }
+
+  async getTechnicianJobDetail(technicianId: string, jobId: string): Promise<InternalJobDetailDto | null> {
+    const job = await this.getTechnicianJob(technicianId, jobId);
+    if (!job) return null;
+    const timeline = (await this.listTechnicianJobHistory(technicianId, jobId)) ?? [];
+    return { job, timeline };
+  }
+
+  private toAssignmentDto(row: AssignmentRow): JobAssignmentDto | null {
+    const tech = this.technicians.get(row.technicianId);
+    if (!tech) return null;
+    return {
+      id: row.id,
+      jobId: row.jobId,
+      businessId: row.businessId,
+      technician: {
+        id: tech.id,
+        displayName: tech.displayName,
+        email: tech.email,
+        phone: tech.phone,
+        isActive: tech.isActive,
+      },
+      assignedBy: row.assignedBy,
+      assignedAt: row.assignedAt,
+    };
+  }
+
+  private toAssignmentHistoryEntry(row: AssignmentRow): JobAssignmentHistoryEntry | null {
+    const tech = this.technicians.get(row.technicianId);
+    if (!tech) return null;
+    return {
+      id: row.id,
+      technician: {
+        id: tech.id,
+        displayName: tech.displayName,
+        email: tech.email,
+        phone: tech.phone,
+        isActive: tech.isActive,
+      },
+      assignedBy: row.assignedBy,
+      assignedAt: row.assignedAt,
+      unassignedAt: row.unassignedAt,
+      isActive: row.unassignedAt === null,
+    };
   }
 
   /** Embed the owning customer/business/service summaries (all server-side rows). */

@@ -29,6 +29,9 @@
           <a class="fl-link fl-nav-link" routerLink="/business/profile">Profile</a>
           <a class="fl-link fl-nav-link" routerLink="/account">Settings</a>
         }
+        @if (showTechnicianJobs()) {
+          <a class="fl-link fl-nav-link" routerLink="/technician/jobs">My jobs</a>
+        }
         <span class="fl-nav-status">{{ auth.currentUser()?.email }}</span>
         <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/account">My account</a>
       } @else {

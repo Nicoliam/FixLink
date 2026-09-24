@@ -58,6 +58,25 @@
         <h2 class="fl-card-title">{{ detail.job.business.businessName }}</h2>
       </article>
 
+      <article class="fl-card" aria-label="Technician assignment">
+        <p class="fl-card-label">Assigned technician</p>
+        @if (assignment()?.assignment; as current) {
+          <h2 class="fl-card-title">{{ current.technician.displayName }}</h2>
+          @if (current.technician.email) {
+            <p class="fl-card-text">{{ current.technician.email }}</p>
+          }
+          @if (current.technician.phone) {
+            <p class="fl-card-text">{{ current.technician.phone }}</p>
+          }
+          <p class="fl-card-text">Assigned {{ current.assignedAt }}</p>
+        } @else {
+          <p class="fl-card-text">No technician assigned yet.</p>
+        }
+        @if ((assignment()?.history?.length ?? 0) > 1) {
+          <p class="fl-card-text">{{ assignment()?.history?.length }} assignments on record.</p>
+        }
+      </article>
+
       <article class="fl-card">
         <p class="fl-card-label">Timeline</p>
         @if (detail.timeline.length === 0) {
@@ -78,6 +97,33 @@
     </div>
 
     @if (canManage(detail.job)) {
+      <section class="fl-card" aria-label="Assign technician">
+        <h2 class="fl-card-title">
+          @if (assignment()?.assignment) {
+            Reassign technician
+          } @else {
+            Assign technician
+          }
+        </h2>
+        <form class="fl-form" [formGroup]="assignForm" (ngSubmit)="assign()" novalidate>
+          <div class="fl-field">
+            <label for="assign-technician">Technician</label>
+            <select id="assign-technician" class="fl-input" formControlName="technicianId">
+              <option value="">Select a technician</option>
+              @for (tech of technicians(); track tech.id) {
+                <option [value]="tech.id">{{ tech.displayName }}</option>
+              }
+            </select>
+          </div>
+          @if (assignError()) {
+            <p class="fl-field-error" role="alert">{{ assignError() }}</p>
+          }
+          <button type="submit" class="fl-btn fl-btn-primary fl-btn-sm" [disabled]="assigning()">
+            {{ assigning() ? 'Assigning…' : assignment()?.assignment ? 'Reassign' : 'Assign' }}
+          </button>
+        </form>
+      </section>
+
       <section class="fl-card" aria-label="Manage job">
         <h2 class="fl-card-title">Manage job</h2>
         @if (!editing()) {

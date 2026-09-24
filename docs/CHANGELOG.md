@@ -1,5 +1,44 @@
 # FixLink — Changelog
 
+## Stage 7C — Technician Assignment + My Jobs (2026-09-24)
+
+- Technician assignment on the existing `job_assignments` table
+  (`assignment_type = TECHNICIAN`, active = `unassigned_at IS
+  NULL`, reassignment closes + inserts atomically — no
+  `technician_jobs` table, no ASSIGNED status, job status
+  untouched): `POST /api/v1/business/jobs/:jobId/assign` and
+  `PATCH /api/v1/business/jobs/:jobId/assignment`
+  (owner/manager; `{ technicianId }` only; active same-business
+  technician required) plus `GET
+  /api/v1/business/jobs/:jobId/assignment` (`{ assignment,
+  history }`). Technician My Jobs derived server-side from the
+  session user: `GET /api/v1/technician/jobs` (own assigned jobs,
+  status filter, pagination) and `GET
+  /api/v1/technician/jobs/:jobId` (`{ job, timeline }`).
+- Authorization: unauthenticated → `401`; wrong roles → `403`
+  on both surfaces; cross-business job/technician ids and
+  marketplace ids on internal surfaces → `404` (no probing);
+  inactive technician → `422`; malformed ids → `400`.
+- Angular: `/business/jobs/:id` gains the assignment card
+  (current technician + history count) with Assign/Reassign
+  controls; new `/technician/jobs` (filter, pagination,
+  loading/empty/error states) and `/technician/jobs/:id`
+  (service/customer/contact/address/priority/schedule/timeline,
+  no assign/parts/manage controls); technician "My jobs" nav
+  (business nav unchanged).
+- Tests: `backend/tests/business-technician-assignment.test.ts`
+  (20 brief-mapped cases: assign roles, cross-business/inactive/
+  non-technician guards, marketplace exclusion, persistence,
+  reassignment + history, technician list/detail isolation, 7B +
+  marketplace regressions) and four new/updated frontend spec
+  files. Full backend suite green: 265/265; frontend suite
+  green: 29 files, 209 tests; `tsc --noEmit` (backend, web app +
+  spec) and both builds pass. No migration — `job_assignments`
+  already supports this stage.
+- Out of scope (later stages): technician execution updates,
+  voice notes, parts requests and approvals, notifications,
+  admin dashboard, payments, marketplace changes.
+
 ## Stage 7B — Internal Business Jobs (2026-09-24)
 
 - Business-managed customers on the existing `customer_profiles`

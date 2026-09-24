@@ -744,3 +744,56 @@ internal list and detail, detail contents (customer/service/
 business/timeline), creation history, status-mutation rejection,
 eligible/ineligible cancellation, pagination, filtering, and
 the business-scoped summary.
+
+# 28. Stage 7C Implementation Notes — Technician Assignment + My Jobs
+
+Implemented 2026-09-24 (`backend/src/modules/business/` — same
+router, `POST /api/v1/business/jobs/:jobId/assign`,
+`PATCH /api/v1/business/jobs/:jobId/assignment`,
+`GET /api/v1/business/jobs/:jobId/assignment`,
+`GET /api/v1/technician/jobs`,
+`GET /api/v1/technician/jobs/:jobId`).
+
+- Only `BUSINESS_OWNER` and `BUSINESS_MANAGER` may assign (via the
+  existing management resolution — business derived server-side,
+  never from the request). `TECHNICIAN`, `CUSTOMER`,
+  `PROFESSIONAL` and `ADMIN` receive `403 FORBIDDEN_ROLE` on the
+  assignment surface; unauthenticated → `401`.
+- Assignment is restricted to `source = INTERNAL` jobs owned by the
+  caller's business and to active technicians in the same business.
+  A foreign/cross-business job id, a foreign technician id or any
+  marketplace id reads as `404 NOT_FOUND` (never `403`), so ids
+  cannot be probed. Inactive technicians → `422`; non-technician
+  ids → `404`; malformed ids → `400`.
+- Assignment never changes job status (no ASSIGNED value exists);
+  it is recorded in `job_assignments`
+  (`assignment_type = TECHNICIAN`, active = `unassigned_at IS
+  NULL`) with full history. No `job_status_history` entry is
+  written for assignment.
+- Technician My Jobs: the technician identity is derived
+  server-side from the session user (membership + active
+  technician row). Only jobs with an active assignment to the
+  caller are listed or readable; everything else reads as `404`.
+  Managers, customers, professionals and admins receive `403` on
+  the technician surface; unauthenticated → `401`.
+
+Role summary for Stage 7C (additions to §27):
+
+BUSINESS_OWNER / BUSINESS_MANAGER:
+- assign/reassign technicians on own INTERNAL jobs
+- view active assignment + history on own INTERNAL jobs
+
+TECHNICIAN:
+- list own assigned INTERNAL jobs (with status filter)
+- open own assigned jobs (+ timeline)
+- still cannot manage the business surface (403, unchanged)
+
+Permission tests added
+(`backend/tests/business-technician-assignment.test.ts`, 20
+cases): owner/manager assign, technician/customer/professional
+rejection, cross-business technician, inactive technician,
+non-technician id, foreign job, marketplace exclusion,
+persistence, reassignment + history, technician list-own,
+technician isolation (list/detail), unrelated business job,
+role/anonymous rejection on the technician surface, 7B
+regression, marketplace regression.
