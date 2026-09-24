@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { BusinessService } from '../../core/services/business.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
 import { businessRoleLabel, verificationLabel } from '../../core/models/business.model';
-import type { Business, BusinessJobsSummary } from '../../core/models/business.model';
+import type { Business, BusinessBoardSummary, BusinessJobsSummary } from '../../core/models/business.model';
 
 type DashboardStatus = 'loading' | 'ready' | 'error';
 
@@ -17,8 +17,10 @@ type DashboardStatus = 'loading' | 'ready' | 'error';
  * count) with an owner-only profile editor, plus REAL internal-job
  * counts from GET /api/v1/business/jobs-summary (total, requested,
  * scheduled, in progress, completed — zero when there is no data,
- * never fake numbers). Technician assignment arrives in a later
- * stage. Authorization is backend-enforced; the role checks here only
+ * never fake numbers). Stage 7G adds the operational board counts
+ * from GET /api/v1/business/jobs-board-summary (assigned, awaiting
+ * parts, history) for the job board workflow. Technician assignment
+ * arrives in a later stage. Authorization is backend-enforced; the role checks here only
  * decide which actions are offered.
  */
 @Component({
@@ -36,6 +38,7 @@ export class BusinessDashboardComponent implements OnInit {
   protected readonly errorMessage = signal('');
   protected readonly business = signal<Business | null>(null);
   protected readonly summary = signal<BusinessJobsSummary | null>(null);
+  protected readonly boardSummary = signal<BusinessBoardSummary | null>(null);
   protected readonly editing = signal(false);
   protected readonly saving = signal(false);
   protected readonly saveError = signal('');
@@ -96,6 +99,15 @@ export class BusinessDashboardComponent implements OnInit {
           finish();
         },
         error: (error: unknown) => fail(error, 'Could not load job statistics. Please try again.'),
+      });
+    // Operational board counts are supplementary: a failure here never
+    // blocks the dashboard — the tiles simply stay hidden.
+    this.api
+      .getBusinessBoardSummary()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (boardSummary) => this.boardSummary.set(boardSummary),
+        error: () => this.boardSummary.set(null),
       });
   }
 

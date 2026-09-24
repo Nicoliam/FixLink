@@ -199,6 +199,15 @@ export function makeBusinessController(service: BusinessService) {
       }
     },
 
+    async getBoardJobsSummary(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBoardJobsSummary(authUser(req).id);
+        send(res, result, 'Board summary retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the board summary. Please try again.', 500);
+      }
+    },
+
     async assignTechnician(req: Request, res: Response): Promise<void> {
       try {
         const result = await service.assignTechnician(authUser(req).id, req.params['jobId'] ?? '', req.body);

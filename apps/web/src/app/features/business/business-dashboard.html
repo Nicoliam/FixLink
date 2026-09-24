@@ -65,6 +65,18 @@
         }
         <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/business/jobs">Manage jobs</a>
       </article>
+
+      @if (boardSummary(); as board) {
+        <article class="fl-card">
+          <p class="fl-card-label">Operations</p>
+          <h2 class="fl-card-title">Job board</h2>
+          <p class="fl-card-text">
+            Assigned: {{ board.assigned }} · Awaiting parts: {{ board.awaitingParts }} ·
+            History: {{ board.history }}
+          </p>
+          <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/business/jobs">Open job board</a>
+        </article>
+      }
     </div>
 
     @if (editing()) {

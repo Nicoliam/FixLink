@@ -1001,3 +1001,54 @@ owner/manager on technician routes `403`), cross-business
 rollback behaviour (failed actions write nothing),
 notification-seam event order + payloads, timeline inclusion
 (both surfaces), technician respond/resume guards.
+
+# 32. Stage 7G Implementation Notes — Business Job Board + History
+
+Implemented 2026-09-24 (`backend/src/modules/business/` — same
+router, extended `GET /api/v1/business/jobs` filters plus `GET
+/api/v1/business/jobs-board-summary`; no migration, no new
+tables, no duplicate statuses).
+
+- Only `BUSINESS_OWNER` and `BUSINESS_MANAGER` may use the board
+  and the board summary. `TECHNICIAN` (business-wide board —
+  technicians keep My Jobs only), `CUSTOMER`, `PROFESSIONAL` and
+  `ADMIN` receive `403 FORBIDDEN_ROLE`; unauthenticated → `401`.
+- Business isolation is derived server-side per request and
+  applies to every filter: the board lists `source = INTERNAL`
+  jobs of the caller's business only. Cross-business job detail
+  reads as `404 NOT_FOUND` (never `403`); a `technicianId`
+  filter for a foreign roster row yields an empty page (`200`,
+  never foreign rows); search terms matching another
+  business's customers return zero rows. Marketplace jobs never
+  appear on the board (`source = INTERNAL` on every read).
+- Board categories derive from existing state and grant no new
+  capability: ASSIGNED is the active `job_assignments` row
+  (assignment itself stays owner/manager-only), HISTORY is the
+  terminal set, SCHEDULED is the `scheduled_at` slot. The
+  enriched row fields (assignment contact info, outstanding
+  parts count, last work timestamp) expose only data the
+  manager could already read per-job.
+- Enriched detail access is unchanged: clicking a board row
+  opens the existing job detail (customer, service,
+  assignment, schedule, Before/During/After, notes, voice
+  notes, parts, approvals, timeline) under the same
+  owner/manager business scoping.
+
+Permission tests added
+(`backend/tests/business-job-board.test.ts`, 22 cases):
+unauthenticated/board-summary `401`, technician/customer
+`403`, owner/manager own-business listing, cross-business
+list/detail `404` (no probing), marketplace exclusion,
+search isolation, all nine board categories against the
+lifecycle (no duplicate statuses), manager parity,
+assigned=true/false derivation, exact status filtering,
+enriched rows (technician + assignedAt, partsOutstanding,
+lastUpdateAt null/completed), business-scoped board
+summary (all nine buckets + zero-business zeros), unchanged
+legacy summary shape, detail reachability, roster-scoped
+technician filter (foreign tech → empty `200`), priority,
+search (reference/name/phone/service), creation-date range,
+pagination (`page`/`pageSize`/`total`), priority/scheduled
+sorting, and invalid-filter `422`s (bad board, board+status,
+board+assigned, bad priority/sort/assigned/technician/date,
+from-after-to).

@@ -31,11 +31,14 @@ import {
 } from './business.store';
 import type {
   AssignTechnicianInput,
+  BusinessBoardJobDto,
+  BusinessBoardSummary,
   BusinessCustomerContact,
   BusinessCustomerDto,
   BusinessDto,
   BusinessIdentity,
   CreateBusinessCustomerInput,
+  InternalJobBoardQuery,
   InternalJobBusinessSummary,
   InternalJobCustomerSummary,
   InternalJobDetailDto,
@@ -980,8 +983,8 @@ export class MysqlBusinessStore implements BusinessStore {
 
   async listInternalJobs(
     businessId: string,
-    query: { status: InternalJobStatus | null; search: string | null; page: number; pageSize: number },
-  ): Promise<{ items: InternalJobDto[]; total: number }> {
+    query: InternalJobBoardQuery,
+  ): Promise<{ items: BusinessBoardJobDto[]; total: number }> {
     const scope = 'j.`business_id` = ? AND j.`source` = \'INTERNAL\' AND j.`deleted_at` IS NULL';
     const params: Array<string | number> = [businessId];
     let filter = '';
@@ -989,10 +992,32 @@ export class MysqlBusinessStore implements BusinessStore {
       filter += ' AND j.`status` = ?';
       params.push(query.status);
     }
+    filter += boardFilterSql(query.board, params);
+    if (query.assigned !== null) {
+      filter += query.assigned
+        ? ` AND EXISTS (${ACTIVE_ASSIGNMENT_EXISTS})`
+        : ` AND NOT EXISTS (${ACTIVE_ASSIGNMENT_EXISTS})`;
+    }
+    if (query.technicianId !== null) {
+      filter += ` AND EXISTS (${ACTIVE_ASSIGNMENT_EXISTS} AND a.\`technician_id\` = ?)`;
+      params.push(query.technicianId);
+    }
+    if (query.priority !== null) {
+      filter += ' AND j.`priority` = ?';
+      params.push(query.priority);
+    }
+    if (query.from !== null) {
+      filter += ' AND j.`created_at` >= ?';
+      params.push(toDbDateTime(new Date(query.from)));
+    }
+    if (query.to !== null) {
+      filter += ' AND j.`created_at` <= ?';
+      params.push(toDbDateTime(new Date(query.to)));
+    }
     if (query.search !== null) {
-      filter += ' AND (j.`reference` LIKE ? ESCAPE \'\\\' OR j.`description` LIKE ? ESCAPE \'\\\' OR j.`title` LIKE ? ESCAPE \'\\\' OR cp.`first_name` LIKE ? ESCAPE \'\\\' OR cp.`last_name` LIKE ? ESCAPE \'\\\' OR s.`name` LIKE ? ESCAPE \'\\\')';
+      filter += ' AND (j.`reference` LIKE ? ESCAPE \'\\\' OR j.`description` LIKE ? ESCAPE \'\\\' OR j.`title` LIKE ? ESCAPE \'\\\' OR cp.`first_name` LIKE ? ESCAPE \'\\\' OR cp.`last_name` LIKE ? ESCAPE \'\\\' OR cp.`email` LIKE ? ESCAPE \'\\\' OR cp.`phone` LIKE ? ESCAPE \'\\\' OR s.`name` LIKE ? ESCAPE \'\\\')';
       const needle = `%${escapeLike(query.search)}%`;
-      params.push(needle, needle, needle, needle, needle, needle);
+      params.push(needle, needle, needle, needle, needle, needle, needle, needle);
     }
     const [countRows] = await this.pool.query<RowDataPacket[]>(
       `SELECT COUNT(*) AS \`total\` FROM \`jobs\` j INNER JOIN \`customer_profiles\` cp ON cp.\`id\` = j.\`customer_id\` LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\` WHERE ${scope}${filter}`,
@@ -1002,10 +1027,66 @@ export class MysqlBusinessStore implements BusinessStore {
     if (total === 0) return { items: [], total: 0 };
     const offset = (query.page - 1) * query.pageSize;
     const [rows] = await this.pool.query<InternalJobRow[]>(
-      `${INTERNAL_JOB_SELECT} WHERE ${scope}${filter} ORDER BY j.\`created_at\` DESC LIMIT ? OFFSET ?`,
+      `${INTERNAL_JOB_SELECT} WHERE ${scope}${filter} ${boardOrderSql(query.sort)} LIMIT ? OFFSET ?`,
       [...params, query.pageSize, offset],
     );
-    return { items: (rows as InternalJobRow[]).map(mapInternalJob), total };
+    const jobs = (rows as InternalJobRow[]).map(mapInternalJob);
+    const items = await this.enrichBoardJobs(jobs);
+    return { items, total };
+  }
+
+  /**
+   * Stage 7G — attach the operational board fields to one page of jobs:
+   * the active TECHNICIAN assignment (null when unassigned), the count
+   * of APPROVED-but-unfulfilled parts requests and the latest
+   * work-documentation timestamp. Three batched queries cover the whole
+   * page — never one query per job.
+   */
+  private async enrichBoardJobs(jobs: InternalJobDto[]): Promise<BusinessBoardJobDto[]> {
+    if (jobs.length === 0) return [];
+    const ids = jobs.map((job) => job.id);
+    const placeholders = ids.map(() => '?').join(', ');
+
+    const [assignmentRows] = await this.pool.query<AssignmentRow[]>(
+      `${ASSIGNMENT_SELECT} WHERE a.\`job_id\` IN (${placeholders}) AND a.\`assignment_type\` = 'TECHNICIAN' AND a.\`unassigned_at\` IS NULL`,
+      ids,
+    );
+    const assignments = new Map<string, JobAssignmentDto>();
+    for (const row of assignmentRows as AssignmentRow[]) {
+      const job = jobs.find((entry) => entry.id === toStringId(row.job_id));
+      if (job) assignments.set(job.id, mapAssignment(row, job.id, job.businessId));
+    }
+
+    const [partsRows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT `job_id`, COUNT(*) AS `outstanding` FROM `parts_requests` WHERE `job_id` IN (' +
+        `${placeholders}) AND \`status\` = 'APPROVED' GROUP BY \`job_id\``,
+      ids,
+    );
+    const outstanding = new Map<string, number>();
+    for (const row of partsRows as Array<{ job_id: number; outstanding: number }>) {
+      outstanding.set(toStringId(row.job_id), Number(row.outstanding));
+    }
+
+    const [activityRows] = await this.pool.query<RowDataPacket[]>(
+      'SELECT `job_id`, MAX(`created_at`) AS `last_update` FROM (' +
+        `SELECT \`job_id\`, \`created_at\` FROM \`job_updates\` WHERE \`job_id\` IN (${placeholders})` +
+        ` UNION ALL SELECT \`job_id\`, \`created_at\` FROM \`job_images\` WHERE \`job_id\` IN (${placeholders})` +
+        ` UNION ALL SELECT \`job_id\`, \`created_at\` FROM \`job_voice_notes\` WHERE \`job_id\` IN (${placeholders})` +
+        ') AS `activity` GROUP BY `job_id`',
+      [...ids, ...ids, ...ids],
+    );
+    const activity = new Map<string, string>();
+    for (const row of activityRows as Array<{ job_id: number; last_update: Date | string }>) {
+      const iso = toIso(row.last_update);
+      if (iso) activity.set(toStringId(row.job_id), iso);
+    }
+
+    return jobs.map((job) => ({
+      ...job,
+      assignment: assignments.get(job.id) ?? null,
+      partsOutstanding: outstanding.get(job.id) ?? 0,
+      lastUpdateAt: activity.get(job.id) ?? null,
+    }));
   }
 
   async getInternalJob(businessId: string, jobId: string): Promise<InternalJobDto | null> {
@@ -1156,6 +1237,55 @@ export class MysqlBusinessStore implements BusinessStore {
     if (!job) return null;
     const timeline = (await this.listInternalJobHistory(businessId, jobId)) ?? [];
     return { job, timeline };
+  }
+
+  /**
+   * Stage 7G — operational board counts for one business (all INTERNAL
+   * jobs). Status buckets come from one GROUP BY; `assigned` counts
+   * jobs with an active TECHNICIAN assignment (any status) and
+   * `history` counts the terminal set (COMPLETED / CLOSED / CONFIRMED).
+   * The legacy `countInternalJobsByStatus` above is unchanged.
+   */
+  async countBoardJobs(businessId: string): Promise<BusinessBoardSummary> {
+    const summary: BusinessBoardSummary = {
+      total: 0,
+      requested: 0,
+      assigned: 0,
+      scheduled: 0,
+      inProgress: 0,
+      awaitingParts: 0,
+      completed: 0,
+      cancelled: 0,
+      history: 0,
+    };
+    const [statusRows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT `status`, COUNT(*) AS `total` FROM `jobs` WHERE `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL GROUP BY `status`",
+      [businessId],
+    );
+    for (const row of statusRows as Array<{ status: InternalJobStatus; total: number }>) {
+      summary.total += Number(row.total);
+      if (row.status === 'REQUESTED') summary.requested += Number(row.total);
+      else if (row.status === 'IN_PROGRESS') summary.inProgress += Number(row.total);
+      else if (row.status === 'AWAITING_PARTS') summary.awaitingParts += Number(row.total);
+      else if (row.status === 'COMPLETED') summary.completed += Number(row.total);
+      else if (row.status === 'CANCELLED') summary.cancelled += Number(row.total);
+      if (row.status === 'COMPLETED' || row.status === 'CLOSED' || row.status === 'CONFIRMED') {
+        summary.history += Number(row.total);
+      }
+    }
+    // "Scheduled" is derived from the visit slot (REQUESTED/SCHEDULED
+    // with `scheduled_at` set) — see the board-category note above.
+    const [scheduledRows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT COUNT(*) AS `scheduled` FROM `jobs` WHERE `business_id` = ? AND `source` = 'INTERNAL' AND `deleted_at` IS NULL AND `scheduled_at` IS NOT NULL AND `status` IN ('REQUESTED', 'SCHEDULED')",
+      [businessId],
+    );
+    summary.scheduled = Number((scheduledRows as Array<{ scheduled: number }>)[0]?.scheduled ?? 0);
+    const [assignedRows] = await this.pool.query<RowDataPacket[]>(
+      "SELECT COUNT(DISTINCT j.`id`) AS `assigned` FROM `jobs` j INNER JOIN `job_assignments` a ON a.`job_id` = j.`id` AND a.`assignment_type` = 'TECHNICIAN' AND a.`unassigned_at` IS NULL WHERE j.`business_id` = ? AND j.`source` = 'INTERNAL' AND j.`deleted_at` IS NULL",
+      [businessId],
+    );
+    summary.assigned = Number((assignedRows as Array<{ assigned: number }>)[0]?.assigned ?? 0);
+    return summary;
   }
 
   // ------------------------------------------------------------------
@@ -2304,4 +2434,70 @@ export class MysqlBusinessStore implements BusinessStore {
 /** Escape SQL LIKE wildcards so search input matches literally. */
 function escapeLike(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+/**
+ * Stage 7G — active TECHNICIAN assignment existence test for one board
+ * row (`j` is the outer `jobs` alias). "Assigned" is derived from this
+ * relationship — there is no ASSIGNED status in the lifecycle.
+ */
+const ACTIVE_ASSIGNMENT_EXISTS = `SELECT 1 FROM \`job_assignments\` a WHERE a.\`job_id\` = j.\`id\` AND a.\`assignment_type\` = 'TECHNICIAN' AND a.\`unassigned_at\` IS NULL`;
+
+/**
+ * Stage 7G — board-category SQL. NEW is REQUESTED, SCHEDULED is
+ * derived from the `scheduled_at` visit slot (no promotion endpoint
+ * moves internal jobs to a SCHEDULED status), HISTORY is the terminal
+ * set (COMPLETED / CLOSED / CONFIRMED) and every other category maps
+ * to its lifecycle status. "ALL" (or null) adds no filter.
+ */
+function boardFilterSql(board: InternalJobBoardQuery['board'], params: Array<string | number>): string {
+  if (board === null || board === 'ALL') return '';
+  switch (board) {
+    case 'NEW':
+      return " AND j.`status` = 'REQUESTED'";
+    case 'ASSIGNED':
+      return ` AND EXISTS (${ACTIVE_ASSIGNMENT_EXISTS})`;
+    case 'SCHEDULED':
+      // Derived from the visit slot (see the memory-store note): a
+      // REQUESTED/SCHEDULED job with `scheduled_at` set. Completed,
+      // cancelled and in-progress jobs keep their own categories.
+      return " AND j.`scheduled_at` IS NOT NULL AND j.`status` IN ('REQUESTED', 'SCHEDULED')";
+    case 'IN_PROGRESS':
+      return " AND j.`status` = 'IN_PROGRESS'";
+    case 'AWAITING_PARTS':
+      return " AND j.`status` = 'AWAITING_PARTS'";
+    case 'COMPLETED':
+      return " AND j.`status` = 'COMPLETED'";
+    case 'CANCELLED':
+      return " AND j.`status` = 'CANCELLED'";
+    case 'HISTORY':
+      params.push('COMPLETED', 'CLOSED', 'CONFIRMED');
+      return ' AND j.`status` IN (?, ?, ?)';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Stage 7G — board ordering. RECENT is newest first; SCHEDULED puts
+ * the next visit first (unscheduled last); PRIORITY puts URGENT work
+ * first. Ties always fall back to newest first.
+ */
+function boardOrderSql(sort: InternalJobBoardQuery['sort']): string {
+  if (sort === 'SCHEDULED') {
+    return 'ORDER BY j.`scheduled_at` IS NULL ASC, j.`scheduled_at` ASC, j.`created_at` DESC';
+  }
+  if (sort === 'PRIORITY') {
+    return "ORDER BY FIELD(j.`priority`, 'URGENT', 'HIGH', 'NORMAL', 'LOW') ASC, j.`created_at` DESC";
+  }
+  return 'ORDER BY j.`created_at` DESC';
+}
+
+/** Format an ISO instant for a MySQL DATETIME comparison (UTC). */
+function toDbDateTime(value: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return (
+    `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())} ` +
+    `${pad(value.getUTCHours())}:${pad(value.getUTCMinutes())}:${pad(value.getUTCSeconds())}`
+  );
 }

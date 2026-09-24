@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { BusinessDashboardComponent } from './business-dashboard';
 import { BusinessService } from '../../core/services/business.service';
-import type { Business, BusinessJobsSummary } from '../../core/models/business.model';
+import type { Business, BusinessBoardSummary, BusinessJobsSummary } from '../../core/models/business.model';
 
 const business: Business = {
   id: '1',
@@ -37,6 +37,18 @@ const summary: BusinessJobsSummary = {
   cancelled: 0,
 };
 
+const boardSummary: BusinessBoardSummary = {
+  total: 3,
+  requested: 1,
+  assigned: 2,
+  scheduled: 1,
+  inProgress: 1,
+  awaitingParts: 1,
+  completed: 0,
+  cancelled: 0,
+  history: 0,
+};
+
 describe('BusinessDashboardComponent', () => {
   let fixture: ComponentFixture<BusinessDashboardComponent>;
 
@@ -44,6 +56,7 @@ describe('BusinessDashboardComponent', () => {
     getMyBusiness: ReturnType<typeof vi.fn>;
     updateBusiness?: ReturnType<typeof vi.fn>;
     getBusinessJobsSummary?: ReturnType<typeof vi.fn>;
+    getBusinessBoardSummary?: ReturnType<typeof vi.fn>;
   }): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [BusinessDashboardComponent],
@@ -54,6 +67,7 @@ describe('BusinessDashboardComponent', () => {
           useValue: {
             updateBusiness: vi.fn(),
             getBusinessJobsSummary: vi.fn().mockReturnValue(of(summary)),
+            getBusinessBoardSummary: vi.fn().mockReturnValue(of(boardSummary)),
             ...api,
           },
         },
@@ -93,6 +107,15 @@ describe('BusinessDashboardComponent', () => {
         .mockReturnValue(of({ total: 0, requested: 0, scheduled: 0, inProgress: 0, completed: 0, cancelled: 0 })),
     });
     expect((fixture.nativeElement.textContent as string)).toContain('0 internal jobs');
+  });
+
+  it('shows operational board counts from the board summary endpoint', async () => {
+    await setup({ getMyBusiness: vi.fn().mockReturnValue(of(business)) });
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Assigned: 2');
+    expect(text).toContain('Awaiting parts: 1');
+    expect(text).toContain('History: 0');
+    expect(text).toContain('Open job board');
   });
 
   it('shows the error state when loading fails', async () => {

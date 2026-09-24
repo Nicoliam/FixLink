@@ -678,6 +678,77 @@ roll back together.
   vice versa on the business surface); unauthenticated → `401`.
 
 MVP payment position (unchanged): internal jobs never charge
+
+
+## 8.6 Businesses — Stage 7G Implementation Notes (Business Job Board + History)
+
+Stage 7G gives owners/managers the operational board for their
+INTERNAL jobs on the ONE shared `jobs` table — no
+`business_jobs` table, no duplicate statuses, no second
+timeline. It reuses `jobs`, `job_assignments`,
+`job_status_history`, `job_updates`, `job_images`,
+`job_voice_notes`, `parts_requests` and `job_approvals`.
+
+- `GET /api/v1/business/jobs` accepts the Stage 7B filters
+  (`status`, `search`, `page`/`pageSize`) plus the board
+  filters: `board` (ALL | NEW | ASSIGNED | SCHEDULED |
+  IN_PROGRESS | AWAITING_PARTS | COMPLETED | CANCELLED |
+  HISTORY), `technicianId` (active assignment to that roster
+  row), `priority` (LOW/NORMAL/HIGH/URGENT), `from`/`to`
+  (inclusive creation-date bounds, `YYYY-MM-DD` or ISO —
+  a bare date covers the whole UTC day), `assigned`
+  (`true` = has an active assignment, `false` = unassigned)
+  and `sort` (RECENT = newest first (default) | SCHEDULED =
+  next visit first, unscheduled last | PRIORITY = URGENT
+  first). `board` cannot be combined with `status` or
+  `assigned` (`422`); unknown board/priority/sort values,
+  `from` after `to` and malformed filters → `422`.
+- Board derivation (no new statuses): NEW is REQUESTED;
+  ASSIGNED means an active TECHNICIAN assignment exists
+  (`unassigned_at IS NULL`); SCHEDULED is derived from the
+  `scheduled_at` visit slot (REQUESTED/SCHEDULED with a slot
+  set — no promotion endpoint moves internal jobs to a
+  SCHEDULED status); HISTORY is the terminal set COMPLETED /
+  CLOSED / CONFIRMED; every other category maps to its
+  lifecycle status.
+- Rows are enriched for operations: each item carries the
+  shared INTERNAL projection plus `assignment` (active
+  assignment with technician + `assignedAt`, null when
+  unassigned), `partsOutstanding` (APPROVED requests not yet
+  PARTS_AVAILABLE) and `lastUpdateAt` (latest job_updates /
+  job_images / job_voice_notes timestamp, null when none).
+- `search` matches reference, title, description, customer
+  name, customer email/phone and service name — always scoped
+  to the caller's business (searching another business's
+  customer name returns zero rows, never their jobs).
+- `GET /api/v1/business/jobs-board-summary` returns the
+  operational counts for the dashboard tabs and the board:
+  `{ total, requested, assigned, scheduled, inProgress,
+  awaitingParts, completed, cancelled, history }` (zero when
+  empty, business-scoped). The legacy `jobs-summary` shape
+  (`{ total, requested, scheduled, inProgress, completed,
+  cancelled }`) is unchanged.
+- Isolation (unchanged rules, extended surface):
+  owner/manager only (`TECHNICIAN`/`CUSTOMER`/`PROFESSIONAL`/
+  `ADMIN` → `403 FORBIDDEN_ROLE`, unauthenticated → `401`);
+  business derived server-side, never from the request; a
+  foreign job reads as `404`; a foreign `technicianId` filter
+  yields an empty page (`200`, never foreign rows);
+  marketplace jobs never appear (`source = INTERNAL`
+  always). Detail (`GET /business/jobs/:id`) is unchanged —
+  the board links into it.
+- Angular: `/business/jobs` is the board (category tabs with
+  counts, technician/priority/date/sort/search filters, job
+  cards with customer, service, technician, status,
+  priority, scheduled/created dates, awaiting-parts badge
+  and last update, pagination, loading/empty/error states);
+  the dashboard adds the operations card (assigned,
+  awaiting parts, history). `/technician/jobs` is
+  untouched — technicians still see only assigned jobs.
+- No migration was required — `jobs.business_id`/`source`/
+  `status`/`priority`/`scheduled_at`/`created_at`,
+  `job_assignments`, the execution tables and
+  `parts_requests.status` already support this stage.
 anyone; agreed amounts remain recorded prices paid directly
 outside the platform.
 
@@ -917,6 +988,8 @@ POST /api/v1/jobs/:id/request
 POST /api/v1/business/jobs
 
 GET /api/v1/business/jobs
+
+GET /api/v1/business/jobs-board-summary
 
 GET /api/v1/business/jobs/:id
 

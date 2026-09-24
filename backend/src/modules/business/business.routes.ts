@@ -21,7 +21,17 @@
  * PATCH /api/v1/business/jobs/:id            update permitted fields (REQUESTED only)
  * POST  /api/v1/business/jobs/:id/cancel     cancel an eligible INTERNAL job
  *
- * Stage 7C (technician assignment + My Jobs):
+  * Stage 7G (business job board + history — same INTERNAL surface):
+  * GET   /api/v1/business/jobs                list own INTERNAL jobs with board
+  *      filters (board, technicianId, priority, from, to, assigned,
+  *      sort) plus status/search/pagination; rows carry the active
+  *      assignment, outstanding parts and latest work timestamp
+  * GET   /api/v1/business/jobs-board-summary  operational counts
+  *      (requested/assigned/scheduled/in-progress/awaiting-parts/
+  *      completed/cancelled/history) for the dashboard and board tabs
+  *      (the legacy jobs-summary shape is unchanged)
+  *
+  * Stage 7C (technician assignment + My Jobs):
  * POST  /api/v1/business/jobs/:id/assign     assign/reassign a technician (owner/manager)
  * PATCH /api/v1/business/jobs/:id/assignment assign/reassign alias (owner/manager)
  * GET   /api/v1/business/jobs/:id/assignment active assignment + history (owner/manager)
@@ -123,9 +133,10 @@ export function makeBusinessRoutes(
   router.get('/business/customers/:customerId', controller.getBusinessCustomer);
   router.patch('/business/customers/:customerId', controller.updateBusinessCustomer);
 
-  // The summary path must be registered before `:jobId` so it is not
+  // The summary paths must be registered before `:jobId` so it is not
   // captured as a job id (which would read as 400, not the summary).
   router.get('/business/jobs-summary', controller.getInternalJobsSummary);
+  router.get('/business/jobs-board-summary', controller.getBoardJobsSummary);
   router.get('/business/jobs', controller.listInternalJobs);
   router.post('/business/jobs', controller.createInternalJob);
   router.get('/business/jobs/:jobId', controller.getInternalJob);

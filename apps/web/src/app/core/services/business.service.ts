@@ -6,6 +6,8 @@ import type { ApiSuccess } from '../models/api.model';
 import type {
   AssignTechnicianRequest,
   Business,
+  BusinessBoardJobList,
+  BusinessBoardSummary,
   BusinessCustomer,
   BusinessCustomerList,
   BusinessJob,
@@ -162,13 +164,32 @@ export class BusinessService {
 
   /** List INTERNAL jobs belonging to the authenticated user's business. */
   listBusinessJobs(params: BusinessJobListParams = {}): Observable<BusinessJobList> {
+    return this.listBoardJobs(params).pipe(
+      map((list) => ({ items: list.items, total: list.total, page: list.page, pageSize: list.pageSize })),
+    );
+  }
+
+  /**
+   * Stage 7G — list INTERNAL jobs with the operational board filters
+   * (board category, technician, priority, creation-date range,
+   * assigned, sort) plus status/search/pagination. Rows carry the
+   * active assignment, outstanding parts and latest work timestamp.
+   */
+  listBoardJobs(params: BusinessJobListParams = {}): Observable<BusinessBoardJobList> {
     let httpParams = new HttpParams();
     if (params.status?.trim()) httpParams = httpParams.set('status', params.status.trim());
+    if (params.board?.trim()) httpParams = httpParams.set('board', params.board.trim());
+    if (params.technicianId?.trim()) httpParams = httpParams.set('technicianId', params.technicianId.trim());
+    if (params.priority?.trim()) httpParams = httpParams.set('priority', params.priority.trim());
+    if (params.from?.trim()) httpParams = httpParams.set('from', params.from.trim());
+    if (params.to?.trim()) httpParams = httpParams.set('to', params.to.trim());
+    if (params.assigned !== undefined) httpParams = httpParams.set('assigned', String(params.assigned));
+    if (params.sort?.trim()) httpParams = httpParams.set('sort', params.sort.trim());
     if (params.search?.trim()) httpParams = httpParams.set('search', params.search.trim());
     if (params.page) httpParams = httpParams.set('page', String(params.page));
     if (params.pageSize) httpParams = httpParams.set('pageSize', String(params.pageSize));
     return this.http
-      .get<ApiSuccess<BusinessJobList>>(`${this.baseUrl}/business/jobs`, { params: httpParams })
+      .get<ApiSuccess<BusinessBoardJobList>>(`${this.baseUrl}/business/jobs`, { params: httpParams })
       .pipe(map((res) => res.data));
   }
 
@@ -231,6 +252,17 @@ export class BusinessService {
   getBusinessJobsSummary(): Observable<BusinessJobsSummary> {
     return this.http
       .get<ApiSuccess<BusinessJobsSummary>>(`${this.baseUrl}/business/jobs-summary`)
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Stage 7G — operational board counts (requested/assigned/scheduled/
+   * in-progress/awaiting-parts/completed/cancelled/history) for the
+   * dashboard and the job board tabs.
+   */
+  getBusinessBoardSummary(): Observable<BusinessBoardSummary> {
+    return this.http
+      .get<ApiSuccess<BusinessBoardSummary>>(`${this.baseUrl}/business/jobs-board-summary`)
       .pipe(map((res) => res.data));
   }
 

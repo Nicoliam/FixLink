@@ -4,22 +4,50 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BusinessService } from '../../core/services/business.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
-import { businessJobPriorityLabel, businessJobStatusLabel } from '../../core/models/business.model';
-import type { BusinessJob } from '../../core/models/business.model';
+import {
+  businessJobBoardLabel,
+  businessJobPriorityLabel,
+  businessJobStatusLabel,
+} from '../../core/models/business.model';
+import type {
+  BusinessBoardJob,
+  BusinessBoardSummary,
+  BusinessJobBoard,
+  BusinessJobBoardSort,
+  BusinessJobPriority,
+  Technician,
+} from '../../core/models/business.model';
 
 type JobsStatus = 'loading' | 'ready' | 'empty' | 'error';
 
-const STATUS_OPTIONS = ['', 'REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
+const BOARD_TABS: readonly BusinessJobBoard[] = [
+  'ALL',
+  'NEW',
+  'ASSIGNED',
+  'SCHEDULED',
+  'IN_PROGRESS',
+  'AWAITING_PARTS',
+  'COMPLETED',
+  'CANCELLED',
+  'HISTORY',
+];
+
+const PRIORITY_OPTIONS: readonly ('' | BusinessJobPriority)[] = ['', 'LOW', 'NORMAL', 'HIGH', 'URGENT'];
+
+const SORT_OPTIONS: readonly BusinessJobBoardSort[] = ['RECENT', 'SCHEDULED', 'PRIORITY'];
 
 /**
- * FixLink business internal jobs — Stage 7B (`/business/jobs`,
- * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
+ * FixLink business job board — Stage 7G (`/business/jobs`, authenticated
+ * BUSINESS_OWNER / BUSINESS_MANAGER).
  *
- * Lists INTERNAL jobs belonging to the caller's business (marketplace
- * jobs never appear here) with status/search filters and pagination.
- * Technician assignment and parts arrive in later stages, so no
- * assignment controls are shown. Authorization is backend-enforced;
- * the role checks in navigation only decide which links are offered.
+ * The operational board for the business's INTERNAL jobs (marketplace
+ * jobs never appear here). Board tabs derive from existing job state —
+ * NEW is REQUESTED, ASSIGNED means an active technician assignment
+ * exists, SCHEDULED is derived from the `scheduled_at` visit slot and
+ * HISTORY is the terminal set — never new statuses. Filtering is
+ * server-backed (board, technician, priority, creation-date range,
+ * search, sort) with business isolation enforced by the backend; the
+ * role checks in navigation only decide which links are offered.
  */
 @Component({
   selector: 'app-business-jobs-list',
@@ -33,30 +61,46 @@ export class BusinessJobsListComponent implements OnInit {
 
   protected readonly status = signal<JobsStatus>('loading');
   protected readonly errorMessage = signal('');
-  protected readonly jobs = signal<BusinessJob[]>([]);
+  protected readonly jobs = signal<BusinessBoardJob[]>([]);
   protected readonly total = signal(0);
   protected readonly page = signal(1);
   protected readonly pageSize = signal(20);
-  protected readonly statusFilter = signal('');
+  protected readonly board = signal<BusinessJobBoard>('ALL');
+  protected readonly technicianId = signal('');
+  protected readonly priority = signal<'' | BusinessJobPriority>('');
+  protected readonly from = signal('');
+  protected readonly to = signal('');
+  protected readonly sort = signal<BusinessJobBoardSort>('RECENT');
   protected readonly search = signal('');
+  protected readonly technicians = signal<Technician[]>([]);
+  protected readonly summary = signal<BusinessBoardSummary | null>(null);
 
   protected readonly statusLabel = businessJobStatusLabel;
   protected readonly priorityLabel = businessJobPriorityLabel;
-  protected readonly statusOptions = STATUS_OPTIONS;
+  protected readonly boardLabel = businessJobBoardLabel;
+  protected readonly boardTabs = BOARD_TABS;
+  protected readonly priorityOptions = PRIORITY_OPTIONS;
+  protected readonly sortOptions = SORT_OPTIONS;
 
   ngOnInit(): void {
+    this.loadTechnicians();
+    this.loadSummary();
     this.load();
   }
 
   protected load(targetPage = 1): void {
     this.status.set('loading');
     this.errorMessage.set('');
-    const filter = this.statusFilter().trim();
-    const search = this.search().trim();
+    const board = this.board();
     this.api
-      .listBusinessJobs({
-        ...(filter ? { status: filter } : {}),
-        ...(search ? { search } : {}),
+      .listBoardJobs({
+        ...(board !== 'ALL' ? { board } : {}),
+        ...(this.technicianId().trim() ? { technicianId: this.technicianId().trim() } : {}),
+        ...(this.priority() ? { priority: this.priority() } : {}),
+        ...(this.from().trim() ? { from: this.from().trim() } : {}),
+        ...(this.to().trim() ? { to: this.to().trim() } : {}),
+        ...(this.sort() !== 'RECENT' ? { sort: this.sort() } : {}),
+        ...(this.search().trim() ? { search: this.search().trim() } : {}),
         page: targetPage,
         pageSize: this.pageSize(),
       })
@@ -76,12 +120,43 @@ export class BusinessJobsListComponent implements OnInit {
       });
   }
 
+  private loadTechnicians(): void {
+    this.api
+      .listTechnicians()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (list) => this.technicians.set(list.items),
+        error: () => this.technicians.set([]),
+      });
+  }
+
+  private loadSummary(): void {
+    this.api
+      .getBusinessBoardSummary()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (summary) => this.summary.set(summary),
+        error: () => this.summary.set(null),
+      });
+  }
+
+  protected selectBoard(tab: BusinessJobBoard): void {
+    if (this.board() === tab) return;
+    this.board.set(tab);
+    this.load(1);
+  }
+
   protected applyFilters(): void {
     this.load(1);
   }
 
   protected clearFilters(): void {
-    this.statusFilter.set('');
+    this.board.set('ALL');
+    this.technicianId.set('');
+    this.priority.set('');
+    this.from.set('');
+    this.to.set('');
+    this.sort.set('RECENT');
     this.search.set('');
     this.load(1);
   }
@@ -98,11 +173,59 @@ export class BusinessJobsListComponent implements OnInit {
     return this.page() * this.pageSize() < this.total();
   }
 
-  protected statusFilterLabel(value: string): string {
-    return value === '' ? 'All statuses' : businessJobStatusLabel(value as Parameters<typeof businessJobStatusLabel>[0]);
+  protected boardCount(tab: BusinessJobBoard): number | null {
+    const summary = this.summary();
+    if (!summary) return null;
+    switch (tab) {
+      case 'ALL':
+        return summary.total;
+      case 'NEW':
+        return summary.requested;
+      case 'ASSIGNED':
+        return summary.assigned;
+      case 'SCHEDULED':
+        return summary.scheduled;
+      case 'IN_PROGRESS':
+        return summary.inProgress;
+      case 'AWAITING_PARTS':
+        return summary.awaitingParts;
+      case 'COMPLETED':
+        return summary.completed;
+      case 'CANCELLED':
+        return summary.cancelled;
+      case 'HISTORY':
+        return summary.history;
+    }
   }
 
-  protected dateLabel(job: BusinessJob): string {
-    return job.scheduledAt ?? job.createdAt;
+  protected priorityFilterLabel(value: '' | BusinessJobPriority): string {
+    return value === '' ? 'All priorities' : businessJobPriorityLabel(value);
+  }
+
+  protected sortLabel(value: BusinessJobBoardSort): string {
+    switch (value) {
+      case 'RECENT':
+        return 'Most recent';
+      case 'SCHEDULED':
+        return 'Scheduled visit';
+      case 'PRIORITY':
+        return 'Priority';
+    }
+  }
+
+  protected emptyTitle(): string {
+    return this.board() === 'ALL' ? 'No internal jobs yet' : 'No jobs in this view yet';
+  }
+
+  protected technicianLabel(job: BusinessBoardJob): string {
+    return job.assignment ? job.assignment.technician.displayName : 'Unassigned';
+  }
+
+  protected scheduledLabel(job: BusinessBoardJob): string {
+    return job.scheduledAt ?? 'Not scheduled yet';
+  }
+
+  protected partsLabel(job: BusinessBoardJob): string {
+    return job.partsOutstanding === 1 ? '1 part outstanding' : `${job.partsOutstanding} parts outstanding`;
   }
 }

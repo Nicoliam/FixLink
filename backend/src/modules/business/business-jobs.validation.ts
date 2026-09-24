@@ -13,6 +13,8 @@
 
 import type {
   CreateInternalJobInput,
+  InternalJobBoardCategory,
+  InternalJobBoardSort,
   InternalJobPriority,
   InternalJobStatus,
   UpdateInternalJobInput,
@@ -311,16 +313,76 @@ export function validateInternalJobCancel(body: unknown): ValidatedInternalJobCa
 
 export interface ValidatedInternalJobListQuery {
   status: InternalJobStatus | null;
+  /** Stage 7G — operational board category (never combined with `status` or `assigned`). */
+  board: InternalJobBoardCategory | null;
+  /** Stage 7G — active-assignment technician filter (roster id, server-scoped). */
+  technicianId: string | null;
+  /** Stage 7G — priority filter. */
+  priority: InternalJobPriority | null;
+  /** Stage 7G — creation-date range (ISO instants, inclusive). */
+  from: string | null;
+  to: string | null;
+  /** Stage 7G — assigned (active assignment exists) vs unassigned. */
+  assigned: boolean | null;
+  /** Stage 7G — result ordering. */
+  sort: InternalJobBoardSort;
   search: string | null;
   page: number;
   pageSize: number;
   error: { status: number; code: string; message: string } | null;
 }
 
-/** Parse and validate the GET /api/v1/business/jobs query string. */
+/** Stage 7G board categories for GET /api/v1/business/jobs. */
+export const INTERNAL_JOB_BOARDS: readonly InternalJobBoardCategory[] = [
+  'ALL',
+  'NEW',
+  'ASSIGNED',
+  'SCHEDULED',
+  'IN_PROGRESS',
+  'AWAITING_PARTS',
+  'COMPLETED',
+  'CANCELLED',
+  'HISTORY',
+];
+
+const BOARD_SORTS: readonly InternalJobBoardSort[] = ['RECENT', 'SCHEDULED', 'PRIORITY'];
+
+/** Parse an inclusive creation-date bound (YYYY-MM-DD or ISO datetime). */
+function parseBoardDate(raw: unknown, endOfDay: boolean): { value: string | null; error: string | null } {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return { value: null, error: null };
+  const trimmed = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    // A bare date covers the whole calendar day in UTC: the `from`
+    // bound starts at midnight, the `to` bound ends at 23:59:59.
+    const candidate = endOfDay ? `${trimmed}T23:59:59.999Z` : `${trimmed}T00:00:00.000Z`;
+    const parsed = new Date(candidate);
+    if (Number.isNaN(parsed.getTime())) return { value: null, error: 'Date filters must be valid dates (YYYY-MM-DD or ISO date/time).' };
+    return { value: parsed.toISOString(), error: null };
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return { value: null, error: 'Date filters must be valid dates (YYYY-MM-DD or ISO date/time).' };
+  return { value: parsed.toISOString(), error: null };
+}
+
+/**
+ * Parse and validate the GET /api/v1/business/jobs query string.
+ *
+ * Stage 7B filters (`status`, `search`, pagination) are unchanged.
+ * Stage 7G adds the operational board category plus technician,
+ * priority, creation-date-range, assigned and sort filters. Derived
+ * board categories (ASSIGNED from the assignment relationship,
+ * HISTORY from terminal statuses) never create new job statuses.
+ */
 export function validateInternalJobListQuery(query: Record<string, unknown>): ValidatedInternalJobListQuery {
   const fallback = (page: number, pageSize: number): ValidatedInternalJobListQuery => ({
     status: null,
+    board: null,
+    technicianId: null,
+    priority: null,
+    from: null,
+    to: null,
+    assigned: null,
+    sort: 'RECENT',
     search: null,
     page,
     pageSize,
@@ -328,6 +390,13 @@ export function validateInternalJobListQuery(query: Record<string, unknown>): Va
   });
   const invalid = (message: string): ValidatedInternalJobListQuery => ({
     status: null,
+    board: null,
+    technicianId: null,
+    priority: null,
+    from: null,
+    to: null,
+    assigned: null,
+    sort: 'RECENT',
     search: null,
     page: 1,
     pageSize: 20,
@@ -353,6 +422,70 @@ export function validateInternalJobListQuery(query: Record<string, unknown>): Va
     status = upper as InternalJobStatus;
   }
 
+  let board: InternalJobBoardCategory | null = null;
+  const rawBoard = query['board'];
+  if (rawBoard !== undefined && rawBoard !== null && String(rawBoard).trim() !== '') {
+    const upper = String(rawBoard).trim().toUpperCase();
+    if (!INTERNAL_JOB_BOARDS.includes(upper as InternalJobBoardCategory)) {
+      return invalid('Invalid board filter. Use all, new, assigned, scheduled, in_progress, awaiting_parts, completed, cancelled or history.');
+    }
+    board = upper as InternalJobBoardCategory;
+  }
+  if (board !== null && status !== null) {
+    return invalid('Board and status filters cannot be combined. Use one of them.');
+  }
+
+  let assigned: boolean | null = null;
+  const rawAssigned = query['assigned'];
+  if (rawAssigned !== undefined && rawAssigned !== null && String(rawAssigned).trim() !== '') {
+    const lowered = String(rawAssigned).trim().toLowerCase();
+    if (lowered !== 'true' && lowered !== 'false') {
+      return invalid('Invalid assigned filter. Use true or false.');
+    }
+    assigned = lowered === 'true';
+  }
+  if (board !== null && assigned !== null) {
+    return invalid('Board and assigned filters cannot be combined. Use one of them.');
+  }
+
+  let technicianId: string | null = null;
+  const rawTechnician = query['technicianId'] ?? query['technician_id'];
+  if (rawTechnician !== undefined && rawTechnician !== null && String(rawTechnician).trim() !== '') {
+    const trimmed = String(rawTechnician).trim();
+    if (!/^[1-9][0-9]*$/.test(trimmed)) {
+      return invalid('Invalid technician filter.');
+    }
+    technicianId = trimmed;
+  }
+
+  let priority: InternalJobPriority | null = null;
+  const rawPriority = query['priority'];
+  if (rawPriority !== undefined && rawPriority !== null && String(rawPriority).trim() !== '') {
+    const upper = String(rawPriority).trim().toUpperCase();
+    if (!PRIORITIES.includes(upper as InternalJobPriority)) {
+      return invalid('Invalid priority filter. Use LOW, NORMAL, HIGH or URGENT.');
+    }
+    priority = upper as InternalJobPriority;
+  }
+
+  const from = parseBoardDate(query['from'], false);
+  if (from.error) return invalid(from.error);
+  const to = parseBoardDate(query['to'] ?? query['until'], true);
+  if (to.error) return invalid(to.error);
+  if (from.value !== null && to.value !== null && from.value > to.value) {
+    return invalid('The from date must not be after the to date.');
+  }
+
+  let sort: InternalJobBoardSort = 'RECENT';
+  const rawSort = query['sort'] ?? query['order'];
+  if (rawSort !== undefined && rawSort !== null && String(rawSort).trim() !== '') {
+    const upper = String(rawSort).trim().toUpperCase();
+    if (!BOARD_SORTS.includes(upper as InternalJobBoardSort)) {
+      return invalid('Invalid sort. Use recent, scheduled or priority.');
+    }
+    sort = upper as InternalJobBoardSort;
+  }
+
   let search: string | null = null;
   const rawSearch = query['search'] ?? query['q'];
   if (rawSearch !== undefined && rawSearch !== null && String(rawSearch).trim() !== '') {
@@ -361,5 +494,5 @@ export function validateInternalJobListQuery(query: Record<string, unknown>): Va
     search = trimmed;
   }
 
-  return { ...fallback(page, pageSize), status, search };
+  return { ...fallback(page, pageSize), status, board, technicianId, priority, from: from.value, to: to.value, assigned, sort, search };
 }

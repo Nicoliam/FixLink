@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { BusinessService } from './business.service';
 import { API_BASE_URL } from '../config/api-config';
-import type { Business, Technician } from '../models/business.model';
+import type { Business, BusinessBoardSummary, Technician } from '../models/business.model';
 
 const API = 'http://test.local/api/v1';
 
@@ -136,5 +136,68 @@ describe('BusinessService', () => {
     expect(req.request.body).toEqual({ isActive: false });
     req.flush({ success: true, data: { ...technician, isActive: false }, message: 'ok' });
     expect(result).toEqual({ ...technician, isActive: false });
+  });
+
+  it('lists board jobs with board, technician, priority, date-range, sort and search params', () => {
+    let result: unknown = null;
+    service
+      .listBoardJobs({
+        board: 'AWAITING_PARTS',
+        technicianId: '7',
+        priority: 'HIGH',
+        from: '2026-09-01',
+        to: '2026-09-30',
+        sort: 'PRIORITY',
+        search: 'Naledi',
+        page: 1,
+        pageSize: 20,
+      })
+      .subscribe((value) => (result = value));
+    const req = httpMock.expectOne(
+      (request) =>
+        request.url === `${API}/business/jobs` &&
+        request.params.get('board') === 'AWAITING_PARTS' &&
+        request.params.get('technicianId') === '7' &&
+        request.params.get('priority') === 'HIGH' &&
+        request.params.get('from') === '2026-09-01' &&
+        request.params.get('to') === '2026-09-30' &&
+        request.params.get('sort') === 'PRIORITY' &&
+        request.params.get('search') === 'Naledi' &&
+        request.params.get('page') === '1' &&
+        request.params.get('pageSize') === '20',
+    );
+    expect(req.request.method).toBe('GET');
+    const page = { items: [], total: 0, page: 1, pageSize: 20 };
+    req.flush({ success: true, data: page, message: 'ok' });
+    expect(result).toEqual(page);
+  });
+
+  it('sends the assigned filter as a string param', () => {
+    service.listBoardJobs({ assigned: true }).subscribe();
+    const req = httpMock.expectOne(
+      (request) => request.url === `${API}/business/jobs` && request.params.get('assigned') === 'true',
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: { items: [], total: 0, page: 1, pageSize: 20 }, message: 'ok' });
+  });
+
+  it('fetches the operational board summary', () => {
+    const summary: BusinessBoardSummary = {
+      total: 4,
+      requested: 1,
+      assigned: 2,
+      scheduled: 1,
+      inProgress: 1,
+      awaitingParts: 1,
+      completed: 0,
+      cancelled: 0,
+      history: 0,
+    };
+    let result: BusinessBoardSummary | null = null;
+    service.getBusinessBoardSummary().subscribe((value) => (result = value));
+    const req = httpMock.expectOne(`${API}/business/jobs-board-summary`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: summary, message: 'ok' });
+    expect(result).toEqual(summary);
   });
 });

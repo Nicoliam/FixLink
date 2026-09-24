@@ -227,11 +227,109 @@ export interface BusinessJobList {
   pageSize: number;
 }
 
+/**
+ * Stage 7G — operational board categories for GET /api/v1/business/jobs
+ * (`board`). Derived from existing job state — never new statuses:
+ * NEW is REQUESTED, ASSIGNED means an active technician assignment
+ * exists, SCHEDULED is derived from the `scheduled_at` visit slot and
+ * HISTORY is the terminal set (COMPLETED / CLOSED / CONFIRMED).
+ */
+export type BusinessJobBoard =
+  | 'ALL'
+  | 'NEW'
+  | 'ASSIGNED'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'AWAITING_PARTS'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'HISTORY';
+
+/** Result ordering for the business job board (`sort`). */
+export type BusinessJobBoardSort = 'RECENT' | 'SCHEDULED' | 'PRIORITY';
+
 export interface BusinessJobListParams {
   status?: string;
+  /** Stage 7G board category (never combined with `status`). */
+  board?: BusinessJobBoard | string;
+  /** Stage 7G roster-technician filter (active assignment). */
+  technicianId?: string;
+  /** Stage 7G priority filter. */
+  priority?: BusinessJobPriority | string;
+  /** Stage 7G inclusive creation-date bounds (YYYY-MM-DD or ISO). */
+  from?: string;
+  to?: string;
+  /** Stage 7G assigned (active assignment exists) vs unassigned. */
+  assigned?: boolean;
+  /** Stage 7G result ordering. */
+  sort?: BusinessJobBoardSort | string;
   search?: string;
   page?: number;
   pageSize?: number;
+}
+
+/**
+ * Stage 7G — one operational board row: the shared INTERNAL job plus
+ * the active technician assignment (null when unassigned), the number
+ * of APPROVED-but-unfulfilled parts requests and the latest
+ * work-documentation timestamp (null when there is none yet).
+ */
+export interface BusinessBoardJob extends BusinessJob {
+  assignment: JobAssignment | null;
+  partsOutstanding: number;
+  lastUpdateAt: string | null;
+}
+
+export interface BusinessBoardJobList {
+  items: BusinessBoardJob[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Stage 7G — operational counts for the business job board and
+ * dashboard (`GET /api/v1/business/jobs-board-summary`). `assigned`
+ * counts jobs with an active technician assignment (any status),
+ * `awaitingParts` counts AWAITING_PARTS jobs and `history` counts the
+ * terminal set (COMPLETED / CLOSED / CONFIRMED).
+ */
+export interface BusinessBoardSummary {
+  total: number;
+  requested: number;
+  assigned: number;
+  scheduled: number;
+  inProgress: number;
+  awaitingParts: number;
+  completed: number;
+  cancelled: number;
+  history: number;
+}
+
+/** Human-readable board category for tabs and headings. */
+export function businessJobBoardLabel(board: BusinessJobBoard | string): string {
+  switch (board) {
+    case 'ALL':
+      return 'All jobs';
+    case 'NEW':
+      return 'New';
+    case 'ASSIGNED':
+      return 'Assigned';
+    case 'SCHEDULED':
+      return 'Scheduled';
+    case 'IN_PROGRESS':
+      return 'In progress';
+    case 'AWAITING_PARTS':
+      return 'Awaiting parts';
+    case 'COMPLETED':
+      return 'Completed';
+    case 'CANCELLED':
+      return 'Cancelled';
+    case 'HISTORY':
+      return 'History';
+    default:
+      return String(board);
+  }
 }
 
 export interface CreateBusinessJobRequest {

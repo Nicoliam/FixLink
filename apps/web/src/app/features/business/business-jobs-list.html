@@ -4,12 +4,31 @@
   </nav>
 
   <p class="fl-eyebrow">Jobs</p>
-  <h1 class="fl-page-title">Internal jobs</h1>
-  <p class="fl-page-subtitle">Jobs for customers your business manages directly.</p>
+  <h1 class="fl-page-title">Job board</h1>
+  <p class="fl-page-subtitle">Operational view of the jobs your business manages directly.</p>
 
   <p>
     <a class="fl-btn fl-btn-primary fl-btn-sm" routerLink="/business/jobs/new">Create internal job</a>
   </p>
+
+  <nav class="fl-card" aria-label="Job board categories">
+    <div class="fl-board-tabs" role="group" aria-label="Filter jobs by category">
+      @for (tab of boardTabs; track tab) {
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary fl-btn-sm"
+          [class.fl-btn-primary]="board() === tab"
+          [attr.aria-pressed]="board() === tab"
+          (click)="selectBoard(tab)"
+        >
+          {{ boardLabel(tab) }}@if (boardCount(tab) !== null) {
+            <span aria-hidden="true"> ({{ boardCount(tab) }})</span>
+            <span class="fl-visually-hidden">, {{ boardCount(tab) }} jobs</span>
+          }
+        </button>
+      }
+    </div>
+  </nav>
 
   <section class="fl-card" aria-label="Filter jobs">
     <form
@@ -18,10 +37,47 @@
       novalidate
     >
       <div class="fl-field">
-        <label for="jobs-status">Status</label>
-        <select id="jobs-status" class="fl-input" [(ngModel)]="statusFilter" name="status">
-          @for (option of statusOptions; track option) {
-            <option [value]="option">{{ statusFilterLabel(option) }}</option>
+        <label for="jobs-technician">Technician</label>
+        <select id="jobs-technician" class="fl-input" [(ngModel)]="technicianId" name="technician">
+          <option value="">All technicians</option>
+          @for (technician of technicians(); track technician.id) {
+            <option [value]="technician.id">{{ technician.displayName }}</option>
+          }
+        </select>
+      </div>
+      <div class="fl-field">
+        <label for="jobs-priority">Priority</label>
+        <select id="jobs-priority" class="fl-input" [(ngModel)]="priority" name="priority">
+          @for (option of priorityOptions; track option) {
+            <option [value]="option">{{ priorityFilterLabel(option) }}</option>
+          }
+        </select>
+      </div>
+      <div class="fl-field">
+        <label for="jobs-from">Created from</label>
+        <input
+          id="jobs-from"
+          class="fl-input"
+          type="date"
+          [(ngModel)]="from"
+          name="from"
+        />
+      </div>
+      <div class="fl-field">
+        <label for="jobs-to">Created to</label>
+        <input
+          id="jobs-to"
+          class="fl-input"
+          type="date"
+          [(ngModel)]="to"
+          name="to"
+        />
+      </div>
+      <div class="fl-field">
+        <label for="jobs-sort">Sort by</label>
+        <select id="jobs-sort" class="fl-input" [(ngModel)]="sort" name="sort">
+          @for (option of sortOptions; track option) {
+            <option [value]="option">{{ sortLabel(option) }}</option>
           }
         </select>
       </div>
@@ -33,7 +89,7 @@
           type="search"
           [(ngModel)]="search"
           name="search"
-          placeholder="Reference, description or customer"
+          placeholder="Reference, customer, phone or service"
         />
       </div>
       <button type="submit" class="fl-btn fl-btn-secondary fl-btn-sm">Apply filters</button>
@@ -53,8 +109,8 @@
     </div>
   } @else if (status() === 'empty') {
     <div class="fl-state" role="status">
-      <h2 class="fl-state-title">No internal jobs yet</h2>
-      <p class="fl-state-text">Create your first internal job for a customer your business manages.</p>
+      <h2 class="fl-state-title">{{ emptyTitle() }}</h2>
+      <p class="fl-page-subtitle">Create your first internal job for a customer your business manages.</p>
       <a class="fl-btn fl-btn-primary fl-btn-sm" routerLink="/business/jobs/new">Create internal job</a>
     </div>
   } @else {
@@ -66,7 +122,23 @@
             <a class="fl-link" [routerLink]="['/business/jobs', job.id]">{{ job.reference }}</a>
           </h2>
           <p class="fl-card-text">{{ job.customer.displayName }} · {{ job.service.name }}</p>
-          <p class="fl-card-text">{{ dateLabel(job) }}</p>
+          @if (job.customer.phone) {
+            <p class="fl-card-text">{{ job.customer.phone }}</p>
+          }
+          <p class="fl-card-text">Technician: {{ technicianLabel(job) }}</p>
+          @if (job.assignment) {
+            <p class="fl-card-text">Assigned {{ job.assignment.assignedAt }}</p>
+          }
+          <p class="fl-card-text">Scheduled: {{ scheduledLabel(job) }}</p>
+          <p class="fl-card-text">Created {{ job.createdAt }}</p>
+          @if (job.status === 'AWAITING_PARTS') {
+            <p class="fl-card-text"><strong>Awaiting parts — {{ partsLabel(job) }}</strong></p>
+          } @else if (job.partsOutstanding > 0) {
+            <p class="fl-card-text">{{ partsLabel(job) }}</p>
+          }
+          @if (job.lastUpdateAt) {
+            <p class="fl-card-text">Last work update {{ job.lastUpdateAt }}</p>
+          }
           <p class="fl-card-text">{{ job.description }}</p>
         </article>
       }

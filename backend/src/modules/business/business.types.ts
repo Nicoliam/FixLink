@@ -245,6 +245,86 @@ export interface InternalJobsSummary {
 }
 
 /**
+ * FixLink Stage 7G — business job board + history.
+ *
+ * The board reuses the ONE shared `jobs` table (`source = INTERNAL`)
+ * plus `job_assignments`, `job_status_history`, `job_updates`,
+ * `job_images`, `job_voice_notes`, `parts_requests` and
+ * `job_approvals`. No new tables, no duplicate statuses, no second
+ * timeline. "Assigned" is derived from the active TECHNICIAN
+ * assignment row (`unassigned_at IS NULL`); "New" is `REQUESTED`;
+ * "History" is the terminal set COMPLETED / CLOSED / CONFIRMED.
+ */
+
+/** Operational board category for GET /api/v1/business/jobs (`board`). */
+export type InternalJobBoardCategory =
+  | 'ALL'
+  | 'NEW'
+  | 'ASSIGNED'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'AWAITING_PARTS'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'HISTORY';
+
+/** Result ordering for the business job board (`sort`). */
+export type InternalJobBoardSort = 'RECENT' | 'SCHEDULED' | 'PRIORITY';
+
+/** Board filter set parsed from the GET /api/v1/business/jobs query string. */
+export interface InternalJobBoardQuery {
+  status: InternalJobStatus | null;
+  board: InternalJobBoardCategory | null;
+  /** Active-assignment roster technician id (business-scoped by the service). */
+  technicianId: string | null;
+  priority: InternalJobPriority | null;
+  /** Inclusive creation-date bounds as ISO instants (or null). */
+  from: string | null;
+  to: string | null;
+  /** True = has an active assignment; false = unassigned. */
+  assigned: boolean | null;
+  sort: InternalJobBoardSort;
+  search: string | null;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * One operational board row: the shared INTERNAL job projection plus
+ * the active technician assignment (null when unassigned), the number
+ * of APPROVED-but-unfulfilled parts requests (outstanding materials)
+ * and the most recent work-documentation timestamp (null when the job
+ * has no notes, photos or voice notes yet).
+ */
+export interface BusinessBoardJobDto extends InternalJobDto {
+  assignment: JobAssignmentDto | null;
+  /** APPROVED parts requests not yet marked PARTS_AVAILABLE. */
+  partsOutstanding: number;
+  /** Latest job_updates / job_images / job_voice_notes timestamp, or null. */
+  lastUpdateAt: string | null;
+}
+
+/**
+ * Operational counts for the business job board
+ * (GET /api/v1/business/jobs-board-summary). All INTERNAL jobs of the
+ * caller's business; `assigned` counts jobs with an active technician
+ * assignment (any status), `awaitingParts` counts AWAITING_PARTS jobs
+ * and `history` counts the terminal set (COMPLETED / CLOSED /
+ * CONFIRMED). The legacy `jobs-summary` shape is unchanged.
+ */
+export interface BusinessBoardSummary {
+  total: number;
+  requested: number;
+  assigned: number;
+  scheduled: number;
+  inProgress: number;
+  awaitingParts: number;
+  completed: number;
+  cancelled: number;
+  history: number;
+}
+
+/**
  * FixLink Stage 7C — technician assignment.
  *
  * Assignments reuse the existing `job_assignments` table with

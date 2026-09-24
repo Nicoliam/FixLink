@@ -1,5 +1,53 @@
 # FixLink — Changelog
 
+## Stage 7G — Business Job Board + History (2026-09-24)
+
+- Operational board on the existing shared jobs
+  architecture — no new tables, no duplicate statuses, no
+  second timeline: extended `GET /api/v1/business/jobs`
+  (`backend/src/modules/business/` — same router,
+  controller, service, memory + MySQL stores) with
+  server-backed `board` (ALL/NEW/ASSIGNED/SCHEDULED/
+  IN_PROGRESS/AWAITING_PARTS/COMPLETED/CANCELLED/HISTORY),
+  `technicianId`, `priority`, `from`/`to` (inclusive
+  creation-date bounds), `assigned`, `sort`
+  (RECENT/SCHEDULED/PRIORITY) plus the Stage 7B
+  `status`/`search`/pagination. Derivation, not new
+  state: NEW is REQUESTED, ASSIGNED is the active
+  TECHNICIAN assignment, SCHEDULED is the `scheduled_at`
+  slot, HISTORY is COMPLETED/CLOSED/CONFIRMED.
+  Rows carry `assignment` (technician + assignedAt),
+  `partsOutstanding` (APPROVED not yet available) and
+  `lastUpdateAt`; search covers reference/title/
+  description/customer name/email/phone/service.
+  New `GET /api/v1/business/jobs-board-summary`
+  (`total/requested/assigned/scheduled/inProgress/
+  awaitingParts/completed/cancelled/history`,
+  business-scoped); legacy `jobs-summary` unchanged.
+  Isolation throughout: owner/manager only (`403`/
+  `401`), server-derived business, foreign jobs `404`,
+  foreign technician filter → empty `200`, marketplace
+  excluded.
+- Angular: `/business/jobs` is the board (counted
+  category tabs, technician/priority/date/sort/search
+  filters, operational cards with awaiting-parts badge,
+  pagination, loading/empty/error states, detail links)
+  and the dashboard gains the operations card; design
+  system extended with wrapping `.fl-board-tabs`.
+  Technician My Jobs untouched.
+- Tests: `backend/tests/business-job-board.test.ts`
+  (22 cases: auth, isolation, all nine boards,
+  derivation, enrichment, counts, filters, search,
+  dates, pagination, sorting, invalid `422`s) plus
+  rewritten/extended frontend board, dashboard and
+  service specs. Full backend suite green: 353/353;
+  frontend suite green: 29 files, 243 tests;
+  `tsc --noEmit` (backend + web app + specs) and both
+  builds pass.
+- Out of scope (next: Stage 8 — Notifications):
+  notification persistence/delivery, payments, admin,
+  GPS, messaging.
+
 ## Stage 7F — Manager Approvals + Awaiting Parts (2026-09-24)
 
 - Manager approval workflow on the existing tables — no new

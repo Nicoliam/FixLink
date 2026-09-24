@@ -55,6 +55,8 @@ import type {
   InternalJobDetailDto,
   InternalJobDto,
   InternalJobsSummary,
+  BusinessBoardJobDto,
+  BusinessBoardSummary,
   JobAssignmentDetailDto,
   JobAssignmentDto,
   PartsApprovalDto,
@@ -511,7 +513,7 @@ export class BusinessService {
   async listInternalJobs(
     authUserId: string,
     query: Record<string, unknown>,
-  ): Promise<ServiceResult<{ items: InternalJobDto[]; total: number; page: number; pageSize: number }>> {
+  ): Promise<ServiceResult<{ items: BusinessBoardJobDto[]; total: number; page: number; pageSize: number }>> {
     const access = await this.resolveManagement(authUserId);
     if (access.businessId === null) {
       return fail(access.status, access.code, access.message);
@@ -520,8 +522,24 @@ export class BusinessService {
     if (parsed.error) {
       return fail(parsed.error.status, parsed.error.code, parsed.error.message);
     }
+    // A technician filter for a roster row outside the caller's
+    // business yields an empty page (200) rather than 404: filters
+    // never leak whether a foreign technician id exists.
+    if (parsed.technicianId !== null) {
+      const technician = await this.business.getTechnicianById(parsed.technicianId);
+      if (!technician || technician.businessId !== access.businessId) {
+        return { status: 200, data: { items: [], total: 0, page: parsed.page, pageSize: parsed.pageSize } };
+      }
+    }
     const result = await this.business.listInternalJobs(access.businessId, {
       status: parsed.status,
+      board: parsed.board,
+      technicianId: parsed.technicianId,
+      priority: parsed.priority,
+      from: parsed.from,
+      to: parsed.to,
+      assigned: parsed.assigned,
+      sort: parsed.sort,
       search: parsed.search,
       page: parsed.page,
       pageSize: parsed.pageSize,
@@ -608,6 +626,21 @@ export class BusinessService {
       return fail(access.status, access.code, access.message);
     }
     const summary = await this.business.countInternalJobsByStatus(access.businessId);
+    return { status: 200, data: summary };
+  }
+
+  /**
+   * Stage 7G — operational board counts (requested/assigned/scheduled/
+   * in-progress/awaiting-parts/completed/cancelled/history) for the
+   * business dashboard and the job board tabs. Business-scoped like
+   * every other management read; the legacy summary above is unchanged.
+   */
+  async getBoardJobsSummary(authUserId: string): Promise<ServiceResult<BusinessBoardSummary>> {
+    const access = await this.resolveManagement(authUserId);
+    if (access.businessId === null) {
+      return fail(access.status, access.code, access.message);
+    }
+    const summary = await this.business.countBoardJobs(access.businessId);
     return { status: 200, data: summary };
   }
 

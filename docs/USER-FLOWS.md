@@ -403,6 +403,37 @@ Assignment updated
 New technician notified
 
 
+## 4.6 Business Job Board + History (Stage 7G)
+
+Business owner / manager
+↓
+Open job board (`/business/jobs`)
+↓
+Category tabs with live counts (All, New, Assigned,
+Scheduled, In Progress, Awaiting Parts, Completed,
+Cancelled, History)
+↓
+Filter (technician, priority, creation-date range, sort,
+search over reference/customer/phone/service)
+↓
+Job card (reference, customer, service, technician +
+assignment date, status, priority, scheduled/created
+dates, awaiting-parts badge, last work update)
+↓
+Open job → existing job detail (customer, service,
+assignment, schedule, Before/During/After, notes, voice
+notes, parts, approvals, timeline)
+↓
+History tab for completed/closed work
+↓
+Dashboard operations card (assigned, awaiting parts,
+history)
+
+Technician flow unchanged: My Jobs still shows only
+assigned jobs. Marketplace flow unchanged: marketplace
+jobs never appear on the internal board.
+
+
 # 5. TECHNICIAN FLOW
 
 

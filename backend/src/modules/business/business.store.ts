@@ -14,12 +14,15 @@
  */
 import type {
   AssignTechnicianInput,
+  BusinessBoardJobDto,
+  BusinessBoardSummary,
   BusinessCustomerDto,
   BusinessDto,
   BusinessIdentity,
   CreateBusinessCustomerInput,
   CreateInternalJobInput,
   CreatePartsRequestInput,
+  InternalJobBoardQuery,
   InternalJobDetailDto,
   InternalJobDto,
   InternalJobsSummary,
@@ -133,11 +136,11 @@ export interface BusinessStore {
    * belongs to the business and the service is active.
    */
   createInternalJob(input: PersistInternalJobInput): Promise<InternalJobDto>;
-  /** INTERNAL jobs for one business, newest first, paginated + filtered. */
+  /** INTERNAL jobs for one business, paginated + filtered (Stage 7G board). */
   listInternalJobs(
     businessId: string,
-    query: { status: InternalJobStatus | null; search: string | null; page: number; pageSize: number },
-  ): Promise<{ items: InternalJobDto[]; total: number }>;
+    query: InternalJobBoardQuery,
+  ): Promise<{ items: BusinessBoardJobDto[]; total: number }>;
   /** One INTERNAL job with embedded customer/service/business, or null. */
   getInternalJob(businessId: string, jobId: string): Promise<InternalJobDto | null>;
   /** Apply a validated field patch (no status change); null when unknown/foreign. */
@@ -157,6 +160,12 @@ export interface BusinessStore {
   listInternalJobHistory(businessId: string, jobId: string): Promise<InternalJobTimelineEntry[] | null>;
   /** INTERNAL job counts by status for the business dashboard. */
   countInternalJobsByStatus(businessId: string): Promise<InternalJobsSummary>;
+  /**
+   * Stage 7G — operational board counts for one business (all INTERNAL
+   * jobs: requested/assigned/scheduled/in-progress/awaiting-parts/
+   * completed/cancelled/history). The legacy summary above is unchanged.
+   */
+  countBoardJobs(businessId: string): Promise<BusinessBoardSummary>;
   /** Full internal-job detail (job + timeline) for the detail endpoint. */
   getInternalJobDetail(businessId: string, jobId: string): Promise<InternalJobDetailDto | null>;
   // ------------------------------------------------------------------

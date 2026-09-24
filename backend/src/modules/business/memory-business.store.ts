@@ -28,11 +28,14 @@ import {
 } from './business.store';
 import type {
   AssignTechnicianInput,
+  BusinessBoardJobDto,
+  BusinessBoardSummary,
   BusinessCustomerContact,
   BusinessCustomerDto,
   BusinessDto,
   BusinessIdentity,
   CreateBusinessCustomerInput,
+  InternalJobBoardQuery,
   InternalJobBusinessSummary,
   InternalJobCustomerSummary,
   InternalJobDetailDto,
@@ -546,25 +549,40 @@ export class MemoryBusinessStore implements BusinessStore {
 
   async listInternalJobs(
     businessId: string,
-    query: { status: InternalJobStatus | null; search: string | null; page: number; pageSize: number },
-  ): Promise<{ items: InternalJobDto[]; total: number }> {
+    query: InternalJobBoardQuery,
+  ): Promise<{ items: BusinessBoardJobDto[]; total: number }> {
     const needle = query.search === null ? null : query.search.toLowerCase();
-    const owned: InternalJobDto[] = [];
+    const owned: InternalJobRow[] = [];
     for (const row of this.internalJobs.values()) {
       if (row.businessId !== businessId) continue;
       if (query.status !== null && row.status !== query.status) continue;
+      if (!matchesBoardCategory(row, query.board, (jobId) => this.activeAssignmentForJob(jobId))) continue;
+      if (query.assigned !== null) {
+        const hasAssignment = this.activeAssignmentForJob(row.id) !== null;
+        if (hasAssignment !== query.assigned) continue;
+      }
+      if (query.technicianId !== null) {
+        const active = this.activeAssignmentForJob(row.id);
+        if (!active || active.technicianId !== query.technicianId) continue;
+      }
+      if (query.priority !== null && row.priority !== query.priority) continue;
+      if (query.from !== null && row.createdAt < query.from) continue;
+      if (query.to !== null && row.createdAt > endOfDayIso(query.to)) continue;
       const dto = this.toJobDto(row);
       if (!dto) continue;
       if (needle) {
         const haystack =
-          `${dto.reference} ${dto.description} ${dto.title ?? ''} ${dto.customer.displayName} ${dto.service.name}`.toLowerCase();
+          `${dto.reference} ${dto.description} ${dto.title ?? ''} ${dto.customer.displayName} ${dto.customer.email ?? ''} ${dto.customer.phone ?? ''} ${dto.service.name}`.toLowerCase();
         if (!haystack.includes(needle)) continue;
       }
-      owned.push(dto);
+      owned.push(row);
     }
-    owned.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    sortBoardRows(owned, query.sort);
     const start = (query.page - 1) * query.pageSize;
-    return { items: owned.slice(start, start + query.pageSize), total: owned.length };
+    return {
+      items: owned.slice(start, start + query.pageSize).map((row) => this.toBoardJobDto(row)),
+      total: owned.length,
+    };
   }
 
   async getInternalJob(businessId: string, jobId: string): Promise<InternalJobDto | null> {
@@ -657,6 +675,65 @@ export class MemoryBusinessStore implements BusinessStore {
     if (!job) return null;
     const timeline = (await this.listInternalJobHistory(businessId, jobId)) ?? [];
     return { job, timeline };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7G — business job board enrichment + operational counts.
+  // ------------------------------------------------------------------
+
+  /** Active assignment (contact info only), outstanding APPROVED parts and latest work timestamp. */
+  private toBoardJobDto(row: InternalJobRow): BusinessBoardJobDto {
+    const job = this.toJobDto(row);
+    if (!job) throw new Error('Board job failed: customer row not found after insert.');
+    const active = this.activeAssignmentForJob(row.id);
+    const assignment = active ? this.toAssignmentDto(active) : null;
+    let partsOutstanding = 0;
+    for (const request of this.partsRequests.values()) {
+      if (request.jobId === row.id && request.status === 'APPROVED') partsOutstanding += 1;
+    }
+    let lastUpdateAt: string | null = null;
+    const consider = (value: string): void => {
+      if (lastUpdateAt === null || value > lastUpdateAt) lastUpdateAt = value;
+    };
+    for (const update of this.techUpdates) {
+      if (update.jobId === row.id) consider(update.createdAt);
+    }
+    for (const image of this.techImages.values()) {
+      if (image.jobId === row.id) consider(image.createdAt);
+    }
+    for (const voice of this.voiceNotes.values()) {
+      if (voice.jobId === row.id) consider(voice.createdAt);
+    }
+    return { ...job, assignment, partsOutstanding, lastUpdateAt };
+  }
+
+  async countBoardJobs(businessId: string): Promise<BusinessBoardSummary> {
+    const summary: BusinessBoardSummary = {
+      total: 0,
+      requested: 0,
+      assigned: 0,
+      scheduled: 0,
+      inProgress: 0,
+      awaitingParts: 0,
+      completed: 0,
+      cancelled: 0,
+      history: 0,
+    };
+    for (const row of this.internalJobs.values()) {
+      if (row.businessId !== businessId) continue;
+      summary.total += 1;
+      if (this.activeAssignmentForJob(row.id) !== null) summary.assigned += 1;
+      if (row.status === 'REQUESTED') summary.requested += 1;
+      if (isScheduledBoardRow(row)) summary.scheduled += 1;
+      if (row.status === 'IN_PROGRESS') summary.inProgress += 1;
+      else if (row.status === 'AWAITING_PARTS') summary.awaitingParts += 1;
+      else if (row.status === 'COMPLETED') summary.completed += 1;
+      else if (row.status === 'CANCELLED') summary.cancelled += 1;
+      if (row.status === 'COMPLETED' || row.status === 'CLOSED' || row.status === 'CONFIRMED') {
+        summary.history += 1;
+      }
+    }
+    return summary;
   }
 
   // ------------------------------------------------------------------
@@ -1600,6 +1677,79 @@ function toCustomerDto(row: BusinessCustomerRow): BusinessCustomerDto {
 }
 
 /**
+ * Stage 7G — board category predicate. "Assigned" is derived from the
+ * active TECHNICIAN assignment (no ASSIGNED status exists); "New" is
+ * REQUESTED; "Scheduled" is derived from the `scheduled_at` visit slot
+ * (no promotion endpoint moves internal jobs to SCHEDULED);
+ * "History" is the terminal set COMPLETED / CLOSED / CONFIRMED. Every
+ * other category maps to its lifecycle status.
+ */
+function matchesBoardCategory(
+  row: InternalJobRow,
+  board: InternalJobBoardQuery['board'],
+  activeAssignment: (jobId: string) => { technicianId: string } | null,
+): boolean {
+  if (board === null || board === 'ALL') return true;
+  switch (board) {
+    case 'NEW':
+      return row.status === 'REQUESTED';
+    case 'ASSIGNED':
+      return activeAssignment(row.id) !== null;
+    case 'SCHEDULED':
+      return isScheduledBoardRow(row);
+    case 'IN_PROGRESS':
+      return row.status === 'IN_PROGRESS';
+    case 'AWAITING_PARTS':
+      return row.status === 'AWAITING_PARTS';
+    case 'COMPLETED':
+      return row.status === 'COMPLETED';
+    case 'CANCELLED':
+      return row.status === 'CANCELLED';
+    case 'HISTORY':
+      return row.status === 'COMPLETED' || row.status === 'CLOSED' || row.status === 'CONFIRMED';
+    default:
+      return true;
+  }
+}
+
+/**
+ * Stage 7G — "scheduled" derivation shared by the SCHEDULED board
+ * category and the board-summary count. No promotion endpoint moves
+ * internal jobs to a SCHEDULED status, so the board derives it from
+ * the visit slot itself: a REQUESTED/SCHEDULED job with `scheduled_at`
+ * set. Completed, cancelled and in-progress jobs keep their own
+ * categories even when they retain a slot.
+ */
+function isScheduledBoardRow(row: InternalJobRow): boolean {
+  return (row.status === 'REQUESTED' || row.status === 'SCHEDULED') && row.scheduledAt !== null;
+}
+
+/** Stage 7G — board ordering: recent, scheduled visit, then priority. */
+function sortBoardRows(rows: InternalJobRow[], sort: InternalJobBoardQuery['sort']): void {
+  const priorityRank = (priority: InternalJobRow['priority']): number =>
+    priority === 'URGENT' ? 0 : priority === 'HIGH' ? 1 : priority === 'NORMAL' ? 2 : 3;
+  if (sort === 'SCHEDULED') {
+    rows.sort((a, b) => {
+      if (a.scheduledAt === null && b.scheduledAt === null) return a.createdAt < b.createdAt ? 1 : -1;
+      if (a.scheduledAt === null) return 1;
+      if (b.scheduledAt === null) return -1;
+      if (a.scheduledAt !== b.scheduledAt) return a.scheduledAt < b.scheduledAt ? -1 : 1;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    });
+    return;
+  }
+  if (sort === 'PRIORITY') {
+    rows.sort((a, b) => {
+      const rank = priorityRank(a.priority) - priorityRank(b.priority);
+      if (rank !== 0) return rank;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    });
+    return;
+  }
+  rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/**
  * Normalize the validated `YYYY-MM-DD HH:MM:SS` scheduled value to the
  * ISO instant the API reports (wall-clock echo, no timezone shift —
  * the slot the business picked is what every consumer reads).
@@ -1607,4 +1757,17 @@ function toCustomerDto(row: BusinessCustomerRow): BusinessCustomerDto {
 function toJobIso(scheduledAt: string | null): string | null {
   if (scheduledAt === null) return null;
   return scheduledAt.replace(' ', 'T');
+}
+
+/**
+ * Stage 7G — extend a `to` bound parsed as a bare YYYY-MM-DD date to the
+ * end of that UTC day so the whole day is included (a full ISO datetime
+ * is honoured as given).
+ */
+function endOfDayIso(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/.test(value)) {
+    const day = value.slice(0, 10);
+    return `${day}T23:59:59.999Z`;
+  }
+  return value;
 }

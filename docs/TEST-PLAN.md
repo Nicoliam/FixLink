@@ -642,3 +642,66 @@ Migration 011 extends `parts_requests.status` with
 `PARTS_AVAILABLE` (Up/Down); `job_approvals`, `jobs`,
 `job_status_history` reused unchanged — no new tables, no
 duplicate job architecture.
+
+## Stage 7G — Business Job Board + History
+
+Backend (`backend/tests/business-job-board.test.ts`, 22
+cases, in-memory business store with the same rules as the
+MySQL implementation — run with `npm test` from `backend/`):
+
+- Authorization/isolation (1–7): unauthenticated board +
+  board-summary `401`; technician `403` (board + summary);
+  customer `403`; owner/manager list only own business
+  jobs; cross-business detail `404` (no probing);
+  marketplace jobs excluded from the board; search cannot
+  leak another business's jobs.
+- Categories/derivation (8–15): all nine board values
+  against the lifecycle (NEW = REQUESTED incl. assigned
+  and scheduled rows, ASSIGNED = active assignment,
+  SCHEDULED = `scheduled_at` slot, HISTORY = terminal —
+  no duplicate statuses); manager parity; assigned
+  true/false; exact `status` filtering; enriched rows
+  (technician + assignedAt, partsOutstanding 1/0,
+  lastUpdateAt null vs completion note); board summary
+  all nine buckets + zero-business zeros (business-
+  scoped); legacy `jobs-summary` shape unchanged;
+  detail reachability from the board.
+- Filtering/search/pagination/sorting (16–22):
+  roster-scoped technician filter (foreign tech → empty
+  `200`); priority (case-insensitive); search over
+  reference/customer/phone/service; creation-date range
+  (bare-day inclusive, from-after-to `422`);
+  `page`/`pageSize`/`total`; priority + scheduled sorts;
+  invalid filters `422` (bad board, board+status,
+  board+assigned, bad priority/sort/assigned/technician/
+  date).
+- Full backend suite green (353/353, incl. all prior
+  stages and the pre-existing working-tree 7B spec).
+
+Frontend (`apps/web`, `npm test` — 29 files, 243 tests,
+all green):
+
+- `business-jobs-list.spec.ts` (rewritten for 7G):
+  loading/empty/error states; job cards (reference,
+  status, source, customer, service, priority);
+  operational info (technician + assignment date, last
+  update) with no inline assignment controls; board tabs
+  with counts; tab selection dispatches the board
+  filter (incl. HISTORY); technician/priority/date/
+  sort/search params; awaiting-parts badge with
+  outstanding count; unassigned display; pagination;
+  detail links.
+- `business-dashboard.spec.ts` (+ operations card):
+  assigned/awaiting-parts/history counts and the
+  Open-job-board link; legacy counts unchanged.
+- `business.service.spec.ts` (+ board params):
+  board/technician/priority/from/to/sort/search/page
+  params, assigned string param, board-summary endpoint.
+- Technician My Jobs specs untouched and passing —
+  technicians still see only assigned jobs.
+
+No migration in Stage 7G — `jobs` (`business_id`,
+`source`, `status`, `priority`, `scheduled_at`,
+`created_at`), `job_assignments`, the execution tables
+and `parts_requests.status` already support the board;
+`011_parts_available.sql` remains the latest migration.
