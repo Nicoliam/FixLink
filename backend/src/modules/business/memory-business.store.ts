@@ -11,8 +11,16 @@
  */
 import {
   JobNotCancellableError,
+  JobNotStartableError,
+  TechnicianImageNotDeletableError,
   TechnicianConflictError,
+  TechnicianJobNotCompletableError,
+  TechnicianJobNotExecutableError,
   type BusinessStore,
+  type CreateTechnicianImageInput,
+  type CreateTechnicianUpdateInput,
+  type CreateTechnicianVoiceNoteInput,
+  type DeleteTechnicianImageInput,
   type LinkTechnicianPersistInput,
   type PersistInternalJobInput,
 } from './business.store';
@@ -34,6 +42,10 @@ import type {
   JobAssignmentDto,
   JobAssignmentHistoryEntry,
   TechnicianDto,
+  TechnicianJobImageDto,
+  TechnicianJobUpdateDto,
+  TechnicianVoiceNoteDto,
+  TechnicianWorkPhase,
   UpdateBusinessCustomerInput,
   UpdateBusinessInput,
   UpdateInternalJobInput,
@@ -120,6 +132,42 @@ interface AssignmentRow {
   unassignedAt: string | null;
 }
 
+/** Stage 7D — mirrors one `job_images` row (shared table, INTERNAL jobs). */
+interface TechnicianImageRow {
+  id: string;
+  jobId: string;
+  uploadedBy: string;
+  phase: TechnicianWorkPhase;
+  storageKey: string;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+/** Stage 7D — mirrors one `job_updates` row (shared table, INTERNAL jobs). */
+interface TechnicianUpdateRow {
+  id: string;
+  jobId: string;
+  authorId: string;
+  phase: TechnicianWorkPhase;
+  note: string;
+  createdAt: string;
+}
+
+/** Stage 7D — mirrors one `job_voice_notes` row (shared table). */
+interface TechnicianVoiceRow {
+  id: string;
+  jobId: string;
+  authorId: string;
+  storageKey: string;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  durationSeconds: number | null;
+  createdAt: string;
+}
+
 export interface SeedBusinessInput {
   ownerUserId: string;
   businessName?: string;
@@ -148,6 +196,12 @@ export class MemoryBusinessStore implements BusinessStore {
   private readonly internalHistory: HistoryRow[] = [];
   private assignmentSeq = 0;
   private readonly assignments: AssignmentRow[] = [];
+  private techImageSeq = 0;
+  private readonly techImages = new Map<string, TechnicianImageRow>();
+  private techUpdateSeq = 0;
+  private readonly techUpdates: TechnicianUpdateRow[] = [];
+  private voiceSeq = 0;
+  private readonly voiceNotes = new Map<string, TechnicianVoiceRow>();
 
   /** Test setup: provision a business owned by the given user. */
   seedBusiness(input: SeedBusinessInput): BusinessRow {
@@ -654,6 +708,290 @@ export class MemoryBusinessStore implements BusinessStore {
     return { job, timeline };
   }
 
+  // ------------------------------------------------------------------
+  // Stage 7D — technician execution (memory implementation).
+  //
+  // Mirrors the shared `job_images` / `job_updates` / `job_voice_notes`
+  // / `job_status_history` tables for INTERNAL jobs with the same rules
+  // as the MySQL implementation: active-assignment scoping, IN_PROGRESS
+  // gating for work documentation, uploader-only deletion, required
+  // completion note, REQUESTED/SCHEDULED → IN_PROGRESS start and
+  // IN_PROGRESS → COMPLETED completion.
+  // ------------------------------------------------------------------
+
+  private activeAssignment(technicianId: string, jobId: string): AssignmentRow | null {
+    return (
+      this.assignments.find(
+        (a) => a.jobId === jobId && a.technicianId === technicianId && a.unassignedAt === null,
+      ) ?? null
+    );
+  }
+
+  async startTechnicianJob(
+    technicianId: string,
+    jobId: string,
+    input: { startedBy: string },
+  ): Promise<InternalJobDto | null> {
+    void input.startedBy;
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const row = this.internalJobs.get(jobId);
+    if (!row) return null;
+    if (row.status !== 'REQUESTED' && row.status !== 'SCHEDULED') throw new JobNotStartableError();
+    const now = nowIso();
+    const previous = row.status;
+    this.internalJobs.set(jobId, { ...row, status: 'IN_PROGRESS', updatedAt: now });
+    this.internalHistory.push({
+      jobId,
+      previousStatus: previous,
+      status: 'IN_PROGRESS',
+      reason: 'Technician started job',
+      createdAt: now,
+    });
+    const next = this.internalJobs.get(jobId);
+    return next ? this.toJobDto(next) : null;
+  }
+
+  private requireAssignedInProgress(technicianId: string, jobId: string): InternalJobRow {
+    if (!this.activeAssignment(technicianId, jobId)) {
+      throw new TechnicianJobNotExecutableError('Job not found.');
+    }
+    const row = this.internalJobs.get(jobId);
+    if (!row) throw new TechnicianJobNotExecutableError('Job not found.');
+    if (row.status !== 'IN_PROGRESS') throw new TechnicianJobNotExecutableError();
+    return row;
+  }
+
+  async createTechnicianJobImage(input: CreateTechnicianImageInput): Promise<TechnicianJobImageDto> {
+    this.requireAssignedInProgress(input.technicianId, input.jobId);
+    this.techImageSeq += 1;
+    const row: TechnicianImageRow = {
+      id: String(this.techImageSeq),
+      jobId: input.jobId,
+      uploadedBy: input.uploadedBy,
+      phase: input.phase,
+      storageKey: input.storageKey,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      size: input.size,
+      createdAt: nowIso(),
+    };
+    this.techImages.set(row.id, row);
+    return stripTechImageKey(row);
+  }
+
+  async listTechnicianJobImages(technicianId: string, jobId: string): Promise<TechnicianJobImageDto[] | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    if (!this.internalJobs.get(jobId)) return null;
+    return [...this.techImages.values()]
+      .filter((image) => image.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map(stripTechImageKey);
+  }
+
+  async getTechnicianJobImageFile(
+    technicianId: string,
+    jobId: string,
+    imageId: string,
+  ): Promise<{ image: TechnicianJobImageDto; storageKey: string } | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const row = this.techImages.get(imageId);
+    if (!row || row.jobId !== jobId) return null;
+    return { image: stripTechImageKey(row), storageKey: row.storageKey };
+  }
+
+  async deleteTechnicianJobImage(input: DeleteTechnicianImageInput): Promise<{ storageKey: string }> {
+    const row = this.techImages.get(input.imageId);
+    if (!this.activeAssignment(input.technicianId, input.jobId) || !row || row.jobId !== input.jobId) {
+      throw new TechnicianImageNotDeletableError('Image not found.');
+    }
+    const job = this.internalJobs.get(input.jobId);
+    if (!job) throw new TechnicianImageNotDeletableError('Image not found.');
+    if (job.status !== 'IN_PROGRESS') {
+      throw new TechnicianImageNotDeletableError('Images can only be deleted while the job is in progress.');
+    }
+    if (row.uploadedBy !== input.deleterId) {
+      throw new TechnicianImageNotDeletableError('You can only delete images you uploaded.');
+    }
+    this.techImages.delete(input.imageId);
+    return { storageKey: row.storageKey };
+  }
+
+  async createTechnicianJobUpdate(input: CreateTechnicianUpdateInput): Promise<TechnicianJobUpdateDto> {
+    this.requireAssignedInProgress(input.technicianId, input.jobId);
+    this.techUpdateSeq += 1;
+    const row: TechnicianUpdateRow = {
+      id: String(this.techUpdateSeq),
+      jobId: input.jobId,
+      authorId: input.authorId,
+      phase: input.phase,
+      note: input.note,
+      createdAt: nowIso(),
+    };
+    this.techUpdates.push(row);
+    return { ...row };
+  }
+
+  async listTechnicianJobUpdates(
+    technicianId: string,
+    jobId: string,
+  ): Promise<TechnicianJobUpdateDto[] | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    if (!this.internalJobs.get(jobId)) return null;
+    return this.techUpdates
+      .filter((update) => update.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((update) => ({ ...update }));
+  }
+
+  async createTechnicianVoiceNote(input: CreateTechnicianVoiceNoteInput): Promise<TechnicianVoiceNoteDto> {
+    this.requireAssignedInProgress(input.technicianId, input.jobId);
+    this.voiceSeq += 1;
+    const row: TechnicianVoiceRow = {
+      id: String(this.voiceSeq),
+      jobId: input.jobId,
+      authorId: input.authorId,
+      storageKey: input.storageKey,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      size: input.size,
+      durationSeconds: input.durationSeconds,
+      createdAt: nowIso(),
+    };
+    this.voiceNotes.set(row.id, row);
+    return stripVoiceKey(row);
+  }
+
+  async listTechnicianVoiceNotes(
+    technicianId: string,
+    jobId: string,
+  ): Promise<TechnicianVoiceNoteDto[] | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    if (!this.internalJobs.get(jobId)) return null;
+    return [...this.voiceNotes.values()]
+      .filter((voice) => voice.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map(stripVoiceKey);
+  }
+
+  async getTechnicianVoiceNoteFile(
+    technicianId: string,
+    jobId: string,
+    voiceNoteId: string,
+  ): Promise<{ voiceNote: TechnicianVoiceNoteDto; storageKey: string } | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const row = this.voiceNotes.get(voiceNoteId);
+    if (!row || row.jobId !== jobId) return null;
+    return { voiceNote: stripVoiceKey(row), storageKey: row.storageKey };
+  }
+
+  async listTechnicianJobAssignmentEvents(
+    technicianId: string,
+    jobId: string,
+  ): Promise<JobAssignmentHistoryEntry[] | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const job = this.internalJobs.get(jobId);
+    if (!job) return null;
+    return this.assignments
+      .filter((a) => a.jobId === jobId)
+      .sort((a, b) => (a.assignedAt < b.assignedAt ? 1 : -1))
+      .map((a) => this.toAssignmentHistoryEntry(a))
+      .filter((entry): entry is JobAssignmentHistoryEntry => entry !== null);
+  }
+
+  async completeTechnicianJob(
+    technicianId: string,
+    jobId: string,
+    input: { note: string; completedBy: string },
+  ): Promise<{ job: InternalJobDto; update: TechnicianJobUpdateDto } | null> {
+    if (!this.activeAssignment(technicianId, jobId)) return null;
+    const row = this.internalJobs.get(jobId);
+    if (!row) return null;
+    if (row.status !== 'IN_PROGRESS') throw new TechnicianJobNotCompletableError();
+    if (input.note.trim() === '') {
+      throw new TechnicianJobNotCompletableError('A completion note is required to complete the job.');
+    }
+    // All checks passed before any mutation: a failed completion cannot
+    // leave the job COMPLETED without its completion record (or vice versa).
+    const now = nowIso();
+    this.techUpdateSeq += 1;
+    const update: TechnicianUpdateRow = {
+      id: String(this.techUpdateSeq),
+      jobId,
+      authorId: input.completedBy,
+      phase: 'AFTER',
+      note: input.note,
+      createdAt: now,
+    };
+    this.techUpdates.push(update);
+    this.internalJobs.set(jobId, { ...row, status: 'COMPLETED', updatedAt: now });
+    this.internalHistory.push({
+      jobId,
+      previousStatus: 'IN_PROGRESS',
+      status: 'COMPLETED',
+      reason: 'Technician completed job',
+      createdAt: now,
+    });
+    const job = this.internalJobs.get(jobId);
+    const dto = job ? this.toJobDto(job) : null;
+    if (!dto) throw new Error('Job completion failed: job not found after update.');
+    return { job: dto, update: { ...update } };
+  }
+
+  // ------------------------------------------------------------------
+  // Stage 7D — business visibility of execution documentation (memory).
+  // ------------------------------------------------------------------
+
+  private ownedInternalJob(businessId: string, jobId: string): InternalJobRow | null {
+    const row = this.internalJobs.get(jobId);
+    return row && row.businessId === businessId ? row : null;
+  }
+
+  async listBusinessJobImages(businessId: string, jobId: string): Promise<TechnicianJobImageDto[] | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    return [...this.techImages.values()]
+      .filter((image) => image.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map(stripTechImageKey);
+  }
+
+  async getBusinessJobImageFile(
+    businessId: string,
+    jobId: string,
+    imageId: string,
+  ): Promise<{ image: TechnicianJobImageDto; storageKey: string } | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    const row = this.techImages.get(imageId);
+    if (!row || row.jobId !== jobId) return null;
+    return { image: stripTechImageKey(row), storageKey: row.storageKey };
+  }
+
+  async listBusinessJobUpdates(businessId: string, jobId: string): Promise<TechnicianJobUpdateDto[] | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    return this.techUpdates
+      .filter((update) => update.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((update) => ({ ...update }));
+  }
+
+  async listBusinessVoiceNotes(businessId: string, jobId: string): Promise<TechnicianVoiceNoteDto[] | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    return [...this.voiceNotes.values()]
+      .filter((voice) => voice.jobId === jobId)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map(stripVoiceKey);
+  }
+
+  async getBusinessVoiceNoteFile(
+    businessId: string,
+    jobId: string,
+    voiceNoteId: string,
+  ): Promise<{ voiceNote: TechnicianVoiceNoteDto; storageKey: string } | null> {
+    if (!this.ownedInternalJob(businessId, jobId)) return null;
+    const row = this.voiceNotes.get(voiceNoteId);
+    if (!row || row.jobId !== jobId) return null;
+    return { voiceNote: stripVoiceKey(row), storageKey: row.storageKey };
+  }
+
   private toAssignmentDto(row: AssignmentRow): JobAssignmentDto | null {
     const tech = this.technicians.get(row.technicianId);
     if (!tech) return null;
@@ -729,8 +1067,19 @@ export class MemoryBusinessStore implements BusinessStore {
   }
 }
 
-function toDto(row: TechnicianRow): TechnicianDto {
-  return {
+/** Stage 7D: strip the protected storage key from image DTOs (never in API responses). */
+function stripTechImageKey(row: TechnicianImageRow): TechnicianJobImageDto {
+  const { storageKey: _storageKey, ...dto } = row;
+  return dto;
+}
+
+/** Stage 7D: strip the protected storage key from voice-note DTOs. */
+function stripVoiceKey(row: TechnicianVoiceRow): TechnicianVoiceNoteDto {
+  const { storageKey: _storageKey, ...dto } = row;
+  return dto;
+}
+
+function toDto(row: TechnicianRow): TechnicianDto {  return {
     id: row.id,
     businessId: row.businessId,
     userId: row.userId,

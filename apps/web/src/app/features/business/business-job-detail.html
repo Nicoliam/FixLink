@@ -190,5 +190,70 @@
         </section>
       }
     }
+
+    @if (execStatus() === 'loading') {
+      <section class="fl-card" aria-label="Work documentation">
+        <p class="fl-card-label">Work documentation</p>
+        <p class="fl-card-text" role="status">Loading execution record…</p>
+      </section>
+    } @else if (execStatus() === 'ready') {
+      <section class="fl-card" aria-label="Work documentation">
+        <p class="fl-card-label">Work documentation</p>
+        <h2 class="fl-card-title">Technician execution record</h2>
+        @if (execImages().length === 0 && execUpdates().length === 0 && execVoiceNotes().length === 0) {
+          <p class="fl-card-text">No work documented yet.</p>
+        }
+        @for (update of execUpdates(); track update.id) {
+          <p class="fl-card-text">{{ phaseLabel(update.phase) }} note · {{ update.createdAt }}</p>
+          <p class="fl-card-text">{{ update.note }}</p>
+        }
+        @for (photo of execImages(); track photo.id) {
+          <p class="fl-card-text">{{ phaseLabel(photo.phase) }} photo · {{ photo.createdAt }}</p>
+          @if (execPhotoUrl(photo.id)) {
+            <img class="fl-photo" [src]="execPhotoUrl(photo.id)" alt="Technician work photo" loading="lazy" />
+          }
+        }
+        @for (voice of execVoiceNotes(); track voice.id) {
+          <p class="fl-card-text">
+            Voice note
+            @if (voice.durationSeconds !== null) {
+              · {{ voice.durationSeconds }}s
+            }
+            · {{ voice.createdAt }}
+          </p>
+          @if (execVoiceUrl(voice.id)) {
+            <audio controls [src]="execVoiceUrl(voice.id)" preload="metadata"></audio>
+          }
+        }
+        @if (execEvents().length > 0) {
+          <div aria-label="Execution timeline">
+            <p class="fl-card-title">Execution timeline</p>
+            <ul>
+              @for (event of execEvents(); track event.createdAt + event.kind) {
+                <li>
+                  @switch (event.kind) {
+                    @case ('status') {
+                      <p class="fl-card-text">{{ statusText(event.status ?? 'REQUESTED') }} · {{ event.createdAt }}</p>
+                    }
+                    @case ('assignment') {
+                      <p class="fl-card-text">Assigned{{ event.technicianName ? ' to ' + event.technicianName : '' }} · {{ event.createdAt }}</p>
+                    }
+                    @case ('update') {
+                      <p class="fl-card-text">{{ phaseLabel(event.phase ?? 'DURING') }} note · {{ event.createdAt }}</p>
+                    }
+                    @case ('image') {
+                      <p class="fl-card-text">{{ phaseLabel(event.phase ?? 'DURING') }} photo · {{ event.createdAt }}</p>
+                    }
+                    @case ('voice') {
+                      <p class="fl-card-text">Voice note · {{ event.createdAt }}</p>
+                    }
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    }
   }
 </div>

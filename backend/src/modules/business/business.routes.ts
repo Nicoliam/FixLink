@@ -28,25 +28,51 @@
  * GET   /api/v1/technician/jobs              jobs assigned to the caller (technician)
  * GET   /api/v1/technician/jobs/:id          one assigned job + timeline (technician)
  *
- * Execution, parts and approvals belong to later stages and are
- * intentionally absent.
+ * Stage 7D (technician execution + voice notes + business visibility):
+ * POST  /api/v1/technician/jobs/:id/start                    start work (REQUESTED/SCHEDULED → IN_PROGRESS)
+ * POST  /api/v1/technician/jobs/:id/images                   upload a BEFORE/DURING/AFTER photo (IN_PROGRESS)
+ * GET   /api/v1/technician/jobs/:id/images                   photo metadata for the assigned job
+ * GET   /api/v1/technician/jobs/:id/images/:imageId/file     photo bytes (authorized, never a path)
+ * DELETE /api/v1/technician/jobs/:id/images/:imageId         uploader deletes their photo (IN_PROGRESS)
+ * POST  /api/v1/technician/jobs/:id/updates                  save a BEFORE/DURING/AFTER note (IN_PROGRESS)
+ * GET   /api/v1/technician/jobs/:id/updates                  progress notes for the assigned job
+ * POST  /api/v1/technician/jobs/:id/voice-notes               upload a voice note (IN_PROGRESS)
+ * GET   /api/v1/technician/jobs/:id/voice-notes               voice-note metadata for the assigned job
+ * GET   /api/v1/technician/jobs/:id/voice-notes/:voiceNoteId/file  voice-note bytes (authorized)
+ * GET   /api/v1/technician/jobs/:id/timeline                 execution timeline (status + work + voice)
+ * POST  /api/v1/technician/jobs/:id/complete                 complete (IN_PROGRESS → COMPLETED, note required)
+ * GET   /api/v1/business/jobs/:id/images                    photo metadata (owner/manager, read-only)
+ * GET   /api/v1/business/jobs/:id/images/:imageId/file       photo bytes (owner/manager)
+ * GET   /api/v1/business/jobs/:id/updates                   progress notes (owner/manager, read-only)
+ * GET   /api/v1/business/jobs/:id/voice-notes                voice-note metadata (owner/manager, read-only)
+ * GET   /api/v1/business/jobs/:id/voice-notes/:voiceNoteId/file  voice-note bytes (owner/manager)
+ * GET   /api/v1/business/jobs/:id/timeline                  execution timeline (owner/manager, read-only)
+ *
+ * Parts, manager approvals and notifications belong to later stages
+ * and are intentionally absent.
  */
 import { Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import multer, { MulterError } from 'multer';
 import { requireAuth } from '../../middleware/auth';
+import { VOICE_NOTE_MAX_BYTES } from '../../services/file-storage';
+import type { FileStorage } from '../../services/file-storage';
 import type { JobsStore } from '../jobs/jobs.store';
 import type { UserRepository } from '../users/user.repository';
 import { makeBusinessController } from './business.controller';
 import { BusinessService } from './business.service';
 import type { BusinessStore } from './business.store';
+import { fail } from '../../utils/response';
 
 export function makeBusinessRoutes(
   users: UserRepository,
   business: BusinessStore,
   jobs?: Pick<JobsStore, 'findActiveService'>,
+  storage?: FileStorage,
 ): Router {
   const router = Router();
-  const service = new BusinessService(users, business, jobs);
+  const service = new BusinessService(users, business, jobs, storage);
   const controller = makeBusinessController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each
@@ -87,6 +113,53 @@ export function makeBusinessRoutes(
 
   router.get('/technician/jobs', controller.listTechnicianJobs);
   router.get('/technician/jobs/:jobId', controller.getTechnicianJob);
+
+  // Stage 7D — technician execution. Memory adapter: file bytes are held
+  // in RAM (10MB cap covers the largest voice note) and written to the
+  // storage dir by the service. Photo field: `image`; voice field: `audio`.
+  const executionUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: VOICE_NOTE_MAX_BYTES, files: 1 },
+  });
+
+  router.post('/technician/jobs/:jobId/start', controller.startTechnicianJob);
+  router.post('/technician/jobs/:jobId/images', executionUpload.single('image'), controller.uploadTechnicianImage);
+  router.get('/technician/jobs/:jobId/images', controller.listTechnicianImages);
+  router.get('/technician/jobs/:jobId/images/:imageId/file', controller.getTechnicianImageFile);
+  router.delete('/technician/jobs/:jobId/images/:imageId', controller.deleteTechnicianImage);
+  router.post('/technician/jobs/:jobId/updates', controller.createTechnicianUpdate);
+  router.get('/technician/jobs/:jobId/updates', controller.listTechnicianUpdates);
+  router.post(
+    '/technician/jobs/:jobId/voice-notes',
+    executionUpload.single('audio'),
+    controller.uploadTechnicianVoiceNote,
+  );
+  router.get('/technician/jobs/:jobId/voice-notes', controller.listTechnicianVoiceNotes);
+  router.get('/technician/jobs/:jobId/voice-notes/:voiceNoteId/file', controller.getTechnicianVoiceNoteFile);
+  router.get('/technician/jobs/:jobId/timeline', controller.getTechnicianExecutionTimeline);
+  router.post('/technician/jobs/:jobId/complete', controller.completeTechnicianJob);
+
+  router.get('/business/jobs/:jobId/images', controller.listBusinessJobImages);
+  router.get('/business/jobs/:jobId/images/:imageId/file', controller.getBusinessJobImageFile);
+  router.get('/business/jobs/:jobId/updates', controller.listBusinessJobUpdates);
+  router.get('/business/jobs/:jobId/voice-notes', controller.listBusinessVoiceNotes);
+  router.get('/business/jobs/:jobId/voice-notes/:voiceNoteId/file', controller.getBusinessVoiceNoteFile);
+  router.get('/business/jobs/:jobId/timeline', controller.getBusinessExecutionTimeline);
+
+  // Multer errors surface here (before the controller): map size/field
+  // violations to the standard 422 envelope instead of a 500.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  router.use((err: unknown, _req: Request, res: Response, next: NextFunction): void => {
+    if (err instanceof MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+        fail(res, 'VALIDATION_ERROR', 'File must be 10MB or smaller.', 422);
+        return;
+      }
+      fail(res, 'VALIDATION_ERROR', 'Invalid file upload.', 422);
+      return;
+    }
+    next(err as Error);
+  });
 
   return router;
 }

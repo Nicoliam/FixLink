@@ -7,7 +7,7 @@
 import type { Request, Response } from 'express';
 import type { AuthenticatedUser } from '../../middleware/auth';
 import { fail, ok, type ErrorCode } from '../../utils/response';
-import type { BusinessService, ServiceResult } from './business.service';
+import type { BusinessService, ServiceResult, UploadedFile } from './business.service';
 
 const ERROR_CODES: readonly ErrorCode[] = [
   'VALIDATION_ERROR',
@@ -31,6 +31,22 @@ function send<T>(res: Response, result: ServiceResult<T>, successMessage: string
 
 function authUser(req: Request): AuthenticatedUser {
   return (req as Request & { user: AuthenticatedUser }).user;
+}
+
+function uploadedFile(req: Request): UploadedFile | null {
+  const file = (req as Request & { file?: Express.Multer.File }).file;
+  if (!file) return null;
+  return {
+    buffer: file.buffer,
+    mimetype: file.mimetype,
+    originalname: file.originalname,
+    size: file.size,
+  };
+}
+
+function safeDownloadName(name: string): string {
+  const cleaned = name.replace(/["\r\n]/g, '').trim();
+  return cleaned === '' ? 'fixlink-file' : cleaned;
 }
 
 export function makeBusinessController(service: BusinessService) {
@@ -216,6 +232,249 @@ export function makeBusinessController(service: BusinessService) {
         send(res, result, 'Job retrieved.');
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the job. Please try again.', 500);
+      }
+    },
+
+    // --------------------------------------------------------------
+    // Stage 7D — technician execution (start, BEFORE/DURING/AFTER
+    // photos + notes, voice notes, timeline, completion). File bytes
+    // stream back with their stored MIME type; storage keys and
+    // filesystem paths are never exposed.
+    // --------------------------------------------------------------
+
+    async startTechnicianJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.startTechnicianJob(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Work started.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not start the job. Please try again.', 500);
+      }
+    },
+
+    async uploadTechnicianImage(req: Request, res: Response): Promise<void> {
+      try {
+        const phase = (req.body as Record<string, unknown> | undefined)?.['phase'];
+        const result = await service.uploadTechnicianImage(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          phase,
+          uploadedFile(req),
+        );
+        send(res, result, 'Photo uploaded.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not upload the photo. Please try again.', 500);
+      }
+    },
+
+    async listTechnicianImages(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listTechnicianImages(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Photos retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve photos. Please try again.', 500);
+      }
+    },
+
+    async getTechnicianImageFile(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getTechnicianImageFile(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['imageId'] ?? '',
+        );
+        if (result.data === undefined) {
+          send(res, result, 'Photo retrieved.');
+          return;
+        }
+        res.setHeader('Content-Type', result.data.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.status(200).send(result.data.buffer);
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
+      }
+    },
+
+    async deleteTechnicianImage(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.deleteTechnicianImage(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['imageId'] ?? '',
+        );
+        send(res, result, 'Photo deleted.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not delete the photo. Please try again.', 500);
+      }
+    },
+
+    async createTechnicianUpdate(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.createTechnicianUpdate(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Progress update saved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not save the update. Please try again.', 500);
+      }
+    },
+
+    async listTechnicianUpdates(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listTechnicianUpdates(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Updates retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve updates. Please try again.', 500);
+      }
+    },
+
+    async uploadTechnicianVoiceNote(req: Request, res: Response): Promise<void> {
+      try {
+        const body = (req.body as Record<string, unknown> | undefined) ?? {};
+        const duration = body['duration'] ?? body['durationSeconds'] ?? body['duration_seconds'];
+        const result = await service.uploadTechnicianVoiceNote(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          uploadedFile(req),
+          duration,
+        );
+        send(res, result, 'Voice note uploaded.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not upload the voice note. Please try again.', 500);
+      }
+    },
+
+    async listTechnicianVoiceNotes(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listTechnicianVoiceNotes(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Voice notes retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve voice notes. Please try again.', 500);
+      }
+    },
+
+    async getTechnicianVoiceNoteFile(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getTechnicianVoiceNoteFile(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['voiceNoteId'] ?? '',
+        );
+        if (result.data === undefined) {
+          send(res, result, 'Voice note retrieved.');
+          return;
+        }
+        res.setHeader('Content-Type', result.data.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.status(200).send(result.data.buffer);
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the voice note. Please try again.', 500);
+      }
+    },
+
+    async getTechnicianExecutionTimeline(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getTechnicianExecutionTimeline(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Timeline retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the timeline. Please try again.', 500);
+      }
+    },
+
+    async completeTechnicianJob(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.completeTechnicianJob(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.body,
+        );
+        send(res, result, 'Job completed successfully.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not complete the job. Please try again.', 500);
+      }
+    },
+
+    // --------------------------------------------------------------
+    // Stage 7D — business visibility of execution documentation
+    // (read-only; no technician-only capability is exposed here).
+    // --------------------------------------------------------------
+
+    async listBusinessJobImages(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listBusinessJobImages(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Photos retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve photos. Please try again.', 500);
+      }
+    },
+
+    async getBusinessJobImageFile(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBusinessJobImageFile(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['imageId'] ?? '',
+        );
+        if (result.data === undefined) {
+          send(res, result, 'Photo retrieved.');
+          return;
+        }
+        res.setHeader('Content-Type', result.data.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.status(200).send(result.data.buffer);
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
+      }
+    },
+
+    async listBusinessJobUpdates(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listBusinessJobUpdates(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Updates retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve updates. Please try again.', 500);
+      }
+    },
+
+    async listBusinessVoiceNotes(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.listBusinessVoiceNotes(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Voice notes retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve voice notes. Please try again.', 500);
+      }
+    },
+
+    async getBusinessVoiceNoteFile(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBusinessVoiceNoteFile(
+          authUser(req).id,
+          req.params['jobId'] ?? '',
+          req.params['voiceNoteId'] ?? '',
+        );
+        if (result.data === undefined) {
+          send(res, result, 'Voice note retrieved.');
+          return;
+        }
+        res.setHeader('Content-Type', result.data.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.status(200).send(result.data.buffer);
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the voice note. Please try again.', 500);
+      }
+    },
+
+    async getBusinessExecutionTimeline(req: Request, res: Response): Promise<void> {
+      try {
+        const result = await service.getBusinessExecutionTimeline(authUser(req).id, req.params['jobId'] ?? '');
+        send(res, result, 'Timeline retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the timeline. Please try again.', 500);
       }
     },
   };

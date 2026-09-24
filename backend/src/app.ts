@@ -117,8 +117,10 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   // calls `router.use(requireAuth(...))`, which answers 401 for requests
   // without a token, so mounting earlier would shadow public endpoints.
   // The business router also receives the shared jobs store so internal
-  // jobs (Stage 7B) validate services against the same catalogue.
-  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs));
+  // jobs (Stage 7B) validate services against the same catalogue, plus
+  // the shared file storage so technician execution (Stage 7D) stores
+  // photos and voice notes through the same adapter as marketplace work.
+  app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs, storage));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

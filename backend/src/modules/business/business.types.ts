@@ -295,3 +295,84 @@ export interface JobAssignmentDetailDto {
 export interface AssignTechnicianInput {
   technicianId: string;
 }
+
+/**
+ * FixLink Stage 7D — technician execution + voice notes.
+ *
+ * Reuses the ONE shared architecture: `jobs` (source = INTERNAL),
+ * `job_images` (phase BEFORE/DURING/AFTER), `job_updates` (phase +
+ * message), `job_voice_notes` (file reference + metadata) and
+ * `job_status_history`. No technician-specific copies of job tables
+ * exist — the DTOs below are projections of those shared tables.
+ * Binary bytes are never stored in MySQL; `fileReference` fields are
+ * opaque server-side storage keys (see `services/file-storage`).
+ */
+
+/** Work-documentation phase for technician photos and notes. */
+export type TechnicianWorkPhase = 'BEFORE' | 'DURING' | 'AFTER';
+
+/** File metadata for a technician job photo (never binaries or paths). */
+export interface TechnicianJobImageDto {
+  id: string;
+  jobId: string;
+  uploadedBy: string;
+  phase: TechnicianWorkPhase;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+/** A written progress / completion note on an internal job. */
+export interface TechnicianJobUpdateDto {
+  id: string;
+  jobId: string;
+  authorId: string;
+  phase: TechnicianWorkPhase;
+  note: string;
+  createdAt: string;
+}
+
+/** File metadata for a technician voice note (never audio bytes). */
+export interface TechnicianVoiceNoteDto {
+  id: string;
+  jobId: string;
+  authorId: string;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  /** Recorded length in seconds, when the client reported it. */
+  durationSeconds: number | null;
+  createdAt: string;
+}
+
+export type TechnicianExecutionEventKind = 'status' | 'assignment' | 'update' | 'image' | 'voice';
+
+/**
+ * One entry of the technician execution timeline (status transitions,
+ * assignment events, progress notes, photos, voice notes).
+ * `actor` is a role label only — never contact details.
+ */
+export interface TechnicianExecutionEventDto {
+  kind: TechnicianExecutionEventKind;
+  createdAt: string;
+  /** 'technician' for work records, 'business' for management events. */
+  actor: 'technician' | 'business';
+  status?: InternalJobStatus;
+  previousStatus?: InternalJobStatus | null;
+  reason?: string | null;
+  /** Assignment events only: who the job was assigned to. */
+  technicianName?: string;
+  phase?: TechnicianWorkPhase;
+  note?: string;
+  imageId?: string;
+  voiceNoteId?: string;
+  mimeType?: string;
+  durationSeconds?: number | null;
+}
+
+/** Technician execution timeline: the job plus chronological events. */
+export interface TechnicianExecutionTimelineDto {
+  job: InternalJobDto;
+  events: TechnicianExecutionEventDto[];
+}

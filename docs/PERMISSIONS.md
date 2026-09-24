@@ -797,3 +797,81 @@ persistence, reassignment + history, technician list-own,
 technician isolation (list/detail), unrelated business job,
 role/anonymous rejection on the technician surface, 7B
 regression, marketplace regression.
+
+# 29. Stage 7D Implementation Notes — Technician Execution + Voice Notes
+
+Implemented 2026-09-24 (`backend/src/modules/business/` —
+technician execution on the same router, voice support in
+`backend/src/services/file-storage.ts`, migration 010 for
+`job_voice_notes.original_filename`).
+
+- Only the actively assigned TECHNICIAN may start, document or
+  complete an internal job (identity derived server-side from
+  the session user — membership + active technician row — never
+  from the request). `CUSTOMER`, `PROFESSIONAL`,
+  `BUSINESS_OWNER`, `BUSINESS_MANAGER` and `ADMIN` receive `403
+  FORBIDDEN_ROLE` on the technician execution surface;
+  unauthenticated → `401`.
+- Execution is restricted to INTERNAL jobs with an active
+  TECHNICIAN assignment to the caller. Another technician's job
+  (same business or not), another business's job, or any
+  marketplace id reads as `404 NOT_FOUND` (never `403`), so job,
+  image and voice-note ids cannot be probed across technicians
+  or businesses. Malformed ids → `400`.
+- State rules are server-side and atomic: start only from
+  REQUESTED/SCHEDULED (else `422`); photos, notes and voice
+  notes only while IN_PROGRESS (else `422`); completion only
+  from IN_PROGRESS with a required note (else `422`); image
+  deletion is uploader-only while IN_PROGRESS (foreign uploader
+  → `403`). The frontend never controls status, ownership or
+  timestamps.
+- File rules mirror marketplace execution: claimed MIME and
+  extension are never trusted — images are sniffed by magic
+  bytes (JPEG/PNG/WebP, 5MB), voice notes by container
+  signatures (WebM/MP4/MP3/WAV/Ogg, 10MB); filenames are
+  sanitized; storage keys are server-generated opaque values
+  (`job-images/…`, `job-voice-notes/…`) and malformed keys are
+  rejected; bytes leave only through authorized endpoints
+  (`inline`, `private` cache) — never public URLs, paths or
+  storage keys in metadata responses.
+- Business visibility is read-only: `BUSINESS_OWNER` /
+  `BUSINESS_MANAGER` may read (not write) photos, notes, voice
+  notes and the timeline of their own INTERNAL jobs; another
+  business's job reads as `404`. Technicians receive `403` on
+  the business visibility surface. Customer visibility is
+  unchanged (marketplace owners keep their existing access;
+  internal business records never leak to customers).
+- Marketplace permissions are unchanged: provider/customer
+  guards, endpoints and stores were not modified for this
+  stage.
+
+Role summary for Stage 7D (additions to §27–28):
+
+BUSINESS_OWNER / BUSINESS_MANAGER:
+- read execution documentation (photos, notes, voice notes,
+  timeline + bytes) on own INTERNAL jobs
+- still cannot perform technician execution (no start, upload,
+  voice-note or complete capability)
+
+TECHNICIAN:
+- start own assigned jobs (REQUESTED/SCHEDULED → IN_PROGRESS)
+- upload BEFORE/DURING/AFTER photos on own IN_PROGRESS jobs
+- save BEFORE/DURING/AFTER notes on own IN_PROGRESS jobs
+- upload voice notes on own IN_PROGRESS jobs
+- complete own IN_PROGRESS jobs (note required)
+- read own execution timeline
+- still cannot manage the business surface (403, unchanged)
+
+Permission tests added
+(`backend/tests/technician-execution.test.ts`, 32 cases):
+assigned start, unassigned start (`404`), cross-business
+access (`404`), BEFORE/DURING/AFTER photos, text updates,
+voice-note upload, unauthorized voice/image/update/complete
+(`404`), voice metadata persistence, storage-abstraction
+delivery, voice-file authorization (`401`/`404`),
+cross-business voice access (`404`), completion history,
+timeline events, audio validation (`422`), size validation
+(`422`), unsafe storage-key rejection; business visibility
+(owner/manager reads, foreign business `404`, technician
+`403`). Stages 7C/6F/marketplace remain covered by their
+untouched suites in the same `npm test` run.

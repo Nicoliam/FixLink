@@ -8,12 +8,16 @@ import { TechnicianService } from '../../core/services/technician.service';
 import type { BusinessJobDetail } from '../../core/models/business.model';
 
 function makeDetail(): BusinessJobDetail {
+  return makeDetailWithStatus('REQUESTED');
+}
+
+function makeDetailWithStatus(status: 'REQUESTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'): BusinessJobDetail {
   return {
     job: {
       id: '5',
       reference: 'FL-2026-000123',
       source: 'INTERNAL',
-      status: 'REQUESTED',
+      status,
       businessId: '1',
       business: { id: '1', businessName: 'Ubuntu Plumbing Co.' },
       customerId: '3',
@@ -51,13 +55,33 @@ function makeDetail(): BusinessJobDetail {
 describe('TechnicianJobDetailComponent', () => {
   let fixture: ComponentFixture<TechnicianJobDetailComponent>;
 
-  async function setup(getMyJob: ReturnType<typeof vi.fn>): Promise<void> {
+  /** Full Stage 7D mock: every TechnicianService method the workspace touches. */
+  function makeApi(overrides: Record<string, ReturnType<typeof vi.fn>> = {}): Record<string, ReturnType<typeof vi.fn>> {
+    return {
+      getMyJob: vi.fn().mockReturnValue(of(makeDetail())),
+      startMyJob: vi.fn(),
+      uploadMyJobImage: vi.fn(),
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      fetchMyJobImageBlob: vi.fn().mockReturnValue(of(new Blob())),
+      deleteMyJobImage: vi.fn(),
+      createMyJobUpdate: vi.fn(),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      uploadMyJobVoiceNote: vi.fn(),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      fetchMyJobVoiceNoteBlob: vi.fn().mockReturnValue(of(new Blob())),
+      getMyJobExecutionTimeline: vi.fn(),
+      completeMyJob: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  async function setup(getMyJob: ReturnType<typeof vi.fn>, extra: Record<string, ReturnType<typeof vi.fn>> = {}): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [TechnicianJobDetailComponent],
       providers: [
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: (): string => '5' } } } },
-        { provide: TechnicianService, useValue: { getMyJob } },
+        { provide: TechnicianService, useValue: makeApi({ getMyJob, ...extra }) },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(TechnicianJobDetailComponent);
@@ -96,5 +120,134 @@ describe('TechnicianJobDetailComponent', () => {
     expect(text).not.toContain('reassign');
     expect(text).not.toContain('parts');
     expect(text).not.toContain('cancel job');
+  });
+
+  it('offers Start Work for REQUESTED jobs and starts on confirm', async () => {
+    const detail = makeDetailWithStatus('REQUESTED');
+    const started = { ...detail.job, status: 'IN_PROGRESS' as const };
+    const startMyJob = vi.fn().mockReturnValue(of(started));
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      startMyJob,
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: started, events: [] })),
+    });
+    const buttons = [...(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLElement>)].map(
+      (button) => button.textContent?.trim(),
+    );
+    expect(buttons).toContain('Start Work');
+    const component = fixture.componentInstance as unknown as {
+      startStart: () => void;
+      confirmStart: () => void;
+    };
+    component.startStart();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent as string).toContain('Start work on this job now?');
+    component.confirmStart();
+    expect(startMyJob).toHaveBeenCalledWith('5');
+  });
+
+  it('shows the BEFORE/DURING/AFTER workspace for IN_PROGRESS jobs', async () => {
+    const detail = makeDetailWithStatus('IN_PROGRESS');
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(
+        of([{ id: '9', jobId: '5', uploadedBy: '2', phase: 'BEFORE', originalFilename: 'b.png', mimeType: 'image/png', size: 12, createdAt: '2026-09-21T10:00:00.000Z' }]),
+      ),
+      listMyJobUpdates: vi.fn().mockReturnValue(
+        of([{ id: '3', jobId: '5', authorId: '2', phase: 'DURING', note: 'Valve removed.', createdAt: '2026-09-21T11:00:00.000Z' }]),
+      ),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(
+        of([{ id: '4', jobId: '5', authorId: '2', originalFilename: 'n.webm', mimeType: 'audio/webm', size: 44, durationSeconds: 12, createdAt: '2026-09-21T11:30:00.000Z' }]),
+      ),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(
+        of({
+          job: detail.job,
+          events: [
+            { kind: 'status', createdAt: '2026-09-21T09:00:00.000Z', actor: 'business', status: 'REQUESTED', previousStatus: null, reason: 'Internal job created by business' },
+            { kind: 'voice', createdAt: '2026-09-21T11:30:00.000Z', actor: 'technician', voiceNoteId: '4', mimeType: 'audio/webm', durationSeconds: 12 },
+          ],
+        }),
+      ),
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Execution workspace');
+    expect(text).toContain('Before work');
+    expect(text).toContain('During work');
+    expect(text).toContain('After work');
+    expect(text).toContain('Valve removed.');
+    expect(text).toContain('Voice note');
+    expect(text).toContain('Complete Job');
+    expect(text).toContain('Execution timeline');
+  });
+
+  it('saves a DURING note through the service', async () => {
+    const detail = makeDetailWithStatus('IN_PROGRESS');
+    const createMyJobUpdate = vi.fn().mockReturnValue(
+      of({ id: '7', jobId: '5', authorId: '2', phase: 'DURING', note: 'Fitting the replacement.', createdAt: '2026-09-21T12:00:00.000Z' }),
+    );
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      createMyJobUpdate,
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    const component = fixture.componentInstance as unknown as {
+      duringForm: { get: (name: string) => { setValue: (value: string) => void } };
+      saveNote: (phase: 'BEFORE' | 'DURING') => void;
+    };
+    component.duringForm.get('note').setValue('Fitting the replacement.');
+    component.saveNote('DURING');
+    expect(createMyJobUpdate).toHaveBeenCalledWith('5', 'DURING', 'Fitting the replacement.');
+  });
+
+  it('explains when voice recording is unavailable without breaking the workflow', async () => {
+    const detail = makeDetailWithStatus('IN_PROGRESS');
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    // Photos and notes stay usable; the audio file picker is the fallback.
+    expect(text).toContain('Add progress photo');
+    expect(text).toContain('Add Progress Update');
+    expect(text).toContain('Or choose an audio file');
+  });
+
+  it('keeps Complete Job disabled until a completion note is entered', async () => {
+    const detail = makeDetailWithStatus('IN_PROGRESS');
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(of([])),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    fixture.detectChanges();
+    const complete = [...(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)].find(
+      (button) => button.textContent?.trim() === 'Complete Job',
+    );
+    expect(complete).toBeDefined();
+    expect(complete?.disabled).toBe(true);
+  });
+
+  it('shows the read-only work record for COMPLETED jobs', async () => {
+    const detail = makeDetailWithStatus('COMPLETED');
+    await setup(vi.fn().mockReturnValue(of(detail)), {
+      listMyJobImages: vi.fn().mockReturnValue(of([])),
+      listMyJobUpdates: vi.fn().mockReturnValue(
+        of([{ id: '8', jobId: '5', authorId: '2', phase: 'AFTER', note: 'Valve replaced and tested.', createdAt: '2026-09-21T13:00:00.000Z' }]),
+      ),
+      listMyJobVoiceNotes: vi.fn().mockReturnValue(of([])),
+      getMyJobExecutionTimeline: vi.fn().mockReturnValue(of({ job: detail.job, events: [] })),
+    });
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('The work record is read-only');
+    expect(text).toContain('Valve replaced and tested.');
   });
 });

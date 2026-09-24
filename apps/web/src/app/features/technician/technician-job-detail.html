@@ -19,13 +19,13 @@
     <p class="fl-page-subtitle">{{ statusText(detail.job.status) }} · {{ priorityText(detail.job.priority) }}</p>
 
     <div class="fl-provider-grid">
-      <article class="fl-card">
+      <article class="fl-card" aria-label="Job details">
         <p class="fl-card-label">Service</p>
         <h2 class="fl-card-title">{{ detail.job.service.name }}</h2>
         <p class="fl-card-text">{{ detail.job.description }}</p>
       </article>
 
-      <article class="fl-card">
+      <article class="fl-card" aria-label="Customer">
         <p class="fl-card-label">Customer</p>
         <h2 class="fl-card-title">{{ detail.job.customer.displayName }}</h2>
         @if (detail.job.customer.email) {
@@ -36,7 +36,7 @@
         }
       </article>
 
-      <article class="fl-card">
+      <article class="fl-card" aria-label="Address">
         <p class="fl-card-label">Address</p>
         <p class="fl-card-text">{{ detail.job.addressLine1 ?? 'No address on file' }}</p>
         <p class="fl-card-text">{{ detail.job.city ?? 'No city on file' }}{{
@@ -47,18 +47,44 @@
         }
       </article>
 
-      <article class="fl-card">
+      <article class="fl-card" aria-label="Schedule">
         <p class="fl-card-label">Schedule</p>
         <p class="fl-card-text">{{ detail.job.scheduledAt ?? 'Not scheduled yet' }}</p>
         <p class="fl-card-text">Priority: {{ priorityText(detail.job.priority) }}</p>
       </article>
 
-      <article class="fl-card">
+      <article class="fl-card" aria-label="Business">
         <p class="fl-card-label">Business</p>
         <h2 class="fl-card-title">{{ detail.job.business.businessName }}</h2>
       </article>
 
-      <article class="fl-card">
+      <article class="fl-card" aria-label="Job status">
+        <p class="fl-card-label">Job status</p>
+        <h2 class="fl-card-title">{{ statusText(detail.job.status) }}</h2>
+        @if (canStart() && !showStartConfirm()) {
+          <button type="button" class="fl-btn fl-btn-primary fl-btn-block" (click)="startStart()">
+            Start Work
+          </button>
+          @if (startError()) {
+            <p class="fl-alert-error" role="alert">{{ startError() }}</p>
+          }
+        } @else if (canStart() && showStartConfirm()) {
+          <div role="group" aria-label="Confirm start of work">
+            <p class="fl-card-text"><strong>Start work on this job now?</strong></p>
+            @if (startError()) {
+              <p class="fl-alert-error" role="alert">{{ startError() }}</p>
+            }
+            <button type="button" class="fl-btn fl-btn-secondary" (click)="cancelStart()" [disabled]="starting()">
+              Cancel
+            </button>
+            <button type="button" class="fl-btn fl-btn-primary" (click)="confirmStart()" [disabled]="starting()">
+              {{ starting() ? 'Starting…' : 'Start Work' }}
+            </button>
+          </div>
+        }
+      </article>
+
+      <article class="fl-card" aria-label="Timeline">
         <p class="fl-card-label">Timeline</p>
         @if (detail.timeline.length === 0) {
           <p class="fl-card-text">No history yet.</p>
@@ -76,5 +102,307 @@
         }
       </article>
     </div>
+
+    @if (workStatus() === 'loading') {
+      <div class="fl-state" role="status">
+        <p>Loading work record…</p>
+      </div>
+    } @else if (workStatus() === 'error') {
+      <div class="fl-state fl-state-error" role="alert">
+        <h2 class="fl-state-title">Could not load the work record</h2>
+        <p class="fl-state-text">{{ workError() }}</p>
+        <button type="button" class="fl-btn fl-btn-primary" (click)="retryWork()">Try again</button>
+      </div>
+    } @else if (workStatus() === 'ready') {
+      <section class="fl-card" aria-label="Execution workspace">
+        <p class="fl-card-label">Execution workspace</p>
+        <h2 class="fl-card-title">Document the work</h2>
+
+        <div aria-label="Before work">
+          <p class="fl-card-title">Before work</p>
+          @for (note of notesFor('BEFORE'); track note.id) {
+            <p class="fl-card-text">{{ note.note }}</p>
+          }
+          @for (photo of imagesFor('BEFORE'); track photo.id) {
+            @if (photoUrl(photo.id)) {
+              <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Before work photo" loading="lazy" />
+            }
+            @if (isWorkEditable()) {
+              <button
+                type="button"
+                class="fl-btn fl-btn-secondary fl-btn-sm"
+                (click)="deletePhoto(photo.id)"
+                [disabled]="deletingImageId() === photo.id"
+              >
+                {{ deletingImageId() === photo.id ? 'Deleting…' : 'Delete photo' }}
+              </button>
+            }
+          }
+          @if (isWorkEditable()) {
+            <form class="fl-form" [formGroup]="beforeForm" (ngSubmit)="saveNote('BEFORE')" novalidate>
+              <div class="fl-field">
+                <label class="fl-label" for="before-note">Add note</label>
+                <textarea id="before-note" class="fl-input" rows="2" formControlName="note"></textarea>
+              </div>
+              <button type="submit" class="fl-btn fl-btn-secondary" [disabled]="savingNote() === 'BEFORE'">
+                {{ savingNote() === 'BEFORE' ? 'Saving…' : 'Add Note' }}
+              </button>
+            </form>
+            <div class="fl-field">
+              <label class="fl-label" for="before-photo">Add photos</label>
+              <input
+                id="before-photo"
+                class="fl-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                (change)="onFileSelected($event, 'BEFORE')"
+                [disabled]="uploadingPhase() !== null"
+              />
+            </div>
+          }
+        </div>
+
+        <div aria-label="During work">
+          <p class="fl-card-title">During work</p>
+          @for (note of notesFor('DURING'); track note.id) {
+            <p class="fl-card-text">{{ note.note }}</p>
+          }
+          @for (photo of imagesFor('DURING'); track photo.id) {
+            @if (photoUrl(photo.id)) {
+              <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Progress photo" loading="lazy" />
+            }
+            @if (isWorkEditable()) {
+              <button
+                type="button"
+                class="fl-btn fl-btn-secondary fl-btn-sm"
+                (click)="deletePhoto(photo.id)"
+                [disabled]="deletingImageId() === photo.id"
+              >
+                {{ deletingImageId() === photo.id ? 'Deleting…' : 'Delete photo' }}
+              </button>
+            }
+          }
+          @for (voice of voiceNotes(); track voice.id) {
+            <div aria-label="Voice note">
+              <p class="fl-card-text">
+                Voice note
+                @if (voice.durationSeconds !== null) {
+                  · {{ voice.durationSeconds }}s
+                }
+                · {{ voice.createdAt }}
+              </p>
+              @if (voiceUrl(voice.id)) {
+                <audio controls [src]="voiceUrl(voice.id)" preload="metadata"></audio>
+              }
+            </div>
+          }
+          @if (isWorkEditable()) {
+            <form class="fl-form" [formGroup]="duringForm" (ngSubmit)="saveNote('DURING')" novalidate>
+              <div class="fl-field">
+                <label class="fl-label" for="during-note">Add progress update</label>
+                <textarea id="during-note" class="fl-input" rows="2" formControlName="note"></textarea>
+              </div>
+              <button type="submit" class="fl-btn fl-btn-secondary" [disabled]="savingNote() === 'DURING'">
+                {{ savingNote() === 'DURING' ? 'Saving…' : 'Add Progress Update' }}
+              </button>
+            </form>
+            <div class="fl-field">
+              <label class="fl-label" for="during-photo">Add progress photo</label>
+              <input
+                id="during-photo"
+                class="fl-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                (change)="onFileSelected($event, 'DURING')"
+                [disabled]="uploadingPhase() !== null"
+              />
+            </div>
+            <div aria-label="Voice recording">
+              <p class="fl-card-title">Voice note</p>
+              @if (!voiceSupported()) {
+                <p class="fl-card-text">Voice recording is not available in this browser. You can still attach an audio file.</p>
+              } @else if (recordingState() === 'requesting') {
+                <p class="fl-card-text" role="status">Waiting for microphone access…</p>
+              } @else if (recordingState() === 'recording') {
+                <p class="fl-card-text" role="status">Recording…</p>
+                <button type="button" class="fl-btn fl-btn-secondary" (click)="stopRecording()">Stop</button>
+              } @else if (!recordedAudioUrl()) {
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-secondary"
+                  (click)="startRecording()"
+                  [disabled]="uploadingVoice()"
+                >
+                  Record Voice Note
+                </button>
+              } @else {
+                <audio controls [src]="recordedAudioUrl()" preload="metadata"></audio>
+                <p class="fl-card-text">Recorded clip · {{ recordedDuration() }}s — listen before uploading.</p>
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-secondary"
+                  (click)="discardRecording()"
+                  [disabled]="uploadingVoice()"
+                >
+                  Remove
+                </button>
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-primary"
+                  (click)="uploadRecording()"
+                  [disabled]="uploadingVoice()"
+                >
+                  {{ uploadingVoice() ? 'Uploading…' : 'Upload Voice Note' }}
+                </button>
+              }
+              @if (recordError()) {
+                <p class="fl-alert-error" role="alert">{{ recordError() }}</p>
+              }
+              <div class="fl-field">
+                <label class="fl-label" for="voice-file">Or choose an audio file</label>
+                <input
+                  id="voice-file"
+                  class="fl-input"
+                  type="file"
+                  accept="audio/webm,audio/mp4,audio/mpeg,audio/wav,audio/ogg"
+                  (change)="onVoiceFileSelected($event)"
+                  [disabled]="uploadingVoice()"
+                />
+              </div>
+              @if (uploadingVoice()) {
+                <p class="fl-card-text" role="status">Uploading voice note…</p>
+              }
+              @if (voiceUploadError()) {
+                <p class="fl-alert-error" role="alert">{{ voiceUploadError() }}</p>
+              }
+            </div>
+          }
+        </div>
+
+        <div aria-label="After work">
+          <p class="fl-card-title">After work</p>
+          @for (photo of imagesFor('AFTER'); track photo.id) {
+            @if (photoUrl(photo.id)) {
+              <img class="fl-photo" [src]="photoUrl(photo.id)" alt="Final photo" loading="lazy" />
+            }
+            @if (isWorkEditable()) {
+              <button
+                type="button"
+                class="fl-btn fl-btn-secondary fl-btn-sm"
+                (click)="deletePhoto(photo.id)"
+                [disabled]="deletingImageId() === photo.id"
+              >
+                {{ deletingImageId() === photo.id ? 'Deleting…' : 'Delete photo' }}
+              </button>
+            }
+          }
+          @if (isWorkEditable()) {
+            <div class="fl-field">
+              <label class="fl-label" for="after-photo">Add final photos</label>
+              <input
+                id="after-photo"
+                class="fl-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                (change)="onFileSelected($event, 'AFTER')"
+                [disabled]="uploadingPhase() !== null"
+              />
+            </div>
+            @if (uploadingPhase()) {
+              <p class="fl-card-text" role="status">Uploading photo…</p>
+            }
+            @if (uploadError()) {
+              <p class="fl-alert-error" role="alert">{{ uploadError() }}</p>
+            }
+            @if (noteError()) {
+              <p class="fl-alert-error" role="alert">{{ noteError() }}</p>
+            }
+            @if (deleteError()) {
+              <p class="fl-alert-error" role="alert">{{ deleteError() }}</p>
+            }
+            <form class="fl-form" [formGroup]="completionForm" novalidate>
+              <div class="fl-field">
+                <label class="fl-label" for="completion-note">Completion note</label>
+                <textarea id="completion-note" class="fl-input" rows="3" formControlName="note"></textarea>
+                @if (completionForm.controls.note.invalid && completionForm.controls.note.touched) {
+                  <p class="fl-field-error" role="alert">A completion note is required to complete the job.</p>
+                }
+              </div>
+            </form>
+            @if (!showCompleteConfirm()) {
+              @if (completeError()) {
+                <p class="fl-alert-error" role="alert">{{ completeError() }}</p>
+              }
+              <button
+                type="button"
+                class="fl-btn fl-btn-primary fl-btn-block"
+                (click)="startComplete()"
+                [disabled]="!canComplete()"
+              >
+                Complete Job
+              </button>
+            } @else {
+              <div role="group" aria-label="Confirm job completion">
+                <p class="fl-card-text"><strong>Mark this job as complete?</strong></p>
+                <p class="fl-card-text">The business will review the documented work.</p>
+                @if (completeError()) {
+                  <p class="fl-alert-error" role="alert">{{ completeError() }}</p>
+                }
+                <button type="button" class="fl-btn fl-btn-secondary" (click)="cancelComplete()" [disabled]="completing()">
+                  Cancel
+                </button>
+                <button type="button" class="fl-btn fl-btn-primary" (click)="confirmComplete()" [disabled]="completing()">
+                  {{ completing() ? 'Completing…' : 'Complete Job' }}
+                </button>
+              </div>
+            }
+          } @else {
+            <p class="fl-card-text">This job is completed. The work record is read-only.</p>
+            @if (completionNote()) {
+              <p class="fl-card-text">{{ completionNote() }}</p>
+            }
+          }
+        </div>
+
+        @if (events().length > 0) {
+          <div aria-label="Execution timeline">
+            <p class="fl-card-title">Execution timeline</p>
+            <ul>
+              @for (event of events(); track event.createdAt + event.kind) {
+                <li>
+                  @switch (event.kind) {
+                    @case ('status') {
+                      <p class="fl-card-text">{{ statusText(event.status ?? 'REQUESTED') }} · {{ event.createdAt }}</p>
+                      @if (event.reason) {
+                        <p class="fl-card-text">{{ event.reason }}</p>
+                      }
+                    }
+                    @case ('assignment') {
+                      <p class="fl-card-text">Assigned{{ event.technicianName ? ' to ' + event.technicianName : '' }} · {{ event.createdAt }}</p>
+                    }
+                    @case ('update') {
+                      <p class="fl-card-text">{{ phaseLabel(event.phase ?? 'DURING') }} note · {{ event.createdAt }}</p>
+                      <p class="fl-card-text">{{ event.note }}</p>
+                    }
+                    @case ('image') {
+                      <p class="fl-card-text">{{ phaseLabel(event.phase ?? 'DURING') }} photo · {{ event.createdAt }}</p>
+                    }
+                    @case ('voice') {
+                      <p class="fl-card-text">
+                        Voice note
+                        @if (event.durationSeconds !== null && event.durationSeconds !== undefined) {
+                          · {{ event.durationSeconds }}s
+                        }
+                        · {{ event.createdAt }}
+                      </p>
+                    }
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    }
   }
 </div>

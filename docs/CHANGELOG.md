@@ -1,5 +1,56 @@
 # FixLink — Changelog
 
+## Stage 7D — Technician Execution + Voice Notes (2026-09-24)
+
+- Technician execution on the shared architecture — no second
+  job-execution system: `jobs` (`source = INTERNAL`), `job_images`
+  (phase BEFORE/DURING/AFTER), `job_updates` (phase + message),
+  `job_voice_notes` (file reference + metadata) and
+  `job_status_history`. New technician surface
+  (`backend/src/modules/business/` — same router, technician
+  identity derived server-side, active-assignment scoping, foreign
+  jobs read as `404`): `POST
+  /api/v1/technician/jobs/:jobId/start` (REQUESTED/SCHEDULED →
+  IN_PROGRESS, atomic), `POST|GET
+  /api/v1/technician/jobs/:jobId/images` (+
+  `GET .../images/:imageId/file`, `DELETE .../images/:imageId`
+  uploader-only), `POST|GET .../updates`, `POST|GET
+  .../voice-notes` (+ `GET .../voice-notes/:voiceNoteId/file`),
+  `GET .../timeline` (status + assignment + update + image +
+  voice events, chronological) and `POST .../complete`
+  (IN_PROGRESS → COMPLETED, note required as the AFTER record).
+  Read-only business visibility for owner/manager on owned jobs:
+  `GET /api/v1/business/jobs/:jobId/images|updates|voice-notes|
+  timeline` (+ file bytes). Voice notes: `audio/webm|mp4|mpeg|
+  wav|ogg`, 10MB max, container-signature sniffing, optional
+  duration 0–36000s, opaque `job-voice-notes/<jobId>/<hex>.<ext>`
+  keys through the shared `FileStorage` adapter (new
+  `saveVoiceNote`), bytes served only via authorized endpoints.
+- Authorization: unauthenticated → `401`; wrong roles → `403`;
+  unassigned/cross-business/cross-technician access → `404` (no
+  probing); pre-start docs, double start, note-less completion →
+  `422`; malformed ids → `400`. Marketplace execution untouched
+  (provider/customer rules, endpoints and stores unchanged).
+- Angular: `/technician/jobs/:id` gains Start Work (confirm),
+  the BEFORE/DURING/AFTER execution workspace (photo upload +
+  delete, notes, MediaRecorder voice recording with playback,
+  remove, upload, mic-denied message and audio-file fallback,
+  completion with required note, execution timeline) and a
+  read-only completed state; `/business/jobs/:id` gains a
+  read-only work-documentation section (photos, notes, voice
+  playback, execution timeline); `.fl-photo` style added.
+- Tests: `backend/tests/technician-execution.test.ts` (32
+  brief-mapped cases: start, photos, updates, voice upload/list/
+  stream, auth isolation, completion, timeline, business
+  visibility, audio/size/key validation) plus updated/new
+  frontend specs. Full backend suite green: 297/297; frontend
+  suite green: 29 files, 217 tests; `tsc --noEmit` (backend, web
+  app + spec) and both builds pass. Migration 010 adds
+  `job_voice_notes.original_filename` (nullable) — no new tables.
+- Out of scope (later stages): parts requests, manager
+  approvals/awaiting-parts, business job board/history redesign,
+  notifications, admin, payments, full system test, client UAT.
+
 ## Stage 7C — Technician Assignment + My Jobs (2026-09-24)
 
 - Technician assignment on the existing `job_assignments` table

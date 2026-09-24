@@ -304,6 +304,18 @@ body {
   border: 1px solid #fecaca;
 }
 
+/* ---------- Work documentation (Stage 6F + 7D) ---------- */
+
+.fl-photo {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  border-radius: var(--fl-radius-control);
+  border: 1px solid var(--fl-input-border);
+  margin: 0.5rem 0;
+}
+
 /* ---------- Role selector ---------- */
 
 .fl-role-grid {

@@ -1169,3 +1169,49 @@ Explicitly out of scope for Stage 7C (later stages):
 technician execution updates, voice notes, parts requests,
 manager approvals, notifications, the admin dashboard, payment
 processing, and marketplace quote/job changes.
+
+# 24. STAGE 7D IMPLEMENTATION NOTES — TECHNICIAN EXECUTION + VOICE NOTES
+
+Implemented 2026-09-24. The assigned technician executes and
+documents the job; the business watches read-only:
+
+Technician My Jobs → open assigned job → Start Work (confirm;
+REQUESTED/SCHEDULED → IN_PROGRESS) → BEFORE (photos + note) →
+DURING (progress photos + updates + voice notes) → AFTER
+(final photos + completion note) → Complete Job (confirm;
+IN_PROGRESS → COMPLETED) → business sees the execution
+history. Assignment itself still never changes job status.
+
+Technician:
+
+Login → My Jobs (unchanged list) → Job detail
+(`/technician/jobs/:id`): service, customer + job contact
+details, description, address, priority, schedule, job status
+with a Start Work action while REQUESTED/SCHEDULED (confirm
+dialog; starting state; error state) → once IN_PROGRESS the
+execution workspace appears with BEFORE (photo picker +
+note form), DURING (progress photo picker, update form, voice
+recorder with Record/Recording/Stop/playback/Remove/Upload
+states plus an audio-file fallback, upload and error states)
+and AFTER (final photo picker, completion-note field) sections
+→ Complete Job (enabled only with a completion note; confirm
+dialog) → COMPLETED shows the read-only work record with the
+completion note → execution timeline (assignment, status,
+notes, photos, voice notes, oldest first) below the workspace.
+Microphone denial shows a clear message and leaves photos and
+notes fully usable. Only assigned jobs are visible; opening
+another job by URL reads as not found. Technician navigation
+is unchanged.
+
+Business owner / manager:
+
+Job detail (`/business/jobs/:id`) gains a read-only work
+documentation section once work has started: technician notes
+(by phase), photos, voice notes with playback, and the
+execution timeline. No start/upload/complete controls appear
+for managers — approvals arrive in a later stage.
+
+Explicitly out of scope for Stage 7D (later stages): parts
+requests, manager approvals / awaiting-parts workflow,
+business job board redesign, notifications, admin, payments,
+full system test, and client UAT.

@@ -483,6 +483,72 @@ Stage 7C connects internal jobs to technicians
 - No migration was required — `job_assignments` (TECHNICIAN type,
   `unassigned_at` history) already supports this stage.
 
+## 8.4 Businesses — Stage 7D Implementation Notes (Technician Execution + Voice Notes)
+
+Stage 7D lets the assigned technician execute and document an
+internal job (`backend/src/modules/business/` — same router, plus
+`backend/src/services/file-storage.ts` voice support and migration
+010). It reuses the ONE shared architecture — `jobs`
+(`source = INTERNAL`), `job_images` (phase BEFORE/DURING/AFTER),
+`job_updates` (phase + message), `job_voice_notes` (file reference
++ metadata) and `job_status_history` — so no technician-specific
+copies of job tables exist. The technician identity is derived
+server-side from the session user (membership + active technician
+row); a technician id is never accepted.
+
+- `POST /api/v1/technician/jobs/:jobId/start` (TECHNICIAN only)
+  moves an assigned job REQUESTED/SCHEDULED → IN_PROGRESS
+  atomically with a `Technician started job` history entry.
+  Unassigned, cross-business or marketplace jobs → `404`; a job
+  in any other state → `422`; managers, customers,
+  professionals and admins → `403`; unauthenticated → `401`.
+- `POST /api/v1/technician/jobs/:jobId/images` (multipart field
+  `image` + `phase`, IN_PROGRESS only) stores JPEG/PNG/WebP
+  (5MB max, magic-byte sniffed, sanitized name, opaque
+  `job-images/<jobId>/<hex>.<ext>` key) and returns metadata
+  only. `GET .../images` lists metadata; `GET
+  .../images/:imageId/file` streams bytes (`Content-Type` from
+  storage, `inline`, `private` cache); `DELETE
+  .../images/:imageId` is uploader-only while IN_PROGRESS
+  (foreign uploader → `403`, otherwise `404`/`422`).
+- `POST /api/v1/technician/jobs/:jobId/updates` saves a
+  BEFORE/DURING/AFTER note (required, ≤2000 chars, IN_PROGRESS
+  only); `GET .../updates` lists them.
+- `POST /api/v1/technician/jobs/:jobId/voice-notes`
+  (multipart field `audio` + optional `duration` seconds,
+  IN_PROGRESS only) stores WebM/MP4/MP3/WAV/Ogg (10MB max,
+  container-signature sniffed, duration 0–36000s, opaque
+  `job-voice-notes/<jobId>/<hex>.<ext>` key via
+  `FileStorage.saveVoiceNote`) and returns `{ id, jobId,
+  authorId, originalFilename, mimeType, size, durationSeconds,
+  createdAt }`. `GET .../voice-notes` lists metadata; `GET
+  .../voice-notes/:voiceNoteId/file` streams bytes (same cache/
+  disposition rules as photos). Voice binaries never sit in
+  MySQL and are never served from a public URL.
+- `GET /api/v1/technician/jobs/:jobId/timeline` returns
+  `{ job, events }` (status + assignment + update + image +
+  voice, oldest first). `POST
+  /api/v1/technician/jobs/:jobId/complete` requires a completion
+  note (≤2000 chars) stored as the AFTER update and moves
+  IN_PROGRESS → COMPLETED atomically (`Technician completed
+  job` history entry); afterwards the job is read-only for the
+  technician. Every unassigned/cross-business access on this
+  surface reads as `404 NOT_FOUND` (never `403`), so job ids
+  cannot be probed.
+- Read-only business visibility (BUSINESS_OWNER/
+  BUSINESS_MANAGER, owned INTERNAL jobs only, foreign → `404`):
+  `GET /api/v1/business/jobs/:jobId/images` (+
+  `.../images/:imageId/file`), `GET .../updates`, `GET
+  .../voice-notes` (+ `.../voice-notes/:voiceNoteId/file`),
+  `GET .../timeline`. No technician-only capability is exposed
+  here (no start/upload/complete for managers).
+- Marketplace execution is untouched: the provider/customer
+  endpoints, guards and stores are unchanged, and internal jobs
+  never appear on the marketplace surface (and vice versa).
+- Migration 010 adds the nullable
+  `job_voice_notes.original_filename` column (mirroring
+  migration 009 for images) — no new tables.
+
 MVP payment position (unchanged): internal jobs never charge
 anyone; agreed amounts remain recorded prices paid directly
 outside the platform.

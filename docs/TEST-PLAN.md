@@ -441,3 +441,72 @@ Frontend (`apps/web`, `npx ng test --watch=false` — 29 files,
 No migration in Stage 7C — `job_assignments`
 (`assignment_type = TECHNICIAN`, `unassigned_at` history)
 already supports it; no database doc change was required.
+
+## Stage 7D — Technician Execution + Voice Notes
+
+Backend (`backend/tests/technician-execution.test.ts`, 32
+cases, in-memory business store + isolated storage tmp dir —
+run with `npm test` from `backend/`; full suite 297/297
+green):
+
+- Assigned technician starts REQUESTED → IN_PROGRESS with
+  history (1); unassigned technician cannot start (2, `404`);
+  cross-business technician cannot access (3, `404`); double
+  start → `422` with the job left IN_PROGRESS;
+  customer/manager on the technician start endpoint → `403`.
+- BEFORE (4), DURING (5) and AFTER (6) photos (`201`, phase +
+  metadata, no storage-key leak); photos before start → `422`
+  (7c variant); unauthorized image upload → `404` (10);
+  uploader delete works and bytes disappear; photo bytes need
+  auth (`401` anonymous, `404` stranger, `200` with
+  `image/*` + `inline` for the owner).
+- BEFORE/DURING text updates (7, `201`); unauthorized update →
+  `404` (11); updates before start → `422`.
+- Voice-note upload (8, `201`, no key leak); metadata
+  persisted — mime, size, duration (13); WAV/Ogg/MP4 accepted;
+  stored bytes stream back with `audio/*` + `inline` +
+  `private` (14); unauthorized upload → `404` (9); file
+  endpoint auth (`401`/`404`) (15); cross-business voice
+  access → `404` (16).
+- Completion needs a note from IN_PROGRESS (note-less/early →
+  `422`); unauthorized complete → `404` (12); completion
+  stores the AFTER note, writes COMPLETED history, closes
+  further docs and rejects repeats (17); timeline carries
+  status + assignment + update + image + voice in
+  chronological order (18).
+- Audio validation rejects text uploads, MIME/content
+  mismatches and bad durations (22, `422`); size validation
+  rejects >10MB voice and >5MB images (23, `422`); malformed
+  and unsafe storage keys are rejected by the adapter with
+  round-trip reads intact (24).
+- Business visibility: owner and manager read images/updates/
+  voice/timeline + bytes (read-only); foreign business →
+  `404`; technician on the business surface → `403`.
+- Stages 7C/6F/marketplace remain covered by their untouched
+  suites in the same run (brief items 19–21).
+
+Frontend (`apps/web`, `npx ng test --watch=false` — 29 files,
+217 tests, all green; Chrome required via `CHROME_BIN` —
+plain `vitest run` hangs on the Angular TestBed setup and is
+not the supported path):
+
+- `technician-job-detail.spec.ts` (updated): existing
+  detail/error/no-management tests intact (Business card
+  restored); Start Work confirm flow calls `startMyJob`;
+  BEFORE/DURING/AFTER workspace with notes, voice and
+  Complete Job; DURING note save dispatches
+  `createMyJobUpdate`; voice-unavailable fallback message with
+  the audio-file picker; Complete Job disabled without a note;
+  read-only completed record.
+- `business-job-detail.spec.ts` (updated): read-only work
+  documentation (notes, photos, voice, timeline) for
+  IN_PROGRESS jobs with no technician capabilities; hidden
+  for REQUESTED jobs; all earlier tests intact.
+- Full suite green with no pre-existing test removed or
+  weakened.
+
+Migration 010 adds nullable
+`job_voice_notes.original_filename` (mirroring 009); the
+shared `jobs` / `job_images` / `job_updates` /
+`job_voice_notes` / `job_status_history` tables are otherwise
+unchanged.

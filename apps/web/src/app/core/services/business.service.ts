@@ -19,7 +19,14 @@ import type {
   JobAssignment,
   JobAssignmentDetail,
   Technician,
+  TechnicianExecutionTimeline,
+  TechnicianJobImage,
+  TechnicianJobImageList,
+  TechnicianJobUpdate,
+  TechnicianJobUpdateList,
   TechnicianList,
+  TechnicianVoiceNote,
+  TechnicianVoiceNoteList,
   UpdateBusinessCustomerRequest,
   UpdateBusinessJobRequest,
   UpdateBusinessRequest,
@@ -29,12 +36,14 @@ import type {
 /**
  * FixLink business API client — Stage 7A (business foundation +
  * technician management) + Stage 7B (business-managed customers and
- * internal jobs) + Stage 7C (technician assignment).
+ * internal jobs) + Stage 7C (technician assignment) + Stage 7D
+ * (read-only execution visibility: photos, notes, voice notes,
+ * timeline).
  *
  * Single owner of business calls. All endpoints require authentication
  * (the interceptor attaches the Bearer token); the business is derived
  * by the backend from the session membership, never from these payloads.
- * Technician execution, parts and approvals arrive in later stages.
+ * Parts and approvals arrive in later stages.
  */
 @Injectable({ providedIn: 'root' })
 export class BusinessService {
@@ -235,6 +244,65 @@ export class BusinessService {
     return this.http
       .get<ApiSuccess<JobAssignmentDetail>>(
         `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/assignment`,
+      )
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Stage 7D — read-only execution visibility for owner/manager.
+   * The technician's BEFORE/DURING/AFTER photos for an owned job.
+   */
+  listBusinessJobImages(jobId: string): Observable<TechnicianJobImage[]> {
+    return this.http
+      .get<ApiSuccess<TechnicianJobImageList>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/images`,
+      )
+      .pipe(map((res) => res.data.items));
+  }
+
+  /** Authorized URL for execution photo bytes (fetch as a Blob for <img>). */
+  businessJobImageFileUrl(jobId: string, imageId: string): string {
+    return `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/images/${encodeURIComponent(imageId)}/file`;
+  }
+
+  /** Fetch authorized execution photo bytes as a Blob. */
+  fetchBusinessJobImageBlob(jobId: string, imageId: string): Observable<Blob> {
+    return this.http.get(this.businessJobImageFileUrl(jobId, imageId), { responseType: 'blob' });
+  }
+
+  /** The technician's progress notes for an owned job (read-only). */
+  listBusinessJobUpdates(jobId: string): Observable<TechnicianJobUpdate[]> {
+    return this.http
+      .get<ApiSuccess<TechnicianJobUpdateList>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/updates`,
+      )
+      .pipe(map((res) => res.data.items));
+  }
+
+  /** The technician's voice notes for an owned job (metadata only, read-only). */
+  listBusinessVoiceNotes(jobId: string): Observable<TechnicianVoiceNote[]> {
+    return this.http
+      .get<ApiSuccess<TechnicianVoiceNoteList>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/voice-notes`,
+      )
+      .pipe(map((res) => res.data.items));
+  }
+
+  /** Authorized URL for voice-note bytes (fetch as a Blob for <audio>). */
+  businessJobVoiceNoteFileUrl(jobId: string, voiceNoteId: string): string {
+    return `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/voice-notes/${encodeURIComponent(voiceNoteId)}/file`;
+  }
+
+  /** Fetch authorized voice-note bytes as a Blob. */
+  fetchBusinessJobVoiceNoteBlob(jobId: string, voiceNoteId: string): Observable<Blob> {
+    return this.http.get(this.businessJobVoiceNoteFileUrl(jobId, voiceNoteId), { responseType: 'blob' });
+  }
+
+  /** Execution timeline for an owned job (status + assignment + work + voice). */
+  getBusinessExecutionTimeline(jobId: string): Observable<TechnicianExecutionTimeline> {
+    return this.http
+      .get<ApiSuccess<TechnicianExecutionTimeline>>(
+        `${this.baseUrl}/business/jobs/${encodeURIComponent(jobId)}/timeline`,
       )
       .pipe(map((res) => res.data));
   }

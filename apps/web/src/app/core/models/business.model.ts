@@ -363,3 +363,112 @@ export function businessJobPriorityLabel(priority: BusinessJobPriority): string 
       return priority;
   }
 }
+
+/**
+ * Technician execution contracts for Stage 7D.
+ *
+ * Mirrors the technician execution endpoints
+ * (/technician/jobs/:id/start|images|updates|voice-notes|timeline|
+ * complete) and the read-only business visibility endpoints
+ * (/business/jobs/:id/images|updates|voice-notes|timeline). Photos,
+ * notes and voice notes reuse the shared job_images / job_updates /
+ * job_voice_notes architecture — the API returns file metadata only,
+ * never binaries or storage paths. Bytes load through the authorized
+ * file endpoints.
+ */
+
+/** Work-documentation phase for technician photos and notes. */
+export type TechnicianWorkPhase = 'BEFORE' | 'DURING' | 'AFTER';
+
+/** Human-friendly label for technician work phases. */
+export function technicianWorkPhaseLabel(phase: TechnicianWorkPhase): string {
+  switch (phase) {
+    case 'BEFORE':
+      return 'Before work';
+    case 'DURING':
+      return 'During work';
+    case 'AFTER':
+      return 'After work';
+  }
+}
+
+/** File metadata for a technician job photo. */
+export interface TechnicianJobImage {
+  id: string;
+  jobId: string;
+  uploadedBy: string;
+  phase: TechnicianWorkPhase;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+export interface TechnicianJobImageList {
+  items: TechnicianJobImage[];
+  total: number;
+}
+
+/** A written progress / completion note on an internal job. */
+export interface TechnicianJobUpdate {
+  id: string;
+  jobId: string;
+  authorId: string;
+  phase: TechnicianWorkPhase;
+  note: string;
+  createdAt: string;
+}
+
+export interface TechnicianJobUpdateList {
+  items: TechnicianJobUpdate[];
+  total: number;
+}
+
+/** File metadata for a technician voice note. */
+export interface TechnicianVoiceNote {
+  id: string;
+  jobId: string;
+  authorId: string;
+  originalFilename: string | null;
+  mimeType: string;
+  size: number;
+  /** Recorded length in seconds, when the client reported it. */
+  durationSeconds: number | null;
+  createdAt: string;
+}
+
+export interface TechnicianVoiceNoteList {
+  items: TechnicianVoiceNote[];
+  total: number;
+}
+
+export type TechnicianExecutionEventKind = 'status' | 'assignment' | 'update' | 'image' | 'voice';
+
+/** One entry of the technician execution timeline. */
+export interface TechnicianExecutionEvent {
+  kind: TechnicianExecutionEventKind;
+  createdAt: string;
+  actor: 'technician' | 'business';
+  status?: BusinessJobStatus;
+  previousStatus?: BusinessJobStatus | null;
+  reason?: string | null;
+  technicianName?: string;
+  phase?: TechnicianWorkPhase;
+  note?: string;
+  imageId?: string;
+  voiceNoteId?: string;
+  mimeType?: string;
+  durationSeconds?: number | null;
+}
+
+/** Technician execution timeline: the job plus chronological events. */
+export interface TechnicianExecutionTimeline {
+  job: BusinessJob;
+  events: TechnicianExecutionEvent[];
+}
+
+/** Result of POST /technician/jobs/:id/complete (job + AFTER record). */
+export interface CompleteTechnicianJobResult {
+  job: BusinessJob;
+  update: TechnicianJobUpdate;
+}
