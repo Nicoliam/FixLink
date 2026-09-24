@@ -66,6 +66,13 @@ export class MemoryUserRepository implements UserRepository {
     // No-op for the ephemeral test store.
   }
 
+  async setStatus(userId: string, status: UserRecord['status']): Promise<void> {
+    const user = this.byId.get(userId);
+    if (user) {
+      this.byId.set(userId, { ...user, status, updatedAt: nowIso() });
+    }
+  }
+
   toSafeUser(user: UserRecord, roles: string[]): ReturnType<UserRepository['toSafeUser']> {
     return toSafeUser(user, roles);
   }

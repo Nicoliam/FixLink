@@ -5,13 +5,17 @@ import { AuthService } from './core/services/auth.service';
 
 const PROVIDER_ROLES = ['PROFESSIONAL', 'BUSINESS_OWNER', 'BUSINESS_MANAGER'];
 
+const BUSINESS_ROLES = ['BUSINESS_OWNER', 'BUSINESS_MANAGER'];
+
 /**
- * FixLink application shell — Stage 5B + 6C.
+ * FixLink application shell — Stage 5B + 6C + 7A.
  *
  * Oceanic header with the FixLink logo and session-aware navigation,
  * plus the routed content. Navigation is UX-only: customers see My Jobs,
- * provider roles see Requests, and the backend enforces the real
- * authorization. Dashboards arrive in later stages.
+ * provider roles see Requests, business roles see Business/Technicians,
+ * and the backend enforces the real authorization. Technicians get no
+ * business-management navigation until Stage 7C. Dashboards arrive in
+ * later stages.
  */
 @Component({
   selector: 'app-root',
@@ -32,5 +36,12 @@ export class App {
     () =>
       this.auth.isAuthenticated() &&
       (this.auth.currentUser()?.roles ?? []).some((role) => PROVIDER_ROLES.includes(role)),
+  );
+
+  /** Business navigation: dashboard and technician roster for business roles only. */
+  protected readonly showBusiness = computed(
+    () =>
+      this.auth.isAuthenticated() &&
+      (this.auth.currentUser()?.roles ?? []).some((role) => BUSINESS_ROLES.includes(role)),
   );
 }

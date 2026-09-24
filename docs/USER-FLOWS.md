@@ -1052,3 +1052,43 @@ Explicitly out of scope for Stage 6F: payment processing of any kind,
 technician marketplace execution, parts requests, manager approvals,
 portfolio publishing (photos stay private), voice notes, the review
 flow, and notifications.
+
+# 21. STAGE 7A IMPLEMENTATION NOTES — BUSINESS FOUNDATION & TECHNICIAN MANAGEMENT
+
+Implemented 2026-09-23. Covers the business side of the
+Create → Assign foundation: an authenticated owner/manager opens
+their business dashboard, keeps the business profile current, and
+builds the technician roster. No jobs are assigned yet.
+
+Business owner:
+
+Login → Business (dashboard: business name, verification state,
+membership role, real technician count; jobs shown as an explicit
+"Coming soon" state, never fake counts) → Edit profile (owner-only;
+name, description, contact, city/province) → Technicians (roster
+with status and contact info) → Invite a technician (name, email,
+optional phone, initial password for brand-new accounts; existing
+FixLink accounts are linked without a password change) →
+Technician detail (rename, activate/deactivate; deactivation
+immediately revokes that technician's business access).
+
+Business manager:
+
+Login → Business (read-only profile; no Edit action is offered) →
+Technicians (same roster) → Invite / rename / activate /
+deactivate technicians in their own business only.
+
+Technician:
+
+Login → No business navigation is offered (minimal surface until
+Stage 7C). Technicians authenticate with their own login and the
+backend exposes only their own roster row.
+
+Customers and professionals see no business navigation at all.
+
+Explicitly out of scope for Stage 7A: business creation/
+onboarding (an owner with no business sees "No business found"),
+internal jobs, technician job assignment, technician My Jobs,
+parts requests, manager approvals, voice notes, notifications,
+the admin dashboard, payment processing, and new marketplace
+functionality.

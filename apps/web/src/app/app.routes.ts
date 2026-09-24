@@ -7,6 +7,8 @@ import { authGuard, guestGuard } from './core/guards/auth.guard';
  * and My Jobs (`/my-jobs`) retrieval.
  * Stage 6C adds provider requests (`/requests`) and request detail with
  * quote submission (`/requests/:id`).
+ * Stage 7A adds the business dashboard (`/business`) and the technician
+ * roster (`/business/technicians`, `/business/technicians/:id`).
  * Role dashboards and the quote lifecycle arrive in later stages.
  */
 export const routes: Routes = [
@@ -51,6 +53,24 @@ export const routes: Routes = [
   {
     path: 'requests/:id',
     loadComponent: () => import('./features/provider/request-detail').then((m) => m.RequestDetailComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business',
+    loadComponent: () =>
+      import('./features/business/business-dashboard').then((m) => m.BusinessDashboardComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/technicians',
+    loadComponent: () =>
+      import('./features/business/technician-list').then((m) => m.TechnicianListComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'business/technicians/:id',
+    loadComponent: () =>
+      import('./features/business/technician-detail').then((m) => m.TechnicianDetailComponent),
     canActivate: [authGuard],
   },
   {

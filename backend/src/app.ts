@@ -23,6 +23,10 @@ import { makeExecutionRoutes } from './modules/execution/execution.routes';
 import { MemoryExecutionStore } from './modules/execution/memory-execution.store';
 import { MysqlExecutionStore } from './modules/execution/mysql-execution.store';
 import type { ExecutionStore } from './modules/execution/execution.store';
+import { makeBusinessRoutes } from './modules/business/business.routes';
+import { MemoryBusinessStore } from './modules/business/memory-business.store';
+import { MysqlBusinessStore } from './modules/business/mysql-business.store';
+import type { BusinessStore } from './modules/business/business.store';
 import { LocalFileStorage, type FileStorage } from './services/file-storage';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
@@ -35,8 +39,10 @@ export interface AppDeps {
   jobs?: JobsStore;
   /** Optional so Stage 6B-era tests keep compiling; defaults to memory. */
   quotes?: QuotesStore;
-  /** Optional so pre-6F tests keep compiling; defaults to memory. */
+  /** Optional so Stage 6F-era tests keep compiling; defaults to memory. */
   execution?: ExecutionStore;
+  /** Optional so pre-7A tests keep compiling; defaults to memory. */
+  business?: BusinessStore;
   /** Optional file storage; defaults to the local MVP adapter. */
   storage?: FileStorage;
 }
@@ -53,6 +59,7 @@ export function resolveDeps(): AppDeps {
       jobs,
       quotes,
       execution: new MemoryExecutionStore(jobs, quotes),
+      business: new MemoryBusinessStore(),
       storage: new LocalFileStorage(),
     };
   }
@@ -65,6 +72,7 @@ export function resolveDeps(): AppDeps {
     jobs,
     quotes: new MysqlQuotesStore(pool),
     execution: new MysqlExecutionStore(pool),
+    business: new MysqlBusinessStore(pool),
     storage: new LocalFileStorage(),
   };
 }
@@ -94,6 +102,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
       ? new MemoryExecutionStore(jobs, quotes instanceof MemoryQuotesStore ? quotes : undefined)
       : undefined);
   const storage = deps.storage ?? new LocalFileStorage();
+  const business = deps.business ?? new MemoryBusinessStore();
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));
   app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
@@ -104,6 +113,10 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   if (quotes && execution) {
     app.use('/api/v1', makeExecutionRoutes(deps.users, jobs, quotes, execution, storage));
   }
+  // Auth-walled routers mount after the public marketplace routes: each
+  // calls `router.use(requireAuth(...))`, which answers 401 for requests
+  // without a token, so mounting earlier would shadow public endpoints.
+  app.use('/api/v1', makeBusinessRoutes(deps.users, business));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

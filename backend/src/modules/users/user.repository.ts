@@ -37,6 +37,12 @@ export interface UserRepository {
   setRoles(userId: string, roles: string[]): Promise<void>;
   getRoles(userId: string): Promise<string[]>;
   touchLogin(userId: string): Promise<void>;
+  /**
+   * Stage 7A — activate an invited technician login. Invited accounts
+   * land ACTIVE (registration still lands PENDING); suspension and
+   * deletion remain the caller's responsibility.
+   */
+  setStatus(userId: string, status: UserStatus): Promise<void>;
   toSafeUser(user: UserRecord, roles: string[]): SafeUser;
 }
 

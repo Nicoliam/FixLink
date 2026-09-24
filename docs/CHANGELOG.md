@@ -1,5 +1,52 @@
 # FixLink — Changelog
 
+## Stage 7A — Business Foundation + Technician Management (2026-09-23)
+
+- Authenticated business surface for `BUSINESS_OWNER` /
+  `BUSINESS_MANAGER`, derived server-side from membership (never a
+  frontend `business_id`): `GET /api/v1/business/me` (profile with
+  membership `role` and real `technicianCount`),
+  `PATCH /api/v1/business/me` (owner-only: name, description,
+  contact, address fields), `GET /api/v1/business/technicians`
+  (roster), `POST /api/v1/business/technicians` (invite: new email
+  creates an `ACTIVE` `TECHNICIAN` login with bcrypt hash;
+  existing accounts link without password changes),
+  `GET /api/v1/business/technicians/:technicianId` (owner/manager
+  roster read, technician self-read) and `PATCH
+  /api/v1/business/technicians/:technicianId` (rename,
+  activate/deactivate with `technicians` + `business_members`
+  flags synced in one transaction, so deactivation immediately
+  revokes access).
+- Authorization: unauthenticated → `401`; customer/professional/
+  technician-management/admin actors → `403`; owner-less accounts
+  → `404`; cross-business technician reads/patches → `404` (no
+  probing); technicians never gain marketplace provider profiles
+  and stay out of the provider inbox. Malformed ids → `400`,
+  invalid payloads → `422`, double-links → `409 CONFLICT`.
+- Angular: `/business` dashboard (name, verification, role,
+  technician count, owner-only profile editor, explicit jobs
+  "Coming soon" state with no fake counts),
+  `/business/technicians` (roster with status/contact, empty and
+  error states, manager invite form) and
+  `/business/technicians/:id` (detail with rename and
+  activate/deactivate for managers); role-aware Business/
+  Technicians navigation for owner/manager only (technicians,
+  customers and professionals get no business navigation).
+- Tests: `backend/tests/business.test.ts` (23 cases: gating,
+  profile, invites incl. technician login, scoping, A-vs-B
+  isolation, technician self/management rules, activation sync,
+  ids, validation, duplicates, roles, envelopes) plus business
+  service/component frontend specs. Full suites green: backend
+  213/213 (auth 19, marketplace 28, jobs 20, quotes 27,
+  quote-acceptance 23, job-scheduling 31, job-execution 42,
+  business 23); `tsc --noEmit` (backend, web app + spec)
+  passes. No migration — existing `business_profiles`,
+  `business_members`, `technicians`, `users` tables reused; no new
+  tables, no duplicate job tables. Out of scope (later stages):
+  business onboarding, internal jobs, assignment, technician My
+  Jobs, parts, approvals, voice notes, notifications, admin,
+  payments, new marketplace work.
+
 ## Stage 6F — Job Execution & Work Documentation (2026-09-23)
 
 - Providers can now document work on in-progress marketplace jobs and

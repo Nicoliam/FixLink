@@ -1,0 +1,82 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/business">← Back to business dashboard</a>
+  </nav>
+
+  <p class="fl-eyebrow">Technicians</p>
+  <h1 class="fl-page-title">Your technicians</h1>
+  <p class="fl-page-subtitle">Everyone on your business roster. Job assignment arrives in a later stage.</p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading technicians…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="load()">Try again</button>
+    </div>
+  } @else {
+    @if (status() === 'empty') {
+      <div class="fl-state" role="status">
+        <h2 class="fl-state-title">No technicians yet</h2>
+        <p class="fl-state-text">Invite your first technician below to start building your team.</p>
+      </div>
+    } @else {
+      <div class="fl-provider-grid">
+        @for (technician of technicians(); track technician.id) {
+          <article class="fl-card">
+            <p class="fl-card-label">{{ statusLabel(technician) }}</p>
+            <h2 class="fl-card-title">
+              <a class="fl-link" [routerLink]="['/business/technicians', technician.id]">{{
+                technician.displayName
+              }}</a>
+            </h2>
+            <p class="fl-card-text">{{ contactLabel(technician) }}</p>
+          </article>
+        }
+      </div>
+    }
+
+    @if (canInvite()) {
+      <section class="fl-card" aria-label="Invite a technician">
+        <h2 class="fl-card-title">Invite a technician</h2>
+        <p class="fl-card-text">They join your business roster with their own login. Existing FixLink accounts are linked without a new password.</p>
+        <form class="fl-form" [formGroup]="inviteForm" (ngSubmit)="invite()" novalidate>
+          <div class="fl-field">
+            <label for="tech-name">Full name</label>
+            <input id="tech-name" class="fl-input" type="text" formControlName="displayName" autocomplete="name" />
+            @if (inviteForm.controls.displayName.touched && inviteForm.controls.displayName.invalid) {
+              <p class="fl-field-error" role="alert">Technician name is required.</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="tech-email">Email</label>
+            <input id="tech-email" class="fl-input" type="email" formControlName="email" autocomplete="email" />
+            @if (inviteForm.controls.email.touched && inviteForm.controls.email.invalid) {
+              <p class="fl-field-error" role="alert">Enter a valid email address.</p>
+            }
+          </div>
+          <div class="fl-field">
+            <label for="tech-phone">Phone (optional)</label>
+            <input id="tech-phone" class="fl-input" type="tel" formControlName="phone" autocomplete="tel" />
+          </div>
+          <div class="fl-field">
+            <label for="tech-password">Initial password</label>
+            <input id="tech-password" class="fl-input" type="password" formControlName="password" autocomplete="new-password" />
+            @if (inviteForm.controls.password.touched && inviteForm.controls.password.invalid) {
+              <p class="fl-field-error" role="alert">Use at least 8 characters.</p>
+            }
+          </div>
+          @if (inviteError()) {
+            <p class="fl-field-error" role="alert">{{ inviteError() }}</p>
+          }
+          <button type="submit" class="fl-btn fl-btn-primary fl-btn-block" [disabled]="inviting()">
+            {{ inviting() ? 'Inviting…' : 'Invite technician' }}
+          </button>
+        </form>
+      </section>
+    }
+  }
+</div>

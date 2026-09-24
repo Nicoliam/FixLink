@@ -21,6 +21,10 @@
         @if (showRequests()) {
           <a class="fl-link fl-nav-link" routerLink="/requests">Requests</a>
         }
+        @if (showBusiness()) {
+          <a class="fl-link fl-nav-link" routerLink="/business">Business</a>
+          <a class="fl-link fl-nav-link" routerLink="/business/technicians">Technicians</a>
+        }
         <span class="fl-nav-status">{{ auth.currentUser()?.email }}</span>
         <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/account">My account</a>
       } @else {

@@ -241,3 +241,62 @@ One additive migration in Stage 6F (`009_job_execution.sql`:
 nullable `job_updates.phase` + `job_images.original_filename`);
 the `database/tests/schema.test.js` suite still requires a live
 MySQL instance and is unchanged.
+
+## Stage 7A — Business Foundation & Technician Management
+
+Backend (`backend/tests/business.test.ts`, in-memory stores, no MySQL
+required — run with `npm test` from `backend/`; in sandboxes where
+the `tsx --test` wrapper stalls, the equivalent
+`node .test-dist/tests/business.test.js` against a `tsc` build
+runs the same file):
+
+- `401` unauthenticated on all six business endpoints; `403` for
+  customer, professional, technician (management surface) and admin
+  actors; `404` for an owner-role account with no business.
+- Owner reads their own business (`200` + standard envelope,
+  `role: OWNER`, real `technicianCount`, no private fields);
+  manager reads the same business with `role: MANAGER`.
+- Owner profile update (`200`, spoofed `business_id`/`owner_id`/
+  `role` ignored); manager update → `403`; empty/unknown-only and
+  malformed-email patches → `422`.
+- Owner and manager invites (`201`): brand-new email creates an
+  `ACTIVE` `TECHNICIAN` login that authenticates with `TECHNICIAN`
+  role; existing accounts link without a password (`password`
+  alongside an existing email → `422`; missing password for a new
+  email → `422`); roster scoping per business; owner/manager detail
+  reads; cross-business reads/patches → `404` (no probing).
+- Technician actors: list/create/patch own-business → `403`,
+  business profile → `403`, own row → `200`, any other id (same or
+  other business) → `404`; deactivation revokes business access
+  (own row → `404`); manager reactivation → `200`.
+- Malformed ids → `400`; unknown ids → `404`; invalid payloads
+  (missing name/email, bad email/phone, short password, empty
+  patch, non-boolean status) → `422`; double-link (same email,
+  owner-as-technician) → `409 CONFLICT`; role assertions for every
+  actor incl. technicians staying out of the provider inbox.
+- All asserted responses preserve the standard success/error
+  envelopes.
+
+Frontend (`apps/web`, run with `npx ng test --watch=false`):
+
+- `business.service.spec.ts`: business fetch without a business id,
+  profile patch body mapping (trimmed, empties omitted),
+  technician list, single-technician fetch with URL encoding,
+  invite body mapping (phone omitted when empty), technician
+  update with the active flag.
+- `business-dashboard.spec.ts`: business name/role/verification/
+  technician count, jobs placeholder without fake counts, error
+  state, owner edit flow (save call args), manager without edit.
+- `technician-list.spec.ts`: roster with status/contact, empty and
+  error states, invite form for managers (hidden for customers),
+  invite submit appending to the roster.
+- `technician-detail.spec.ts`: detail with contact info, error
+  state, owner deactivate call args with status change,
+  hidden management for technicians.
+- `app.spec.ts` unchanged (header entry points); role-aware
+  Business/Technicians navigation follows the `showBusiness`
+  rule (owner/manager only).
+
+No migration in Stage 7A — the existing `business_profiles`,
+`business_members`, `technicians` and `users` tables already
+support it; no database doc change was required.

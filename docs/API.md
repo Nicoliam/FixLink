@@ -300,6 +300,76 @@ PATCH /api/v1/businesses/me/team/:id
 DELETE /api/v1/businesses/me/team/:id
 
 
+## 8.1 Businesses — Stage 7A Implementation Notes
+
+Stage 7A implements the business foundation and technician roster
+(`backend/src/modules/business/`). The implemented paths are:
+
+- `GET /api/v1/business/me` → `200` own business profile
+- `PATCH /api/v1/business/me` → `200` updated profile (owner only)
+- `GET /api/v1/business/technicians` → `200 { items, total }` roster
+- `POST /api/v1/business/technicians` → `201` invited technician
+- `GET /api/v1/business/technicians/:technicianId` → `200` roster row
+- `PATCH /api/v1/business/technicians/:technicianId` → `200` updated row
+
+(The `/businesses/me…` paths sketched in §8 pre-date implementation
+and are reconciled in a later stage; Stage 7A owns `/business/…`.)
+
+- The business is derived server-side from the authenticated user's
+  membership (`business_profiles.owner_user_id` / active
+  `business_members` rows). No `business_id`, `owner_id`, `role` or
+  business association is read from the request — spoofed fields are
+  ignored.
+- `GET /business/me` (requires `BUSINESS_OWNER` / `BUSINESS_MANAGER`)
+  returns the profile with the caller's membership `role`
+  (`OWNER`/`MANAGER`) and the real `technicianCount`. Only public/
+  business fields are exposed (name, slug, description, logo
+  reference metadata, email, phone, address/city/province/postal,
+  verification status, rating, active flag, timestamps) — never
+  `owner_user_id`, verification documents, internal notes or audit
+  data. No `BUSINESS_OWNER`/`BUSINESS_MANAGER` business → `404
+  NOT_FOUND`; `CUSTOMER` / `PROFESSIONAL` / `TECHNICIAN`-only /
+  `ADMIN` actors → `403 FORBIDDEN_ROLE`; unauthenticated → `401`.
+- `PATCH /business/me` accepts `businessName` (1–255),
+  `description` (≤2000), `email`, `phone`, `addressLine1`, `city`,
+  `province`, `postalCode` (snake_case aliases accepted); unknown
+  fields are ignored per existing validation conventions and an
+  empty patch → `422`. Only `OWNER` may edit (`MANAGER` → `403`).
+- `POST /business/technicians` (`BUSINESS_OWNER`/`BUSINESS_MANAGER`)
+  accepts `{ displayName (1–255, `name` alias), email,
+  phone? (optional), password? }`. A new email creates an `ACTIVE`
+  `TECHNICIAN` login (bcrypt hash — never plaintext) plus the
+  `business_members` (`TECHNICIAN`) and `technicians` rows; an
+  existing account is linked (gaining the `TECHNICIAN` role) without
+  touching its password — a `password` alongside an existing email
+  is rejected (`422`), and a missing password for a new email is
+  rejected (`422`). An account already actively linked to the
+  business (owner, manager or technician) → `409 CONFLICT` — rows
+  are never double-linked. Technicians never gain a marketplace
+  provider profile here.
+- `GET /business/technicians/:technicianId` returns the row with
+  contact info (email/phone from `users` — never credentials) for
+  the owner's/manager's own business; another business's id reads
+  as `404 NOT_FOUND`, never `403`. A `TECHNICIAN` caller reads only
+  their own row (via the user association); any other id reads as
+  `404`. Malformed ids → `400 VALIDATION_ERROR`.
+- `PATCH /business/technicians/:technicianId` (`OWNER`/`MANAGER`
+  only — technicians receive `403`, including for their own row)
+  accepts `{ displayName?, isActive? }` (≥1 required). The active
+  flag is kept in sync across `technicians.is_active` and
+  `business_members.is_active`, so deactivation immediately revokes
+  business access. Another business's id → `404`.
+- No new tables or columns were created — the existing
+  `business_profiles`, `business_members`, `technicians` and
+  `users` tables already support this stage. Business
+  creation/onboarding (a `BUSINESS_OWNER` with no business reads
+  `404`) belongs to a later stage.
+
+MVP payment position (unchanged): business and technician
+management never charge anyone; agreed quote amounts remain
+recorded prices paid directly outside the platform.
+
+
 # 9. Technicians
 
 GET /api/v1/technicians/me

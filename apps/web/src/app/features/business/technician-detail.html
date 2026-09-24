@@ -1,0 +1,59 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/business/technicians">← Back to technicians</a>
+  </nav>
+
+  <p class="fl-eyebrow">Technician</p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading technician…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="load()">Try again</button>
+    </div>
+  } @else if (technician(); as tech) {
+    <h1 class="fl-page-title">{{ tech.displayName }}</h1>
+    <p class="fl-page-subtitle">{{ statusLabel(tech) }} technician on your business roster.</p>
+
+    <div class="fl-provider-grid">
+      <article class="fl-card">
+        <p class="fl-card-label">Contact</p>
+        <p class="fl-card-text">{{ tech.email ?? 'No email on file' }}</p>
+        <p class="fl-card-text">{{ tech.phone ?? 'No phone on file' }}</p>
+      </article>
+
+      @if (canManage()) {
+        <article class="fl-card">
+          <p class="fl-card-label">Manage</p>
+          <form class="fl-form" [formGroup]="renameForm" (ngSubmit)="saveName()" novalidate>
+            <div class="fl-field">
+              <label for="tech-rename">Display name</label>
+              <input id="tech-rename" class="fl-input" type="text" formControlName="displayName" autocomplete="name" />
+              @if (renameForm.controls.displayName.touched && renameForm.controls.displayName.invalid) {
+                <p class="fl-field-error" role="alert">Technician name is required.</p>
+              }
+            </div>
+            <button type="submit" class="fl-btn fl-btn-secondary fl-btn-sm" [disabled]="renaming()">
+              {{ renaming() ? 'Saving…' : 'Rename' }}
+            </button>
+            <button
+              type="button"
+              class="fl-btn fl-btn-secondary fl-btn-sm"
+              (click)="toggleActive()"
+              [disabled]="toggling()"
+            >
+              {{ toggling() ? 'Updating…' : tech.isActive ? 'Deactivate' : 'Activate' }}
+            </button>
+          </form>
+          @if (actionError()) {
+            <p class="fl-field-error" role="alert">{{ actionError() }}</p>
+          }
+        </article>
+      }
+    </div>
+  }
+</div>

@@ -87,6 +87,10 @@ export class MysqlUserRepository implements UserRepository {
     await this.pool.query('UPDATE `users` SET `last_login_at` = NOW() WHERE `id` = ?', [userId]);
   }
 
+  async setStatus(userId: string, status: UserStatus): Promise<void> {
+    await this.pool.query('UPDATE `users` SET `status` = ? WHERE `id` = ?', [status, userId]);
+  }
+
   toSafeUser(user: UserRecord, roles: string[]): ReturnType<UserRepository['toSafeUser']> {
     return toSafeUser(user, roles);
   }

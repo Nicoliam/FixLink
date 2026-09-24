@@ -549,6 +549,8 @@ accepted-quote integrity, and envelope consistency.
 # 25. Stage 6F Implementation Notes — Job Execution & Work Documentation
 
 Implemented 2026-09-23 (`backend/src/modules/execution/`,
+
+Implemented 2026-09-23 (`backend/src/modules/execution/`,
 `backend/src/services/file-storage.ts`,
 `POST /api/v1/jobs/:jobId/images|updates|complete|confirm`,
 `GET /api/v1/jobs/:jobId/images|images/:imageId/file|updates|timeline`,
@@ -609,3 +611,55 @@ bytes), uploader-only deletion, completion guards and note
 requirement, confirmation ownership and atomic closure, closed-job
 immutability, bypass attempts, timeline contents, rollback atomicity,
 and envelope consistency.
+
+
+# 26. Stage 7A Implementation Notes — Business Foundation & Technician Management
+
+Implemented 2026-09-23 (`backend/src/modules/business/`,
+`GET|PATCH /api/v1/business/me`,
+`GET|POST /api/v1/business/technicians`,
+`GET|PATCH /api/v1/business/technicians/:technicianId`).
+
+- The business is derived server-side per request from
+  `business_profiles.owner_user_id` and active `business_members`
+  rows — never from request parameters. `TECHNICIAN` members,
+  `CUSTOMER`s, `PROFESSIONAL`s and `ADMIN`s have no business
+  management identity and receive `403 FORBIDDEN_ROLE` on
+  business/technician endpoints (a `BUSINESS_OWNER`-role account
+  with no business row reads `404 NOT_FOUND`, not `403`).
+- `BUSINESS_OWNER` has full access to their business, including
+  profile edits. `BUSINESS_MANAGER` is scoped to the business they
+  belong to: view the profile and manage (invite, view, rename,
+  activate/deactivate) its technicians — profile edits are
+  owner-only (`403`).
+- Technicians authenticate (`TECHNICIAN` role) and read only their
+  own roster row (self-access via the `technicians.user_id`
+  association). They cannot list, invite, rename or
+  activate/deactivate — not even themselves (`403` on the
+  collection and mutation endpoints, `404` on other technicians'
+  rows) — and cannot access business administration, create
+  marketplace provider profiles, submit quotes or accept customer
+  quotes (the quotes module already excludes `TECHNICIAN` members
+  from provider identity).
+- Business isolation: every technician row is re-scoped to the
+  caller's business before it is returned. Business A's owner or
+  manager reading business B's technician id gets `404 NOT_FOUND`,
+  never `403`, so technician ids cannot be probed across
+  businesses. Deactivation flips both `technicians.is_active` and
+  `business_members.is_active` in one transaction, immediately
+  revoking business access (a deactivated technician's own row
+  reads as `404`).
+- Linking is never duplicated: an account holding any active
+  membership (owner, manager or technician) in the business cannot
+  be re-linked (`409 CONFLICT`); linking an existing account never
+  resets its password (a supplied `password` is rejected with
+  `422`).
+
+Permission tests added (`backend/tests/business.test.ts`):
+unauthenticated rejection, customer/professional/admin rejection,
+owner/manager read, owner-only update, new/existing-account
+invites with technician login, roster scoping, cross-business
+`404` isolation (read and patch), technician management/self-access
+rejection, activation sync and access revocation, malformed/unknown
+ids, invalid payloads, duplicate handling, and role assertions
+(including technicians staying out of the provider inbox).
