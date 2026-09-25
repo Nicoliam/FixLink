@@ -2,7 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { getPool } from './config/db';
-import { env } from './config/env';
+import { env, isAllowedCorsOrigin } from './config/env';
 import { makeAuthRoutes } from './modules/auth/auth.routes';
 import { MemoryRefreshStore, type RefreshStore } from './modules/auth/refresh.store';
 import { MysqlRefreshStore } from './modules/auth/mysql-refresh.store';
@@ -115,7 +115,21 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
 
   app.disable('x-powered-by');
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigin }));
+  // Only echo `Access-Control-Allow-Origin` for an exact configured origin.
+  // Returning a fixed value for every origin advertises the wrong origin and
+  // makes the browser discard the response, which surfaces to the user as a
+  // generic failure with no readable error body.
+  app.use(
+    cors({
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin || isAllowedCorsOrigin(requestOrigin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
+    }),
+  );
   app.use(express.json({ limit: '100kb' }));
 
   app.get('/health', (_req, res) => {

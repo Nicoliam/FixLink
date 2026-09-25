@@ -114,7 +114,7 @@ The current implementation reads the variables below. Names are exact; do not su
 | `JWT_ACCESS_TTL_SECONDS` | No | Access-token lifetime; default `900` |
 | `REFRESH_TOKEN_TTL_SECONDS` | No | Refresh-token lifetime; default `2592000` |
 | `BCRYPT_COST` | No | Password hashing cost; default `12` |
-| `CORS_ORIGIN` | Yes | Exact allowed web origin, without a trailing slash |
+| `CORS_ORIGIN` | Yes | Comma-separated allowlist of exact allowed web origins, without trailing slashes |
 | `FILE_STORAGE_DIR` | Yes for file workflows | Durable directory for the local MVP file adapter |
 
 `JWT_SECRET` is a legacy fallback read by the current configuration when `JWT_ACCESS_SECRET` is not set. New deployments should set `JWT_ACCESS_SECRET` explicitly and should not rely on the fallback.
@@ -137,6 +137,8 @@ Production requirements:
 ## 8. CORS, HTTPS and headers
 
 Set `CORS_ORIGIN` to the exact deployed web origin, for example `https://app.example.co.za`. Do not use `*` for a credentialed production deployment.
+
+`CORS_ORIGIN` accepts a comma-separated allowlist when more than one origin must be served, for example `http://localhost:4200,http://127.0.0.1:4200`. Matching is exact per origin. Note that `localhost` and `127.0.0.1` are distinct origins to a browser, so a developer reaching the dev server by IP needs both listed. The API echoes `Access-Control-Allow-Origin` only for a listed origin and omits the header entirely otherwise; a request from an unlisted origin is completed server-side but its response is discarded by the browser, and the client cannot report a meaningful API error for it.
 
 Terminate TLS at the public edge or trusted reverse proxy. Redirect HTTP to HTTPS. Preserve security headers from the API where applicable, and configure the static web server with a restrictive Content Security Policy, HSTS, frame protection, MIME sniffing protection and referrer policy appropriate to the deployment.
 

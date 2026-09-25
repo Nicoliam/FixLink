@@ -19,6 +19,31 @@ function numberOr(name: string, fallback: number): number {
 }
 
 const productionEnvironments = new Set(['production', 'prod']);
+const devDefaultCorsOrigins = ['http://localhost:4200', 'http://127.0.0.1:4200'];
+
+/**
+ * CORS_ORIGIN accepts a comma-separated allowlist so a single API process can
+ * serve more than one exact origin (e.g. `localhost` and `127.0.0.1`, which are
+ * distinct origins to a browser). A mismatched allowlist is rejected outright
+ * rather than silently echoing a single configured value, which would tell the
+ * browser the wrong origin and block the request.
+ */
+function corsOrigins(): string[] {
+  const raw = process.env['CORS_ORIGIN'];
+  if (raw === undefined || raw.trim() === '') return devDefaultCorsOrigins;
+  const parsed = raw
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter((origin) => origin !== '');
+  if (parsed.length === 0) {
+    throw new Error(`Invalid CORS_ORIGIN: no origins listed in "${raw}".`);
+  }
+  return parsed;
+}
+
+export function isAllowedCorsOrigin(origin: string, allowed: readonly string[] = env.corsOrigins): boolean {
+  return allowed.includes(origin.replace(/\/+$/, ''));
+}
 const knownExampleSecrets = new Set([
   'dev-only-change-me',
   'fixlink-test-secret',
@@ -30,7 +55,7 @@ const knownExampleSecrets = new Set([
 export const env = {
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
   port: numberOr('PORT', 3000),
-  corsOrigin: process.env['CORS_ORIGIN'] ?? 'http://localhost:4200',
+  corsOrigins: corsOrigins(),
   authStore: (process.env['AUTH_STORE'] ?? 'mysql').toLowerCase(),
   db: {
     host: process.env['DB_HOST'] ?? '127.0.0.1',

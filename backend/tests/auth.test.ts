@@ -18,7 +18,7 @@ import { duplicateKeyKind } from '../src/modules/auth/auth.service';
 import { toSafeUser, type UserRepository } from '../src/modules/users/user.repository';
 import { signAccessToken } from '../src/utils/tokens';
 import { verifyPassword } from '../src/utils/password';
-import { isStrongProductionSecret } from '../src/config/env';
+import { isAllowedCorsOrigin, isStrongProductionSecret, env } from '../src/config/env';
 
 const SENSITIVE_KEYS = ['password', 'password_hash', 'passwordHash', 'hash'];
 
@@ -451,5 +451,56 @@ describe('standard error envelope for non-controller failures', () => {
     assert.equal(res.body.success, false);
     assert.match(res.body.error.message, /too large/i);
     assert.equal(res.headers['content-type']?.includes('text/html'), false);
+  });
+});
+
+describe('CORS allowlist', () => {
+  let app: Express;
+  beforeEach(() => {
+    ({ app } = buildApp());
+  });
+
+  it('allows every configured origin and echoes that exact origin', async () => {
+    assert.ok(env.corsOrigins.length > 0);
+    for (const origin of env.corsOrigins) {
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .set('Origin', origin)
+        .send({ email: `cors-${encodeURIComponent(origin)}@example.co.za`, password: 'Str0ngPassw0rd!' });
+      assert.equal(
+        res.headers['access-control-allow-origin'],
+        origin,
+        `expected ACAO to echo ${origin}`,
+      );
+    }
+  });
+
+  it('answers a same-origin-safe request with no CORS header at all', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .set('Origin', 'http://evil.example.com')
+      .send({ email: 'cors-denied@example.co.za', password: 'Str0ngPassw0rd!' });
+    // Never advertise another origin: a mismatched ACAO makes the browser
+    // discard the body, which the client cannot report as a real API error.
+    assert.equal(res.headers['access-control-allow-origin'], undefined);
+  });
+
+  it('completes the preflight for an allowed origin', async () => {
+    const res = await request(app)
+      .options('/api/v1/auth/register')
+      .set('Origin', env.corsOrigins[0])
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'content-type');
+    assert.equal(res.status, 204);
+    assert.equal(res.headers['access-control-allow-origin'], env.corsOrigins[0]);
+    assert.match(String(res.headers['access-control-allow-methods']), /POST/);
+  });
+
+  it('isAllowedCorsOrigin matches exactly and ignores a trailing slash', () => {
+    assert.equal(isAllowedCorsOrigin('http://localhost:4200', ['http://localhost:4200']), true);
+    assert.equal(isAllowedCorsOrigin('http://localhost:4200/', ['http://localhost:4200']), true);
+    assert.equal(isAllowedCorsOrigin('http://127.0.0.1:4200', ['http://localhost:4200']), false);
+    assert.equal(isAllowedCorsOrigin('http://localhost:4201', ['http://localhost:4200']), false);
+    assert.equal(isAllowedCorsOrigin('http://evil.example.com', ['http://localhost:4200']), false);
   });
 });
