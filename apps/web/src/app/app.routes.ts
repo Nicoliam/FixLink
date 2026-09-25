@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { adminGuard } from './core/guards/admin.guard';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 /**
@@ -119,6 +120,45 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/technician/technician-job-detail').then((m) => m.TechnicianJobDetailComponent),
     canActivate: [authGuard],
+  },
+  {
+    path: 'admin',
+    canActivate: [adminGuard],
+    canActivateChild: [adminGuard],
+    loadComponent: () => import('./features/admin/admin-shell').then((m) => m.AdminShellComponent),
+    children: [
+      { path: '', loadComponent: () => import('./features/admin/admin-dashboard').then((m) => m.AdminDashboardComponent) },
+      { path: 'users', data: { resource: 'users' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'users/:id', data: { resource: 'users' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'customers', data: { resource: 'customers' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'customers/:id', data: { resource: 'customers' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'professionals', data: { resource: 'professionals' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'professionals/:id', data: { resource: 'professionals' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'businesses', data: { resource: 'businesses' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'businesses/:id', data: { resource: 'businesses' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'technicians', data: { resource: 'technicians' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'technicians/:id', data: { resource: 'technicians' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'services', data: { resource: 'services' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'services/new', loadComponent: () => import('./features/admin/admin-service-editor').then((m) => m.AdminServiceEditor) },
+      { path: 'services/:id/edit', loadComponent: () => import('./features/admin/admin-service-editor').then((m) => m.AdminServiceEditor) },
+      { path: 'services/:id', data: { resource: 'services' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'jobs', data: { resource: 'jobs' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'jobs/:id', data: { resource: 'jobs' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'verification', data: { resource: 'verifications' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'verification/:id', data: { resource: 'verifications' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'certificates', data: { resource: 'certificates' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'certificates/:id', data: { resource: 'certificates' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'reviews', data: { resource: 'reviews' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'reviews/:id', data: { resource: 'reviews' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'reports', data: { resource: 'reports' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'reports/:id', data: { resource: 'reports' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'disputes', data: { resource: 'disputes' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'disputes/:id', data: { resource: 'disputes' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'audit-logs', data: { resource: 'audit-logs' }, loadComponent: () => import('./features/admin/admin-resource-page').then((m) => m.AdminResourcePage) },
+      { path: 'audit-logs/:id', data: { resource: 'audit-logs' }, loadComponent: () => import('./features/admin/admin-detail-page').then((m) => m.AdminDetailPage) },
+      { path: 'settings', loadComponent: () => import('./features/admin/admin-settings').then((m) => m.AdminSettingsComponent) },
+      { path: '**', loadComponent: () => import('./features/admin/admin-not-found').then((m) => m.AdminNotFoundComponent) },
+    ],
   },
   {
     path: 'login',

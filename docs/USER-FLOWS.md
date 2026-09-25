@@ -835,70 +835,312 @@ Technician receives notification
 Technician responds
 
 
-# 11. ADMIN FLOWS
+# 11. ADMIN FLOWS (Stage 9)
 
+Admin access is a lazy `/admin` area. The frontend shows the Admin link
+only when the authenticated user has `ADMIN`; the backend independently
+requires a valid session and an active authoritative `ADMIN` role. The
+area is available to multi-role users who also hold `ADMIN`.
 
-## 11.1 Admin User Management
+## 11.1 Admin Navigation
+
+The admin shell navigation is:
+
+- Dashboard — `/admin`
+- Users — `/admin/users`
+- Customers — `/admin/customers`
+- Professionals — `/admin/professionals`
+- Businesses — `/admin/businesses`
+- Technicians — `/admin/technicians`
+- Services — `/admin/services`
+- Jobs — `/admin/jobs`
+- Verification — `/admin/verification`
+- Certificates — `/admin/certificates`
+- Reviews — `/admin/reviews`
+- Reports — `/admin/reports`
+- Disputes — `/admin/disputes`
+- Audit Logs — `/admin/audit-logs`
+- Settings — `/admin/settings`
+
+Each list route has a corresponding `:id` detail route where applicable.
+Service creation and editing use `/admin/services/new` and
+`/admin/services/:id/edit`. An unknown admin child route shows the
+admin page-not-found state with a dashboard link.
+
+## 11.2 Dashboard
+
+Admin
+↓
+Open `/admin`
+↓
+Load `/api/v1/admin/dashboard`
+↓
+View:
+- Users: total, active and pending
+- Jobs: total, open and in progress
+- Professionals: total, verified and pending
+- Businesses: total, verified and pending
+- Customers
+- Active / total technicians
+- Active / inactive services
+- Completed jobs
+- Verification requests pending or needing information
+- Certificates pending or needing information
+- Reports open or in review
+- Disputes open or in review
+
+Dashboard links open the matching resource list, including queue links
+with `status` query parameters. The dashboard has loading, error and
+retry states. A successful response with zero values is a valid empty
+platform state.
+
+## 11.3 Browse and Filter Resource Lists
+
+Admin
+↓
+Open a resource list
+↓
+Enter search text where supported
+↓
+Select resource-specific filters
+↓
+Apply or reset filters
+↓
+View paginated records
+↓
+Open a record detail
+
+Implemented list filters include:
+
+- Users: search, status and role
+- Customers: search
+- Professionals and businesses: search and verification status
+- Technicians: search and active state
+- Services: search, service status and category id
+- Jobs: search, source, job status, customer/professional/business id
+  and creation-date range
+- Verification: search, type, status and user id
+- Certificates: search, status, professional id and business id
+- Reviews: search, exact/minimum/maximum rating; the visibility control
+  filters the current page only
+- Reports: search, report type and status
+- Disputes: search and status
+- Audit logs: search, actor id, action, entity type/id and date range
+
+Lists show the current page, total and page size, with Previous and Next
+controls. Loading, empty and error states are present; errors can be
+retried. Applying a filter resets to page 1. An older response cannot
+overwrite a newer list request.
+
+## 11.4 Enriched Detail Views
+
+Admin
+↓
+Open a customer, professional, business, technician or job detail
+↓
+Review the bounded operational context
+↓
+Open a linked job or technician where the detail provides one
+↓
+Return to the source list
+
+Customer detail shows the customer summary, newest 50 jobs and newest 50
+reviews, plus job/review counts and average rating. Job entries link to the
+admin job detail and include provider/service names.
+
+Professional detail shows the verification/activity summary, newest 50
+services, service areas, portfolio projects, certificates, identity
+verification state and reviews. Portfolio entries show project metadata,
+publication state and image count; image references and binaries are not
+shown.
+
+Business detail shows the safe owner summary, including last login, the
+bounded member list, bounded technician roster and newest 50 business jobs
+with customer names. Technician detail shows the business context, assigned
+job count, newest 50 assigned jobs and newest 50 assignment records.
+
+Job detail shows the safe job record, newest 100 status timeline entries,
+newest 50 quotes with their items, newest 100 assignment records and
+bounded documentation metadata. Documentation sections cover execution
+images, updates, voice notes and parts requests. Image and voice metadata
+may include safe filename/MIME/size/duration fields, but no raw storage
+reference, file key, filesystem path or binary is exposed. Parts items
+show `hasPhoto` rather than a photo reference.
+
+All nested child collections are bounded detail views, not a full database
+export. They show an empty state when no child records are returned. The
+admin list pagination remains separate from these detail limits.
+
+## 11.5 User Suspend and Reactivate
 
 Admin
 ↓
 Users
 ↓
-Search user
+Open user detail
 ↓
-Open user
+Review safe user fields, roles and last login
 ↓
-View details
+Select Suspend user or Reactivate user
 ↓
-Take permitted administrative action
+Confirm the status change
 ↓
-Audit action where required
+Backend validates actor, current state and audit persistence
+↓
+Updated user and success message
+↓
+Action appears in Audit Logs
 
+Suspend is available for users that are not already suspended or deleted.
+Reactivate is available for suspended users. The backend rejects
+self-actions, invalid state changes and unsafe repeated actions. The
+detail screen shows action errors and does not treat a frontend
+confirmation dialog as authorization.
 
-## 11.2 Admin Provider Verification
+## 11.6 Service Management
+
+Admin
+↓
+Services
+↓
+Open a service detail or Add service
+↓
+Review/enter category, name, slug, description, sort order and active state
+↓
+Save
+↓
+Backend validates fields, category and uniqueness
+↓
+Service list/detail updates
+↓
+Audit entry recorded
+
+Existing services can be edited from `/admin/services/:id/edit` and
+activated or deactivated from the detail screen. Category listing is
+read-only. Duplicate slugs or duplicate names within a category are
+rejected by the backend.
+
+## 11.7 Verification Review
 
 Admin
 ↓
 Verification
 ↓
-Open request
+Filter PENDING or NEEDS_INFO
 ↓
-Review
+Open verification detail
 ↓
-Approve
-or
-Reject
-or
-Request information
+View request metadata and review fields
 ↓
-Status updated
+Optionally open the protected identity document
 ↓
-Provider notified
+Enter notes when required
+↓
+Choose Approve, Reject or Request info
+↓
+Confirm
+↓
+Backend updates the request and related profile verification state
+↓
+Audit entry recorded
 
+Identity and business verification are reviewed through the verification
+workflow. A certificate verification request cannot be decided through
+this route; it belongs to the certificate workflow. Approved and rejected
+records are terminal. Document viewing is protected and audited.
 
-## 11.3 Admin Job Review
+## 11.8 Certificate Review
 
 Admin
 ↓
-Jobs
+Certificates
 ↓
-Search job
+Filter by status, professional or business
 ↓
-Open job
+Open certificate detail
 ↓
-Review:
-- Customer
-- Provider/business
-- Quote
-- Status
-- Timeline
-- Media
-- Messages where permitted
+View certificate metadata and review fields
 ↓
-Take permitted administrative action
+Optionally open the protected certificate document
+↓
+Enter notes when required
+↓
+Choose Approve, Reject or Request info
+↓
+Confirm
+↓
+Backend updates the certificate
+↓
+Audit entry recorded
 
+Certificate decisions are separate from verification decisions and have
+the same terminal-state and note requirements. The UI does not expose a
+certificate upload or edit form.
 
-# 12. JOB STATUS FLOW
+## 11.9 Jobs, Reviews, Reports and Disputes
+
+Admin
+↓
+Jobs, Reviews, Reports or Disputes
+↓
+Search/filter records
+↓
+Open detail
+
+Jobs are platform-wide read-only records in Stage 9. The detail displays
+reference, source, status, customer/provider/business/service context,
+description, location, schedule and agreed amount. There is no admin job
+status, quote, media, message, timeline or assignment action.
+
+Reviews are read-only. The list can filter rating and the detail shows
+review context and visibility state. There is no review moderation,
+visibility, deletion or response action.
+
+Reports support the guarded status update form. The admin may move a
+report from `OPEN` to `IN_REVIEW`, `RESOLVED` or `DISMISSED`, or from
+`IN_REVIEW` to `RESOLVED` or `DISMISSED`. `RESOLVED` and `DISMISSED`
+are terminal. The form confirms before submitting and displays backend
+transition errors.
+
+Disputes support the guarded status/resolution form. The current backend
+rejects same-status updates, updates to `CLOSED`, and `IN_REVIEW` → `OPEN`.
+It otherwise accepts another valid status combination when the body rules
+pass; the current implementation does not reject `RESOLVED` → `OPEN` or
+`RESOLVED` → `IN_REVIEW`. `RESOLVED` and `CLOSED` require a resolution.
+The form confirms before submitting and displays backend transition
+errors.
+
+## 11.10 Audit Log Viewing
+
+Admin
+↓
+Audit Logs
+↓
+Filter by search, actor, action, entity, id and date range
+↓
+View paginated entries
+↓
+Open an entry
+↓
+Review action, actor, entity, metadata, IP address and timestamp
+
+Audit logs are read-only. There is no create, edit or delete action. The
+list and detail show loading, empty and error states, and pagination.
+The backend records the covered administrative mutations and successful
+document views.
+
+## 11.11 Admin States and Limitations
+
+All admin list and detail screens provide loading, error/retry and empty
+states where the record set is empty. Detail actions have saving/disabled
+states and use confirmation dialogs for user status, service status,
+verification/certificate decisions and report/dispute updates. The
+Settings route is intentionally an explicit “Settings are not yet
+configured” state. Admin-specific notification contexts/types were not
+added; the existing authenticated notification inbox remains unchanged.
+
+No migration was created because the existing platform tables support
+the Stage 9 operations.
 
 Standard flow:
 

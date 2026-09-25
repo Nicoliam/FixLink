@@ -36,6 +36,10 @@ import { NotificationService } from './modules/notifications/notifications.servi
 import { LocalFileStorage, type FileStorage } from './services/file-storage';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
+import { makeAdminRoutes } from './modules/admin/admin.routes';
+import { MemoryAdminStore } from './modules/admin/memory-admin.store';
+import { MysqlAdminStore } from './modules/admin/mysql-admin.store';
+import type { AdminStore } from './modules/admin/admin.store';
 
 export interface AppDeps {
   users: UserRepository;
@@ -66,15 +70,17 @@ export interface AppDeps {
    * best-effort in-app delivery.
    */
   notifications?: NotificationStore;
+  admin?: AdminStore;
 }
 
 export function resolveDeps(): AppDeps {
   const refreshStore = new MemoryRefreshStore();
   if (env.authStore === 'memory') {
+    const users = new MemoryUserRepository();
     const jobs = new MemoryJobsStore();
     const quotes = new MemoryQuotesStore(jobs);
     return {
-      users: new MemoryUserRepository(),
+      users,
       refreshStore,
       marketplace: new MemoryMarketplaceStore(),
       jobs,
@@ -83,6 +89,7 @@ export function resolveDeps(): AppDeps {
       business: new MemoryBusinessStore(),
       storage: new LocalFileStorage(),
       notifications: new MemoryNotificationsStore(),
+      admin: new MemoryAdminStore(users),
     };
   }
   const pool = getPool();
@@ -97,6 +104,7 @@ export function resolveDeps(): AppDeps {
     business: new MysqlBusinessStore(pool),
     storage: new LocalFileStorage(),
     notifications: new MysqlNotificationsStore(pool),
+    admin: new MysqlAdminStore(pool),
   };
 }
 
@@ -130,6 +138,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   // feature service plus the notifications router below.
   const notifications = deps.notifications ?? new MemoryNotificationsStore();
   const notify = new NotificationService(notifications);
+  const admin = deps.admin ?? new MemoryAdminStore(deps.users);
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));
   app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
@@ -150,6 +159,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   app.use('/api/v1', makeBusinessRoutes(deps.users, business, jobs, storage, deps.events, notify));
   // Stage 8 — in-app notification inbox (recipient is always the session user).
   app.use('/api/v1', makeNotificationsRoutes(deps.users, notifications));
+  app.use('/api/v1', makeAdminRoutes(deps.users, admin, storage));
 
   // Standard 404 envelope for unknown API routes.
   app.use('/api', (_req, res) => {

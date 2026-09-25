@@ -58,6 +58,10 @@ export class App {
       (this.auth.currentUser()?.roles ?? []).some((role) => BUSINESS_ROLES.includes(role)),
   );
 
+  protected readonly showAdmin = computed(
+    () => this.auth.isAuthenticated() && (this.auth.currentUser()?.roles ?? []).includes('ADMIN'),
+  );
+
   /** Technician navigation: jobs assigned to the caller. */
   protected readonly showTechnicianJobs = computed(
     () => this.auth.isAuthenticated() && (this.auth.currentUser()?.roles ?? []).includes('TECHNICIAN'),

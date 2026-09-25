@@ -1,3 +1,5 @@
+import type { AdminList, AdminUserFilters, AdminUserDto } from '../admin/admin.types';
+
 export type UserStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'DELETED';
 
 /** Internal user record — includes the password hash (never sent to clients). */
@@ -8,6 +10,7 @@ export interface UserRecord {
   passwordHash: string;
   status: UserStatus;
   emailVerifiedAt: string | null;
+  lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +23,7 @@ export interface SafeUser {
   status: UserStatus;
   roles: string[];
   emailVerifiedAt: string | null;
+  lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +40,7 @@ export interface UserRepository {
   create(input: CreateUserInput): Promise<UserRecord>;
   setRoles(userId: string, roles: string[]): Promise<void>;
   getRoles(userId: string): Promise<string[]>;
+  listAdminUsers(filters: AdminUserFilters): Promise<AdminList<AdminUserDto>>;
   touchLogin(userId: string): Promise<void>;
   /**
    * Stage 7A — activate an invited technician login. Invited accounts
@@ -54,6 +59,7 @@ export function toSafeUser(user: UserRecord, roles: string[]): SafeUser {
     status: user.status,
     roles: [...roles].sort(),
     emailVerifiedAt: user.emailVerifiedAt,
+    lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

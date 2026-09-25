@@ -774,3 +774,93 @@ No migration in Stage 8 — the migration 008
 title/message, related entity, read state and
 timestamps; `reference_type` carries `JOB` (marketplace)
 or `INTERNAL_JOB` (internal) for exact navigation.
+
+## Stage 9 — Admin / Platform Operations
+
+Stage 9 was confirmed by the current test runs:
+
+- Backend: **404 passed**, **51 suites**, 0 failed (`backend/npm test`).
+- Frontend: **310 passed**, **35 test files**, 0 failed
+  (`apps/web/npm test -- --watch=false`).
+- No migration was created because existing platform tables already
+  support the admin operations.
+
+### Backend coverage (`backend/tests/admin.test.ts` and regression suites)
+
+- Authentication: missing/invalid credentials return `401`; authoritative
+  `ADMIN` is required; a non-admin, `PENDING` ADMIN and stale-role token
+  return `403`.
+- Role matrix: `CUSTOMER`, `PROFESSIONAL`, `BUSINESS_OWNER`,
+  `BUSINESS_MANAGER` and `TECHNICIAN` are rejected on the admin surface;
+  multi-role access is granted only when the authoritative roles include
+  active `ADMIN`.
+- Platform-wide visibility: users, customers, professionals, businesses,
+  technicians, services, jobs, verification, certificates, reviews,
+  reports, disputes and audit logs are readable through their list/detail
+  contracts.
+- Enriched user DTOs: `lastLoginAt` is present in the user list and
+  detail safe projection.
+- Enriched detail DTOs: customer job history/reviews and summary;
+  professional services, service areas, portfolio metadata, certificates,
+  identity-verification state, reviews and summary; business owner,
+  members, technicians, jobs and summary; technician business context,
+  assigned-job count, job history and assignments; job timeline, quotes and
+  quote items, assignment history and execution/parts metadata are
+  returned.
+- Bounded child collections and privacy: customer/professional/business/
+  technician child collections are bounded to 50; job timeline,
+  assignments and documentation are bounded to 100; job quotes are bounded
+  to 50. Job documentation contains metadata but no raw storage
+  references, file keys, paths or bytes; portfolio exposes metadata and
+  image counts rather than image references.
+- User status: filtering/pagination, safe user projections, suspend and
+  reactivate, self-action rejection, invalid reactivation states and
+  unknown ids are covered.
+- Service management: categories, create/update/activate/deactivate,
+  duplicate/conflict handling, strict bodies and audit persistence are
+  covered.
+- Query validation: unknown parameters, invalid enums, malformed ids,
+  out-of-range page/pageSize, invalid booleans, invalid dates and
+  from-after-to are covered; date-only upper bounds are inclusive.
+- Verification and certificates: identity/business/certificate workflows
+  remain separate, decision notes are validated, terminal decisions are
+  rejected and related profile verification state is updated only for the
+  applicable workflow.
+- Reports and disputes: list filters, guarded status transitions,
+  required dispute resolutions, stale/same-state/terminal transitions
+  and `409` conflicts are covered, including the implemented
+  `IN_REVIEW` → `OPEN` dispute guard.
+- Atomic audit behavior: failed audit persistence rolls back service,
+  user-status, verification and report mutations; the audit list does not
+  show a failed mutation.
+- Document access and privacy: active admins can stream allowlisted
+  verification/certificate documents; non-admins and inactive admins are
+  rejected; storage keys, document references, paths and credentials do
+  not appear in admin projections; successful document views create
+  audit entries.
+- Privacy regression: all admin list projections are checked for password,
+  hash, token, document-reference, file-reference and internal-path
+  fields.
+
+### Frontend coverage
+
+- `admin.guard.spec.ts`: active multi-role ADMIN access, authenticated
+  non-admin redirect, anonymous return URL, session restoration and lazy
+  route ordering.
+- `admin-api.service.spec.ts`: exact paths and methods, list query
+  serialization, pagination, empty status/decision bodies, service
+  mutations, report/dispute bodies, activation endpoints and protected
+  document blob requests.
+- `admin-screens.spec.ts`: dashboard and queue rendering, all resource
+  list screens, filter submission, pagination, stale-response protection,
+  empty/error/retry states, user status confirmation, last-login display,
+  enriched customer/professional/business/technician/job detail sections,
+  bounded job documentation/metadata rendering without a private filename,
+  verification notes and confirmation, terminal-state action suppression,
+  report/dispute actions, service field validation and strict service
+  submission.
+- The frontend exposes the implemented admin settings not-configured state
+  and admin not-found state; no unsupported admin action is represented
+  as implemented.
+
+No database migration is part of Stage 9.

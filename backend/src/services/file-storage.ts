@@ -48,19 +48,22 @@ export interface StoredFile {
   size: number;
 }
 
+export type AdminDocumentKind = 'verification' | 'certificate';
+
 export interface FileStorage {
   save(jobId: string, buffer: Buffer, extension: string): Promise<StoredFile>;
-  /** Stage 7D: persist a technician voice note (same safety rules as images). */
   saveVoiceNote(jobId: string, buffer: Buffer, extension: string): Promise<StoredFile>;
+  saveAdminDocument(kind: AdminDocumentKind, id: string, buffer: Buffer, extension: string): Promise<StoredFile>;
   read(storageKey: string): Promise<Buffer | null>;
   remove(storageKey: string): Promise<void>;
 }
 
 const IMAGE_STORAGE_KEY_PATTERN = /^job-images\/[1-9][0-9]*\/[0-9a-f]{32}\.(jpg|png|webp)$/;
 const VOICE_STORAGE_KEY_PATTERN = /^job-voice-notes\/[1-9][0-9]*\/[0-9a-f]{32}\.(webm|mp4|m4a|mp3|wav|ogg)$/;
+const ADMIN_DOCUMENT_STORAGE_KEY_PATTERN = /^(verification|certificates)\/[1-9][0-9]*\/[0-9a-f]{32}\.(pdf|jpg|png|webp)$/;
 
 function isStorageKey(value: string): boolean {
-  return IMAGE_STORAGE_KEY_PATTERN.test(value) || VOICE_STORAGE_KEY_PATTERN.test(value);
+  return IMAGE_STORAGE_KEY_PATTERN.test(value) || VOICE_STORAGE_KEY_PATTERN.test(value) || ADMIN_DOCUMENT_STORAGE_KEY_PATTERN.test(value);
 }
 
 export function defaultStorageDir(): string {
@@ -91,6 +94,17 @@ export class LocalFileStorage implements FileStorage {
       throw new Error('Unsupported audio extension.');
     }
     const storageKey = `job-voice-notes/${jobId}/${randomBytes(16).toString('hex')}.${ext}`;
+    const absolute = this.pathFor(storageKey);
+    await mkdir(path.dirname(absolute), { recursive: true });
+    await writeFile(absolute, buffer);
+    return { storageKey, size: buffer.length };
+  }
+
+  async saveAdminDocument(kind: AdminDocumentKind, id: string, buffer: Buffer, extension: string): Promise<StoredFile> {
+    if (!/^[1-9][0-9]*$/.test(id)) throw new Error('Invalid document id for storage.');
+    const ext = extension.toLowerCase();
+    if (ext !== 'pdf' && ext !== 'jpg' && ext !== 'png' && ext !== 'webp') throw new Error('Unsupported document extension.');
+    const storageKey = `${kind === 'certificate' ? 'certificates' : kind}/${id}/${randomBytes(16).toString('hex')}.${ext}`;
     const absolute = this.pathFor(storageKey);
     await mkdir(path.dirname(absolute), { recursive: true });
     await writeFile(absolute, buffer);

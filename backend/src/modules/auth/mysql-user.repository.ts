@@ -14,6 +14,7 @@ interface UserRow {
   password_hash: string;
   status: UserStatus;
   email_verified_at: Date | string | null;
+  last_login_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -31,6 +32,7 @@ function mapRow(row: UserRow): UserRecord {
     passwordHash: row.password_hash,
     status: row.status,
     emailVerifiedAt: toIso(row.email_verified_at),
+    lastLoginAt: toIso(row.last_login_at),
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
   };
@@ -81,6 +83,28 @@ export class MysqlUserRepository implements UserRepository {
       [userId],
     );
     return (rows as Array<{ name: string }>).map((r) => r.name);
+  }
+
+  async listAdminUsers(filters: import('../admin/admin.types').AdminUserFilters) {
+    const conditions: string[] = ['1 = 1'];
+    const params: unknown[] = [];
+    if (filters.status !== null) { conditions.push('u.`status` = ?'); params.push(filters.status); }
+    if (filters.role !== null) { conditions.push('EXISTS (SELECT 1 FROM `user_roles` ur JOIN `roles` r ON r.`id` = ur.`role_id` WHERE ur.`user_id` = u.`id` AND r.`name` = ?)'); params.push(filters.role); }
+    if (filters.search !== null) { conditions.push('(u.`email` LIKE ? OR u.`phone` LIKE ?)'); const pattern = `%${filters.search.replace(/[\\%_]/g, (ch) => `\\\\${ch}`)}%`; params.push(pattern, pattern); }
+    const [counts] = await this.pool.query(`SELECT COUNT(*) AS total FROM users u WHERE ${conditions.join(' AND ')}`, params);
+    const total = Number((counts as Array<{ total: number }>)[0]?.total ?? 0);
+    const offset = (filters.page - 1) * filters.pageSize;
+    const [rawRows] = await this.pool.query(
+      `SELECT u.id, u.email, u.phone, u.status, u.email_verified_at, u.last_login_at, u.created_at, u.updated_at
+         FROM users u WHERE ${conditions.join(' AND ')} ORDER BY u.created_at DESC LIMIT ? OFFSET ?`,
+      [...params, filters.pageSize, offset],
+    );
+    const rows = rawRows as UserRow[];
+    const items = await Promise.all(rows.map(async (row) => {
+      const user = mapRow({ ...row, password_hash: '' });
+      return { ...toSafeUser(user, await this.getRoles(user.id)) };
+    }));
+    return { items, total, page: filters.page, pageSize: filters.pageSize };
   }
 
   async touchLogin(userId: string): Promise<void> {

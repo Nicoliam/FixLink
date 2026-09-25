@@ -169,28 +169,153 @@ ADMIN
 
 # 8. Admin
 
+ADMIN is a platform-level role with one explicit Stage 9 capability set;
+there are no fine-grained delegated admin permissions or per-resource
+admin roles.
+
 ## Can
 
-- Manage platform users
-- View customers
-- View professionals
-- View businesses
-- View technicians
-- Manage services
-- Manage service categories
-- Review verification
+- View the platform-wide user directory and safe user details, including
+  `lastLoginAt`
+- View bounded customer job history and customer reviews from customer
+  detail records
+- View professional services, service areas, portfolio metadata,
+  certificates, identity-verification state and reviews from professional
+  detail records
+- View business owner, members, team, technicians and bounded business jobs
+  from business detail records
+- View technician business context, assigned-job count, assigned jobs and
+  assignment history from technician detail records
+- View job timeline, quotes and quote items, assignment history and
+  bounded execution/parts metadata from job detail records
+- Suspend eligible users and reactivate suspended users
+- View platform-wide customers, professional profiles, businesses and
+  technician roster records
+- View platform-wide jobs, job filters and safe job details
+- View and manage the service catalogue; service categories are read-only
+- Review identity and business verification requests
 - Review certificates
-- View jobs
-- Manage reported content
-- Manage disputes
-- View reports
-- View audit logs
-- Manage platform settings where authorized
+- View reviews, reports and disputes
+- Update report status within the guarded report state machine
+- Update dispute status and resolution within the guarded dispute state
+  machine
+- View audit logs and audit-log details
+- View the protected verification and certificate documents through the
+  dedicated admin document endpoints
 
-Admin actions must be audited where appropriate.
+## Cannot
 
+- Access the admin area without a valid authenticated session
+- Use the admin area while the ADMIN account is not `ACTIVE`
+- Access admin routes when the `ADMIN` role is not present in the
+  authoritative user record
 
-# 9. Ownership Rules
+- Change their own account status
+- Moderate, hide, delete or respond to reviews
+- Change job status, quotes, media, messages, timelines or assignments
+- Assign or reassign technicians
+- Change user roles or create/delete platform users
+- Manage platform settings
+- Upload or edit verification or certificate records
+- Access business-scoped customer or job workflows as a business user
+- See private document references, storage keys, filesystem paths or
+  unrelated credentials in admin JSON responses
+
+## Multi-role behavior
+
+Roles are additive. A user with `ADMIN` plus one or more other roles can
+use the admin area while the account is active. The admin route does not
+require the user to hold only `ADMIN`; the other role-specific surfaces
+continue to apply their own server-side checks. `ADMIN` does not by
+itself grant marketplace, business or technician capabilities. Conversely,
+another role does not grant admin access.
+
+## Platform-wide visibility and scope
+
+The admin user, customer, professional, business, technician, service,
+job, verification, certificate, review, report, dispute and audit
+resources are visible across the platform to an active ADMIN. This is
+platform operations visibility, not business membership ownership. An
+admin does not need to be a member of the business owning a job or
+record, and the admin list queries do not apply a caller-business
+filter.
+
+Admin visibility is not a general authorization bypass for other APIs.
+Admin-only visibility must not be used as a substitute for the existing
+customer, provider, business or technician ownership checks on those
+surfaces.
+
+Detail views expose only safe, bounded operational projections. Child
+collections are not a full export: customer, professional, business and
+technician children are limited to 50 records where implemented; job
+timeline, assignments and documentation are limited to 100 and job quotes
+to 50. Job documentation is metadata-only: raw storage references, file
+keys, paths and bytes are excluded. Portfolio details expose project
+metadata and image counts rather than image references or binaries.
+
+## Backend enforcement
+
+The frontend `adminGuard` and navigation are user-experience controls
+only. The backend admin router first applies `requireAuth` and then
+`requireAdmin`; it loads the current user status and roles from the
+authoritative user repository rather than trusting JWT role claims. Missing
+or invalid authentication, including a `SUSPENDED` or `DELETED` account,
+returns `401`; an authenticated `PENDING` account or a non-admin account
+returns `403 FORBIDDEN_ROLE`. Every admin mutation is validated and
+authorized again in the service and store layers. Audit persistence is
+part of the mutation operation for
+user status, service, verification, certificate, report and dispute
+changes.
+
+## Private files and documents
+
+Identity documents, verification documents, private business documents
+and other private files are never returned as normal admin JSON. Admin
+metadata excludes document references, document MIME metadata, storage
+keys, filesystem paths and binary content. The only implemented document
+access is the authenticated active-admin verification-document and
+certificate-document endpoint, which serves an allowlisted safe MIME
+type with a sanitized attachment filename. Successful reads append a
+`VERIFICATION_DOCUMENT_VIEWED` or `CERTIFICATE_DOCUMENT_VIEWED` audit
+entry. Public marketplace endpoints do not expose these files.
+
+## Audit immutability
+
+Audit logs are read-only through the Stage 9 API. There is no route to
+create, edit or delete an audit record. User status changes, service
+changes, verification decisions, certificate decisions, report updates,
+dispute updates and successful document views are recorded by the
+backend. A failed audit write rolls back the associated state change;
+there is no successful mutation without its audit record in the covered
+mutation paths.
+
+## Self-action and state rules
+
+- An administrator cannot suspend or reactivate their own account; this
+  returns `409 CONFLICT`.
+- Only `PENDING` or `ACTIVE` users can be suspended, and only
+  `SUSPENDED` users can be reactivated.
+- Verification and certificate records that are already `APPROVED` or
+  `REJECTED` are terminal; repeated or otherwise unsafe decisions return
+  `409 CONFLICT`.
+- Reports may move forward through `IN_REVIEW`, `RESOLVED` or
+  `DISMISSED`; `IN_REVIEW` cannot return to `OPEN`, and terminal report
+  states cannot be changed.
+- The current dispute guard rejects same-status updates, any update to
+  `CLOSED`, and `IN_REVIEW` → `OPEN`. Other valid status combinations
+  currently pass the guard; the implementation does not reject
+  `RESOLVED` → `OPEN` or `RESOLVED` → `IN_REVIEW`.
+- A resolution is required when a dispute becomes `RESOLVED` or
+  `CLOSED`. Verification rejection and needs-info decisions require
+  notes.
+
+## Implemented limitations
+
+Stage 9 does not implement settings management, review moderation, job
+intervention, user-role management or technician assignment. The Settings
+screen is an explicit not-configured state. Admin-specific notification
+contexts and notification types were not added; the existing session-wide
+notification inbox is unchanged.
 
 Ownership must be evaluated server-side.
 
@@ -376,10 +501,10 @@ Provider/business:
 
 Admin:
 
-- Moderate/manage reported reviews
-
-
-# 17. Notification Permissions
+- View review records and visibility state through the admin review list
+  and detail endpoints
+- Moderate/manage reported reviews is not implemented in Stage 9; there
+  is no review mutation, moderation, visibility or response endpoint
 
 Users can only access their own notifications.
 
@@ -476,8 +601,10 @@ Implemented 2026-09-23 (`backend/src/modules/quotes/`).
   request detail exposes only a privacy-limited customer display name
   (first name + last initial); no email, phone, ID documents or
   admin-only information.
-- Admin platform quote management belongs to the later admin surface
-  (`/api/v1/admin/*`); ADMIN is not a quoting provider in this stage.
+  - Admin platform quote management is not part of Stage 9; the admin
+    surface exposes read-only job projections and does not provide a
+    quote-management operation. ADMIN is not a quoting provider.
+
 
 Permission tests added (`backend/tests/quotes.test.ts`): unrelated
 providers/businesses isolated, technician/customer/admin rejection,
@@ -1077,4 +1204,26 @@ search (reference/name/phone/service), creation-date range,
 pagination (`page`/`pageSize`/`total`), priority/scheduled
 sorting, and invalid-filter `422`s (bad board, board+status,
 board+assigned, bad priority/sort/assigned/technician/date,
-from-after-to).
+  from-after-to).
+
+# 33. Stage 9 implementation notes — Admin / Platform Operations
+
+Implemented 2026-09-25 in `backend/src/modules/admin/` and the lazy
+Angular `/admin` area. The active-admin backend gate, multi-role rule,
+platform-wide resource visibility, private document rules, immutable
+audit behavior, self-action protection and status transition rules above
+are the implemented Stage 9 contract.
+
+The complete backend/frontend test counts confirmed for this stage are
+404 passing backend tests in 51 suites and 310 passing frontend tests in
+35 files. The tests cover non-admin role rejection, authoritative active
+ADMIN authorization, safe user status changes, platform-wide resource
+reads, service management, verification/certificate decisions, report and
+dispute transitions, audit atomicity, document access and privacy, query
+validation, Angular loading/empty/error states, filters, pagination,
+confirmation dialogs and the frontend guard/routes.
+
+No migration was created because the existing tables already supported
+the Stage 9 reads and mutations. No settings, review moderation, job
+intervention, role management or technician assignment capability was
+added.

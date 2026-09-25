@@ -1265,49 +1265,420 @@ excluded. Delivery is best-effort — a notification failure never
 rolls back the committed job/quote/assignment operation.
 
 
-# 23. Admin
+# 23. Admin — Stage 9 implementation
 
-Admin routes use:
+All admin routes are under:
 
 /api/v1/admin/
 
-Examples:
+Every route in this section requires `Authorization: Bearer <accessToken>`
+and an authoritative `ADMIN` role loaded from the user repository. The
+account must also be `ACTIVE`. A stale token claim is not trusted. Missing
+or invalid authentication, including `SUSPENDED` or `DELETED` users, returns
+`401 UNAUTHORIZED`; an authenticated `PENDING` account or a non-admin
+account returns `403 FORBIDDEN_ROLE`.
+
+Admin responses use the standard envelope defined in §2. List responses use:
+
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "pageSize": 20
+}
+
+Every list accepts `search` (or `q`), `page` and `pageSize` unless noted
+otherwise. `page` is 1–1000, `pageSize` is 1–50, the default page is 1 and
+the default page size is 20. Text values are trimmed and limited to 128
+characters. Resource ids are positive integers. Dates accept `YYYY-MM-DD`
+or a valid ISO date-time; a date-only `to` bound includes the whole UTC
+day. Unknown query parameters, invalid values and `from` after `to` return
+`422 VALIDATION_ERROR`. Boolean filters accept `true`/`1`/`yes` and
+`false`/`0`/`no` (case-insensitive).
+
+## 23.1 Dashboard and users
+
+GET /api/v1/admin/dashboard
+
+Returns `200` with aggregate counts for users, customers, professionals,
+businesses, technicians, services, jobs, verification requests,
+certificates, reports and disputes.
 
 GET /api/v1/admin/users
 
+Query:
+
+- `search` or `q`
+- `status`: `PENDING`, `ACTIVE`, `SUSPENDED` or `DELETED`
+- `role`: `CUSTOMER`, `PROFESSIONAL`, `BUSINESS_OWNER`,
+  `BUSINESS_MANAGER`, `TECHNICIAN` or `ADMIN`
+- `page`, `pageSize` (and the `page_size` alias)
+
 GET /api/v1/admin/users/:id
 
-GET /api/v1/admin/providers
+Returns the safe user projection:
+
+`id`, `email`, `phone`, `status`, `roles`, `emailVerifiedAt`, `createdAt`,
+`updatedAt` and `lastLoginAt`. The list and detail use the same safe user
+projection; `lastLoginAt` is null until a successful login is recorded.
+
+POST /api/v1/admin/users/:id/suspend
+
+POST /api/v1/admin/users/:id/reactivate
+
+Both requests use an empty object body (`{}`); any body field is rejected
+with `422 VALIDATION_ERROR`. They return the updated safe user with
+`200`. A user can move from `PENDING` or `ACTIVE` to `SUSPENDED`, and from
+`SUSPENDED` to `ACTIVE`. Reactivating a user that is not suspended,
+suspending a user that is already suspended or deleted, and changing the
+acting administrator's own account status return `409 CONFLICT`. Unknown
+ids return `404 NOT_FOUND`; malformed ids return `422`.
+
+## 23.2 Customers, professionals, businesses and technicians
+
+GET /api/v1/admin/customers
+
+GET /api/v1/admin/customers/:id
+
+The customer list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`). Customer projections contain profile identity and contact
+fields: `id`, `userId`, `businessId`, `firstName`, `lastName`,
+`displayName`, `email`, `phone`, `preferredContact`, `createdAt` and
+`updatedAt`.
+
+The customer detail adds `jobs`, `reviews` and `summary`. Jobs are the
+customer's newest 50 non-deleted jobs and include the safe provider and
+service names. Reviews are the newest 50 reviews for the customer and use
+the admin review projection. `summary` contains `jobCount`, `activeJobCount`, `reviewCount` and
+`ratingAvg` for the detail context. The returned child arrays are bounded;
+the summary is not a replacement for a separate paginated history query.
+
+GET /api/v1/admin/professionals
+
+GET /api/v1/admin/professionals/:id
+
+The professional list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`) and `status` (or the `verificationStatus` alias): `UNVERIFIED`,
+`PENDING`, `VERIFIED` or `REJECTED`. The projection contains profile
+summary, verification state, activity, rating, location, service/portfolio/
+certificate counts and timestamps; it does not contain private identity
+verification data.
+
+The professional detail adds `services`, `serviceAreas`, `portfolio`,
+`certificates`, `identityVerification`, `reviews` and `summary`. Services,
+areas, portfolio metadata, certificates and reviews are each bounded to
+50 newest/relevant records. Service entries contain id, name, slug,
+category id and category name; areas contain area name, city and province.
+Portfolio entries contain project metadata and `imageCount`, not portfolio
+image binaries or file references. `identityVerification` is a single safe
+state object containing id, status and reviewed time, or null. Certificates
+use the certificate projection and reviews use the review projection.
+`summary` contains service, portfolio, certificate and review counts plus
+rating average. Private identity document references and portfolio image
+references are not included.
 
 GET /api/v1/admin/businesses
 
+GET /api/v1/admin/businesses/:id
+
+The business list supports the same search and pagination parameters and
+`status`/`verificationStatus` with the four verification values above. The
+projection contains business identity, public/business contact and address
+fields, verification state, activity, ratings, technician/service counts
+and timestamps. It does not contain private verification documents or
+internal audit data.
+
+The business detail adds `owner`, `members`, `technicians`, `jobs` and
+`summary`. `owner` is a safe user summary with id, email, phone, status,
+roles and `lastLoginAt`; it does not include credentials or password
+fields. `members` is bounded to 50 rows and contains user id, role,
+active state, invited time and joined time. `technicians` is bounded to
+50 roster rows and `jobs` to 50 newest business-owned jobs with a
+customer name. `summary` contains member, technician, job and active-job
+counts for the returned business detail. The detail is platform-wide for
+an active ADMIN and does not require membership in the displayed business.
+
 GET /api/v1/admin/technicians
 
-GET /api/v1/admin/jobs
+GET /api/v1/admin/technicians/:id
+
+The technician list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`), `businessId` (or `business_id`) and `isActive` (or
+`active`). The projection contains roster identity, business/user ids,
+display name, email, phone, active state and timestamps. There is no
+admin technician assignment mutation in Stage 9.
+
+The technician detail adds `business`, `assignedJobCount`, `jobs` and
+`assignments`. `business` contains only id, name, city and province. The
+newest 50 assigned jobs contain safe job fields plus customer and business
+names. The newest 50 assignment records contain assignment type, linked
+professional/business/technician ids, technician name, assigned-by id,
+assigned/unassigned timestamps and active state. `assignedJobCount` is the
+count represented by the returned job collection. The detail is an
+administrative view; it does not create, change or revoke an assignment.
+
+## 23.3 Services
+
+GET /api/v1/admin/services/categories
+
+Returns `200` with the unpaginated service-category array. The projection
+contains `id`, `name`, `slug`, `description`, `isActive` and `sortOrder`.
+There is no category mutation route.
 
 GET /api/v1/admin/services
 
-GET /api/v1/admin/categories
+GET /api/v1/admin/services/:id
 
-GET /api/v1/admin/verification
+The service list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`), `categoryId` (or `category_id`), `status` (`ACTIVE` or
+`INACTIVE`) and `isActive` (or `active`). When `isActive`/`active` and
+`status` are both supplied, the explicit boolean filter takes precedence.
+The service projection contains category identity/name/slug, name, slug,
+description, active state, sort order and timestamps.
 
-GET /api/v1/admin/verification/:id
+POST /api/v1/admin/services
 
-POST /api/v1/admin/verification/:id/approve
+Creates a service and returns `201` with the service projection.
 
-POST /api/v1/admin/verification/:id/reject
+Request fields:
 
-POST /api/v1/admin/verification/:id/request-information
+- `categoryId` — required positive integer id
+- `name` — required text, 1–128 characters
+- `slug` — required text, 1–128 characters
+- `description` — optional text, up to 128 characters, or null
+- `sortOrder` — integer from 0 through 100000
+- `isActive` — boolean
+
+Unknown body fields are rejected. Duplicate service names within a
+category or duplicate slugs return `409 CONFLICT`; an unknown category
+returns `404 NOT_FOUND`; invalid body values return `422`.
+
+PATCH /api/v1/admin/services/:id
+
+Updates one or more of the same service fields and returns `200`. The
+body must contain at least one service change and may not contain unknown
+fields. The same category, duplicate and validation rules apply.
+
+POST /api/v1/admin/services/:id/activate
+
+POST /api/v1/admin/services/:id/deactivate
+
+Use an empty object body. These return the updated service with `200`.
+Activating an active service or deactivating an inactive service returns
+`409 CONFLICT`.
+
+## 23.4 Jobs
+
+GET /api/v1/admin/jobs
+
+GET /api/v1/admin/jobs/:id
+
+The job list supports:
+
+- `search`/`q`
+- `page`, `pageSize` (or `page_size`)
+- `source`: `MARKETPLACE` or `INTERNAL`
+- `status`: `REQUESTED`, `QUOTED`, `ACCEPTED`, `SCHEDULED`,
+  `IN_PROGRESS`, `AWAITING_PARTS`, `COMPLETED`, `CONFIRMED`, `CLOSED`,
+  `CANCELLED` or `DISPUTED`
+- `from`, `to` creation-date bounds
+- `customerId`/`customer_id`, `professionalId`/`professional_id` and
+  `businessId`/`business_id`
+
+The job projection contains `id`, `reference`, `source`, `status`,
+customer/professional/business/service ids, title, description, city,
+province, `scheduledAt`, `agreedAmount`, `currency` and timestamps. The
+job detail adds `timeline`, `quotes`, `assignments` and `documentation`.
+Timeline entries contain previous status, status, reason and timestamp,
+bounded to 100. Quotes are bounded to 50 and include provider/business
+context, amount, currency, status, message, timestamps and quote items
+(description, quantity, unit price, total and sort order). Assignment
+history is bounded to 100 and uses the assignment projection. Documentation
+contains images, updates, voice notes and parts-request metadata, each
+bounded to 100; images include phase, original filename, MIME type, size,
+uploader and timestamp, voice notes include author, original filename,
+MIME type, size, duration and timestamp, and parts items include part name,
+quantity, notes, `hasPhoto` and timestamp. The documentation projection
+contains no image, voice-note or parts-photo storage references, file
+keys, filesystem paths or binary content. The Stage 9 admin job surface
+is read-only; it does not expose a job status mutation or a quote, media,
+message or timeline intervention endpoint.
+
+## 23.5 Verification and certificates
+
+GET /api/v1/admin/verifications
+
+GET /api/v1/admin/verifications/:id
+
+The verification list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`), `type` (`IDENTITY`, `CERTIFICATE` or `BUSINESS`), `status`
+(`PENDING`, `APPROVED`, `REJECTED` or `NEEDS_INFO`) and `userId` (or
+`user_id`). The projection contains request id, user id/email, type,
+status, reviewer/time/notes and timestamps. The document itself is not
+part of the JSON response.
+
+POST /api/v1/admin/verifications/:id/approve
+
+POST /api/v1/admin/verifications/:id/reject
+
+POST /api/v1/admin/verifications/:id/request-info
+
+The approve request may use `{ "notes": null }`, or an optional 1–1000
+character note. Reject and request-info require `notes` with 1–1000
+characters. Unknown fields and missing required notes return `422`.
+
+`PENDING` and `NEEDS_INFO` may be approved, rejected or returned for more
+information. `APPROVED` and `REJECTED` are terminal and return `409
+CONFLICT` for another decision. A `CERTIFICATE` verification request must
+use the separate certificate workflow below. Identity and business
+verification update the related verification state where applicable;
+the professional and business verification projections remain separate.
+
+GET /api/v1/admin/verifications/:id/document
+
+Returns the protected identity-verification document as bytes with its
+recorded safe MIME type, an attachment disposition and a sanitized
+filename. Only `application/pdf`, `image/jpeg`, `image/png` and
+`image/webp` are served. The response is not the standard JSON envelope.
+The storage key, database document reference, filesystem path and internal
+metadata are never returned. The endpoint requires an active ADMIN and
+records `VERIFICATION_DOCUMENT_VIEWED` in the audit log after the file
+is read successfully. Missing, unsupported or unreadable documents return
+`404 NOT_FOUND`; malformed ids return `422`.
+
+## 23.6 Certificates
 
 GET /api/v1/admin/certificates
 
+GET /api/v1/admin/certificates/:id
+
+The certificate list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`), `status` (`PENDING`, `APPROVED`, `REJECTED` or
+`NEEDS_INFO`), `professionalId` (or `professional_id`) and `businessId`
+(or `business_id`). The projection contains owner ids/type, title,
+issuer, issue/expiry dates, verification status, reviewer/time/notes and
+timestamps. It does not contain the document reference or bytes.
+
+POST /api/v1/admin/certificates/:id/approve
+
+POST /api/v1/admin/certificates/:id/reject
+
+POST /api/v1/admin/certificates/:id/request-info
+
+These use the same `{ "notes": ... }` contract and note rules as
+verification decisions. `PENDING` and `NEEDS_INFO` can receive a decision;
+`APPROVED` and `REJECTED` are terminal. Unsafe, duplicate or out-of-state
+decisions return `409 CONFLICT`.
+
+GET /api/v1/admin/certificates/:id/document
+
+Returns the protected certificate bytes with the same safe MIME,
+attachment-disposition, sanitized-filename and audit-viewing rules as the
+identity document endpoint. Storage references and paths are never
+returned.
+
+## 23.7 Reviews, reports and disputes
+
 GET /api/v1/admin/reviews
+
+GET /api/v1/admin/reviews/:id
+
+The review list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`), `rating`, `minRating` (or `min_rating`) and `maxRating` (or
+`max_rating`), each rating value being 1–5. The projection includes job,
+customer, provider/business ids, display names, rating, comment, visibility
+state and timestamps. Reviews are read-only in Stage 9; there is no
+review moderation, visibility mutation or response route.
 
 GET /api/v1/admin/reports
 
+GET /api/v1/admin/reports/:id
+
+The report list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`), `type` (or `reportType`/`report_type`: `PROVIDER`, `REVIEW`,
+`JOB`, `USER` or `CONTENT`) and `status` (`OPEN`, `IN_REVIEW`, `RESOLVED`
+or `DISMISSED`).
+
+PATCH /api/v1/admin/reports/:id/status
+
+Request:
+
+{ "status": "OPEN | IN_REVIEW | RESOLVED | DISMISSED" }
+
+`OPEN` may move to `IN_REVIEW`, `RESOLVED` or `DISMISSED`. `IN_REVIEW`
+may move to `RESOLVED` or `DISMISSED`, but not back to `OPEN`. `RESOLVED`
+and `DISMISSED` are terminal. Repeated, stale, terminal and backwards
+transitions return `409 CONFLICT`; an invalid status/body returns `422`.
+The updated report is returned with `200`.
+
 GET /api/v1/admin/disputes
 
+GET /api/v1/admin/disputes/:id
+
+The dispute list supports `search`/`q`, `page`, `pageSize` (or
+`page_size`) and `status` (`OPEN`, `IN_REVIEW`, `RESOLVED` or `CLOSED`).
+The projection contains job id, opener, reason, description, status,
+resolution, resolver/time and timestamps.
+
+PATCH /api/v1/admin/disputes/:id
+
+Request fields:
+
+- `status` — required: `OPEN`, `IN_REVIEW`, `RESOLVED` or `CLOSED`
+- `resolution` — required 1–1000 characters for `RESOLVED` or `CLOSED`;
+  optional or null for `OPEN` and `IN_REVIEW`
+
+The current backend guard rejects a same-status update, any update to
+`CLOSED`, and `IN_REVIEW` → `OPEN`. It otherwise accepts another valid
+status combination when the body rules pass; the current implementation
+does not reject `RESOLVED` → `OPEN` or `RESOLVED` → `IN_REVIEW`. Invalid
+bodies or missing resolutions return `422`, and the updated dispute is
+returned with `200`.
+
+## 23.8 Audit logs
+
 GET /api/v1/admin/audit-logs
+
+GET /api/v1/admin/audit-logs/:id
+
+The audit list supports `search`/`q`, `page`, `pageSize` (or `page_size`),
+`actorId` (or `actor_id`), `action`, `entityType` (or `entity_type`),
+`entityId` (or `entity_id`) and `from`/`to`. The projection contains
+`id`, actor id/email, action, entity type/id, `metadata`, IP address and
+timestamp. Audit entries are read-only: no admin create, update or delete
+route exists. Administrative state changes and document views are written
+through the same audit mechanism; mutation and audit persistence are
+atomic in the MySQL store and the memory store test double.
+
+## 23.9 Admin response and safety rules
+
+- Successful JSON operations return `200`, except service creation which
+  returns `201`; the standard success envelope is used.
+- Validation failures, unknown query parameters, unsupported body fields
+  and malformed resource ids return `422 VALIDATION_ERROR`.
+- Missing resources return `404 NOT_FOUND`; invalid state changes,
+  duplicate service values and unsafe transitions return `409 CONFLICT`.
+- Unexpected storage or persistence failures return the safe `500
+  INTERNAL_ERROR` envelope without SQL, paths or stack traces.
+- Nested detail collections are bounded server-side: customer, professional,
+  business and technician child collections use a maximum of 50 records;
+  job timeline, assignments and documentation collections use a maximum
+  of 100 records, and job quotes use a maximum of 50. These are detail
+  projections, not an unpaginated export of the underlying tables.
+- Admin JSON projections intentionally exclude password hashes, plaintext
+  passwords, access/refresh tokens, private verification/certificate
+  document references, document MIME/storage metadata, storage keys,
+  filesystem paths and file bytes. Nested job documentation returns safe
+  metadata only; it never returns raw image, voice-note or parts-photo
+  storage references or binary content. Binary documents are available only
+  through the two protected document endpoints above.
+- There is no admin settings endpoint, review moderation endpoint, job
+  intervention endpoint, role-assignment endpoint or technician-assignment
+  endpoint in Stage 9.
+- No migration was created for Stage 9 because the existing users,
+  profiles, services, jobs, verification, certificate, report, dispute and
+  audit tables already support these operations. See `docs/ADMIN.md` for
+  the operational boundary.
 
 
 # 24. Authentication Requirements

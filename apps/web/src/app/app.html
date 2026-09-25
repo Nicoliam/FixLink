@@ -15,6 +15,9 @@
       @if (auth.isRestoring()) {
         <span class="fl-nav-status" role="status">Checking session…</span>
       } @else if (auth.isAuthenticated() && auth.currentUser()) {
+        @if (showAdmin()) {
+          <a class="fl-link fl-nav-link" routerLink="/admin">Admin</a>
+        }
         @if (showMyJobs()) {
           <a class="fl-link fl-nav-link" routerLink="/my-jobs">My jobs</a>
         }

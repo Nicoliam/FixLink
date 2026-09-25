@@ -1,11 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
 import { fail } from '../utils/response';
 import { verifyAccessToken } from '../utils/tokens';
-import type { UserRepository } from '../modules/users/user.repository';
+import type { UserRepository, UserStatus } from '../modules/users/user.repository';
 
 export interface AuthenticatedUser {
   id: string;
   email: string;
+  status: UserStatus;
   roles: string[];
 }
 
@@ -46,6 +47,7 @@ export function requireAuth(users: UserRepository) {
       (req as Request & { user: AuthenticatedUser }).user = {
         id: user.id,
         email: user.email,
+        status: user.status,
         roles,
       };
       next();
@@ -59,6 +61,25 @@ export function requireAuth(users: UserRepository) {
  * Optional-auth variant used by logout: attaches req.user when a valid
  * Bearer token is present, otherwise continues without one.
  */
+export function requireAdmin() {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const user = (req as Request & { user?: AuthenticatedUser }).user;
+    if (!user) {
+      fail(res, 'UNAUTHORIZED', 'Authentication required.', 401);
+      return;
+    }
+    if (user.status !== 'ACTIVE') {
+      fail(res, 'FORBIDDEN_ROLE', 'Administrator account must be active.', 403);
+      return;
+    }
+    if (!user.roles.includes('ADMIN')) {
+      fail(res, 'FORBIDDEN_ROLE', 'Administrator access required.', 403);
+      return;
+    }
+    next();
+  };
+}
+
 export function optionalAuth(users: UserRepository) {
   const strict = requireAuth(users);
   return (req: Request, res: Response, next: NextFunction): void => {

@@ -1,5 +1,53 @@
 # FixLink — Changelog
 
+## Stage 9 — Admin / Platform Operations (2026-09-25)
+
+- Completed the active-admin platform operations surface on the existing
+  data model: dashboard aggregates; platform-wide user, customer,
+  professional, business, technician, service, job, verification,
+  certificate, review, report, dispute and audit-log visibility; enriched
+  detail DTOs for user last-login metadata, customer history, professional
+  catalogue/portfolio/certificate context, business membership/team/jobs,
+  technician assignment history and job timeline/quotes/documentation;
+  guarded user suspension/reactivation; service creation/editing/activation;
+  verification and certificate review; report/dispute status operations;
+  and read-only audit-log viewing.
+- Backend: `backend/src/modules/admin/` now provides strict query/body
+  validation, safe projections, authoritative `requireAuth` +
+  active `ADMIN` enforcement, platform-wide store queries, bounded nested
+  detail projections, protected verification/certificate document
+  streaming, metadata-only job documentation, atomic audit writes and
+  typed conflict/not-found/validation errors. The backend contract is
+  documented in `docs/API.md`; operational boundaries are in
+  `docs/ADMIN.md`.
+- Frontend: lazy `/admin` shell, dashboard, resource lists/details,
+  filters, pagination, loading/empty/error/retry states, enriched detail
+  sections and nested job documentation metadata, confirmations, service
+  editor, protected document opening, settings not-configured state and
+  admin not-found state. Navigation/guard checks are UX-only; the backend
+  remains the security boundary.
+- Security/privacy: non-admin and inactive-admin requests are rejected;
+  multi-role users are allowed only when active `ADMIN` is authoritative;
+  self-status changes are rejected; private document references,
+  storage keys, filesystem paths, credentials and binary content are not
+  returned by JSON projections; document views are audited; audit entries
+  are read-only; state transitions are guarded server-side.
+- Documentation: added `docs/ADMIN.md`; updated `docs/API.md`,
+  `docs/PERMISSIONS.md`, `docs/USER-FLOWS.md` and `docs/TEST-PLAN.md`
+  with the exact implemented Stage 9 contracts and limitations.
+- Tests confirmed: backend **404 passed** across **51 suites**;
+  frontend **310 passed** across **35 test files**. The suites cover the
+  admin role matrix, resource and enriched-detail contracts, bounded child
+  collections, query validation, privacy, document access, atomic audit
+  behavior, transitions, UI states, filters, pagination and confirmations.
+- No migration was created because existing platform tables were reused;
+  `docs/DATABASE.md` was intentionally not changed.
+- Stage 9 limitations remain explicit: settings are not implemented;
+  review moderation, job intervention, role management and technician
+  assignment are not implemented; admin-specific notification contexts
+  were not added.
+- Next: **Stage 10**. No Stage 10 work is started by this change.
+
 ## Stage 8 — In-App Notifications (2026-09-24)
 
 - MVP in-app system on the existing `notifications` table
@@ -45,9 +93,9 @@
   frontend suite green: 32 files, 268 tests;
   `tsc --noEmit` (backend + web app + specs) and both
   builds pass.
-- Out of scope (next: Stage 9 — Admin / Platform
-  Operations): admin contexts, email/SMS/WhatsApp/push,
-  payments, GPS, messaging.
+- Out of scope in Stage 8: admin contexts, email/SMS/WhatsApp/push,
+  payments, GPS, messaging. Admin / Platform Operations is delivered in
+  Stage 9 below; no Stage 10 work is started by this changelog.
 
 ## Stage 7G — Business Job Board + History (2026-09-24)
 
