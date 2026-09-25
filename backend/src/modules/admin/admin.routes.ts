@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { requireAdmin, requireAuth } from '../../middleware/auth';
 import type { UserRepository } from '../users/user.repository';
 import { makeAdminController } from './admin.controller';
@@ -9,7 +10,14 @@ import { LocalFileStorage, type FileStorage } from '../../services/file-storage'
 export function makeAdminRoutes(users: UserRepository, store: AdminStore, storage: FileStorage = new LocalFileStorage()): Router {
   const router = Router();
   const controller = makeAdminController(new AdminService(users, store, storage));
-  router.use(requireAuth(users), requireAdmin());
+  const adminLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 300,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many admin requests. Please try again later.' } },
+  });
+  router.use(adminLimiter, requireAuth(users), requireAdmin());
   router.get('/admin/dashboard', controller.dashboard);
   router.get('/admin/users', controller.listUsers);
   router.get('/admin/users/:id', controller.getUser);

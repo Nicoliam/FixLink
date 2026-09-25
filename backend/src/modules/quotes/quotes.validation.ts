@@ -52,9 +52,10 @@ export function validateCreateQuote(body: unknown): ValidatedCreateQuote {
   let currency = 'ZAR';
   if (rawCurrency !== undefined && rawCurrency !== null && String(rawCurrency).trim() !== '') {
     if (typeof rawCurrency !== 'string' || !/^[A-Za-z]{3}$/.test(rawCurrency.trim())) {
-      return invalid(422, 'Currency must be a 3-letter code (e.g. ZAR).');
+      return invalid(422, 'Currency must be ZAR.');
     }
     currency = rawCurrency.trim().toUpperCase();
+    if (currency !== 'ZAR') return invalid(422, 'Currency must be ZAR.');
   }
 
   const rawMessage = body['message'] ?? body['description'] ?? body['note'];
@@ -94,6 +95,13 @@ export function validateCreateQuote(body: unknown): ValidatedCreateQuote {
         return invalid(422, `Quote item ${index + 1} needs a unit price of 0 or more.`);
       }
       items.push({ description, quantity: roundMoney(quantity), unitPrice: roundMoney(unitPrice) });
+    }
+  }
+
+  if (items.length > 0) {
+    const derivedTotal = roundMoney(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+    if (derivedTotal !== roundMoney(total)) {
+      return invalid(422, 'Quote total must equal the sum of its line items.');
     }
   }
 

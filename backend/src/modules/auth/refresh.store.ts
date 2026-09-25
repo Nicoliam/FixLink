@@ -8,6 +8,7 @@ export interface RefreshSession {
 export interface RefreshStore {
   save(session: RefreshSession): Promise<void>;
   findByHash(tokenHash: string): Promise<RefreshSession | null>;
+  consume(tokenHash: string): Promise<RefreshSession | null>;
   revokeByHash(tokenHash: string): Promise<void>;
   revokeAllForUser(userId: string): Promise<void>;
 }
@@ -38,6 +39,17 @@ export class MemoryRefreshStore implements RefreshStore {
       this.sessions.delete(tokenHash);
       return null;
     }
+    return session;
+  }
+
+  async consume(tokenHash: string): Promise<RefreshSession | null> {
+    const session = this.sessions.get(tokenHash) ?? null;
+    if (!session) return null;
+    if (session.expiresAtMs <= Date.now()) {
+      this.sessions.delete(tokenHash);
+      return null;
+    }
+    this.sessions.delete(tokenHash);
     return session;
   }
 

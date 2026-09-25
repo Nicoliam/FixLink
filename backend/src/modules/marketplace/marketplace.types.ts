@@ -46,7 +46,6 @@ export interface ProviderCardDto {
   providerType: ProviderType;
   name: string;
   description: string | null;
-  photoReference: string | null;
   city: string | null;
   province: string | null;
   verificationStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
@@ -68,7 +67,6 @@ export interface ProviderProfileDto extends ProviderCardDto {
 
 export interface PortfolioImageDto {
   id: string;
-  fileReference: string;
   mimeType: string | null;
   kind: 'BEFORE' | 'AFTER' | 'GENERAL';
   sortOrder: number;

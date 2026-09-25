@@ -10,6 +10,8 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const mysql = require('mysql2/promise');
+const fs = require('node:fs');
+const path = require('node:path');
 const { getConfig } = require('../db');
 
 const EXPECTED_TABLES = [
@@ -66,13 +68,26 @@ before(async () => {
 });
 
 after(async () => {
-  await db.end();
+  if (db) await db.end();
 });
 
 describe('schema presence', () => {
   it('creates all 41 domain tables', async () => {
     const found = await tables();
     for (const t of EXPECTED_TABLES) assert.ok(found.has(t), `missing table: ${t}`);
+  });
+
+  it('persists refresh sessions as hashed metadata only', async () => {
+    const found = await tables();
+    assert.ok(found.has('refresh_tokens'));
+    const [rows] = await db.query(
+      `SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'refresh_tokens'`
+    );
+    const names = new Set(rows.map((row) => row.COLUMN_NAME));
+    assert.ok(names.has('token_hash'));
+    assert.ok(names.has('revoked_at'));
+    assert.ok(!names.has('token'));
   });
 
   it('does NOT create split job tables or out-of-scope tables', async () => {
@@ -86,9 +101,10 @@ describe('schema presence', () => {
     assert.deepEqual(jobTables, ['jobs']);
   });
 
-  it('tracks all 8 migrations as applied', async () => {
+  it('tracks every migration file as applied', async () => {
+    const files = fs.readdirSync(path.join(__dirname, '../migrations')).filter((file) => file.endsWith('.sql'));
     const [rows] = await db.query('SELECT COUNT(*) AS n FROM `schema_migrations`');
-    assert.equal(rows[0].n, 8);
+    assert.equal(rows[0].n, files.length);
   });
 });
 
@@ -258,6 +274,14 @@ describe('money, files and privacy rules', () => {
       assert.ok(r.password_hash.length >= 50, 'password_hash suspiciously short');
       assert.ok(!r.password_hash.includes('FixLink-dev-001'), 'plaintext password detected');
     }
+  });
+
+  it('matches the approval comment contract to its database column', async () => {
+    const [rows] = await db.query(
+      `SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'parts_requests' AND COLUMN_NAME = 'review_notes'`
+    );
+    assert.equal(Number(rows[0].CHARACTER_MAXIMUM_LENGTH), 1000);
   });
 
   it('keeps verification documents as private references only', async () => {

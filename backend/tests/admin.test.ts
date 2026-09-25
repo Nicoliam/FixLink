@@ -251,7 +251,9 @@ describe('admin authorization and resources', () => {
     assert.equal(report.status, 200);
     const dispute = await request(app).patch('/api/v1/admin/disputes/1').set(auth(admin.token)).send({ status: 'RESOLVED', resolution: 'Refund agreed directly with the parties.' });
     assert.equal(dispute.status, 200);
-    assert.equal(dispute.body.data.status, 'RESOLVED');
+     assert.equal(dispute.body.data.status, 'RESOLVED');
+     const reverse = await request(app).patch('/api/v1/admin/disputes/1').set(auth(admin.token)).send({ status: 'OPEN' });
+     assert.equal(reverse.status, 409);
   });
 
   it('rejects stale and terminal report/dispute transitions consistently', async () => {
@@ -285,8 +287,10 @@ describe('admin authorization and resources', () => {
     const documentApp = createApp({ users, refreshStore: new MemoryRefreshStore(), admin: documentStore, storage });
     const verification = await request(documentApp).get('/api/v1/admin/verifications/1/document').set(auth(admin.token));
     assert.equal(verification.status, 200);
-    assert.equal(verification.headers['content-type'], 'application/pdf');
-    assert.match(verification.headers['content-disposition'], /attachment/);
+     assert.equal(verification.headers['content-type'], 'application/pdf');
+     assert.equal(verification.headers['cache-control'], 'no-store, no-cache, must-revalidate, private');
+     assert.equal(verification.headers.pragma, 'no-cache');
+     assert.match(verification.headers['content-disposition'], /attachment/);
     assert.ok(!JSON.stringify(verification.body).includes(verificationFile.storageKey));
     const certificate = await request(documentApp).get('/api/v1/admin/certificates/1/document').set(auth(admin.token));
     assert.equal(certificate.status, 200);

@@ -39,6 +39,8 @@ export function makeAdminController(service: AdminService) {
       if (value.data === undefined) { result(res, value); return; }
       res.status(value.status).setHeader('Content-Type', value.data.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${value.data.filename}"`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
       res.setHeader('Content-Length', String(value.data.size));
       res.send(value.data.buffer);
     }),
@@ -52,6 +54,8 @@ export function makeAdminController(service: AdminService) {
       if (value.data === undefined) { result(res, value); return; }
       res.status(value.status).setHeader('Content-Type', value.data.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${value.data.filename}"`);
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
       res.setHeader('Content-Length', String(value.data.size));
       res.send(value.data.buffer);
     }),

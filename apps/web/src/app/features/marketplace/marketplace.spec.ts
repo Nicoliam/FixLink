@@ -11,7 +11,7 @@ const card: ProviderCard = {
   providerType: 'professional',
   name: 'Sipho Ndlovu — ProPlumb',
   description: 'PIRB-registered plumber.',
-  photoReference: null,
+
   city: 'Johannesburg',
   province: 'Gauteng',
   verificationStatus: 'VERIFIED',

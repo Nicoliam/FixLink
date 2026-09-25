@@ -12,7 +12,7 @@ const profile: ProviderProfile = {
   name: 'Sipho Ndlovu — ProPlumb',
   description: 'PIRB-registered plumber.',
   bio: 'PIRB-registered plumber doing leaks across Joburg North.',
-  photoReference: null,
+
   city: 'Johannesburg',
   province: 'Gauteng',
   verificationStatus: 'VERIFIED',
@@ -46,8 +46,8 @@ describe('ProviderDetailComponent', () => {
             description: 'Same-day fix.',
             service: { id: '1', name: 'Leak Repair & Pipe Fixes', slug: 'leak-repair' },
             images: [
-              { id: '1', fileReference: 'portfolio/1/before-sink.jpg', mimeType: 'image/jpeg', kind: 'BEFORE', sortOrder: 1 },
-              { id: '2', fileReference: 'portfolio/1/after-sink.jpg', mimeType: 'image/jpeg', kind: 'AFTER', sortOrder: 2 },
+              { id: '1', mimeType: 'image/jpeg', kind: 'BEFORE', sortOrder: 1 },
+              { id: '2', mimeType: 'image/jpeg', kind: 'AFTER', sortOrder: 2 },
             ],
             createdAt: '2026-09-20T10:00:00.000Z',
           },

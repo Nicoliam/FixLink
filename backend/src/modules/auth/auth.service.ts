@@ -91,19 +91,16 @@ export class AuthService {
       return { status: 401, code: 'INVALID_REFRESH_TOKEN', message: 'Refresh token is invalid or expired.' };
     }
 
-    const session = await this.refreshStore.findByHash(hashRefreshToken(refreshToken));
+    const session = await this.refreshStore.consume(hashRefreshToken(refreshToken));
     if (!session) {
       return { status: 401, code: 'INVALID_REFRESH_TOKEN', message: 'Refresh token is invalid or expired.' };
     }
 
     const user = await this.users.findById(session.userId);
     if (!user || user.status === 'SUSPENDED' || user.status === 'DELETED') {
-      await this.refreshStore.revokeByHash(session.tokenHash);
       return { status: 401, code: 'INVALID_REFRESH_TOKEN', message: 'Refresh token is invalid or expired.' };
     }
 
-    // Rotation: the presented token is single-use from this point on.
-    await this.refreshStore.revokeByHash(session.tokenHash);
     const roles = await this.users.getRoles(user.id);
     const tokens = await this.issueSession(user.id, user.email, roles);
     return { status: 200, data: { user: this.users.toSafeUser(user, roles), ...tokens } };

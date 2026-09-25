@@ -52,7 +52,6 @@ describe('HomeComponent marketplace foundation', () => {
           providerType: 'professional',
           name: 'Sipho Ndlovu — ProPlumb',
           description: null,
-          photoReference: null,
           city: 'Johannesburg',
           province: 'Gauteng',
           verificationStatus: 'VERIFIED',

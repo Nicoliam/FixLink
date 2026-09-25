@@ -272,7 +272,7 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
     }
     const [rows] = await this.pool.query<ProfessionalRow[]>(
       `SELECT pp.\`id\`, pp.\`display_name\`, pp.\`bio\`, pp.\`experience_years\`,
-              pp.\`profile_photo_reference\`, pp.\`verification_status\`,
+              pp.\`verification_status\`,
               pp.\`rating_avg\`, pp.\`rating_count\`,
               (SELECT COUNT(*) FROM \`portfolio_projects\` pf
                 WHERE pf.\`professional_id\` = pp.\`id\` AND pf.\`is_published\` = 1 AND pf.\`deleted_at\` IS NULL) AS \`portfolio_count\`,
@@ -296,7 +296,6 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
         providerType: 'professional' as const,
         name: row.display_name,
         description: row.bio,
-        photoReference: row.profile_photo_reference,
         city: areas[0]?.city ?? null,
         province: areas[0]?.province ?? null,
         verificationStatus: row.verification_status,
@@ -342,7 +341,7 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
       }
     }
     const [rows] = await this.pool.query<BusinessRow[]>(
-      `SELECT bp.\`id\`, bp.\`business_name\`, bp.\`description\`, bp.\`logo_reference\`,
+      `SELECT bp.\`id\`, bp.\`business_name\`, bp.\`description\`,
               bp.\`city\`, bp.\`province\`, bp.\`verification_status\`,
               bp.\`rating_avg\`, bp.\`rating_count\`,
               (SELECT COUNT(*) FROM \`portfolio_projects\` pf
@@ -366,7 +365,6 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
         providerType: 'business' as const,
         name: row.business_name,
         description: row.description,
-        photoReference: row.logo_reference,
         city: row.city,
         province: row.province,
         verificationStatus: row.verification_status,
@@ -436,7 +434,7 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
     if (type === 'professional') {
       const [rows] = await this.pool.query<ProfessionalRow[]>(
         `SELECT pp.\`id\`, pp.\`display_name\`, pp.\`bio\`, pp.\`experience_years\`,
-                pp.\`profile_photo_reference\`, pp.\`verification_status\`,
+                pp.\`verification_status\`,
                 pp.\`rating_avg\`, pp.\`rating_count\`,
                 (SELECT COUNT(*) FROM \`portfolio_projects\` pf
                   WHERE pf.\`professional_id\` = pp.\`id\` AND pf.\`is_published\` = 1 AND pf.\`deleted_at\` IS NULL) AS \`portfolio_count\`,
@@ -459,7 +457,6 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
         name: row.display_name,
         description: row.bio,
         bio: row.bio,
-        photoReference: row.profile_photo_reference,
         city: areas[0]?.city ?? null,
         province: areas[0]?.province ?? null,
         verificationStatus: row.verification_status,
@@ -474,7 +471,7 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
       };
     }
     const [rows] = await this.pool.query<BusinessRow[]>(
-      `SELECT bp.\`id\`, bp.\`business_name\`, bp.\`description\`, bp.\`logo_reference\`,
+      `SELECT bp.\`id\`, bp.\`business_name\`, bp.\`description\`,
               bp.\`city\`, bp.\`province\`, bp.\`verification_status\`,
               bp.\`rating_avg\`, bp.\`rating_count\`,
               (SELECT COUNT(*) FROM \`portfolio_projects\` pf
@@ -497,7 +494,6 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
       name: row.business_name,
       description: row.description,
       bio: row.description,
-      photoReference: row.logo_reference,
       city: row.city,
       province: row.province,
       verificationStatus: row.verification_status,
@@ -540,7 +536,6 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
     interface ImageRow extends RowDataPacket {
       id: number;
       project_id: number;
-      file_reference: string;
       mime_type: string | null;
       kind: PortfolioImageDto['kind'];
       sort_order: number;
@@ -548,7 +543,7 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
     const projectIds = projects.map((p) => toStringId(p.id));
     const placeholders = projectIds.map(() => '?').join(',');
     const [images] = await this.pool.query<ImageRow[]>(
-      `SELECT \`id\`, \`project_id\`, \`file_reference\`, \`mime_type\`, \`kind\`, \`sort_order\`
+      `SELECT \`id\`, \`project_id\`, \`mime_type\`, \`kind\`, \`sort_order\`
          FROM \`portfolio_images\`
         WHERE \`project_id\` IN (${placeholders})
         ORDER BY \`sort_order\`, \`id\``,
@@ -560,7 +555,6 @@ export class MysqlMarketplaceStore implements MarketplaceStore {
       const list = imagesByProject.get(key) ?? [];
       list.push({
         id: toStringId(image.id),
-        fileReference: image.file_reference,
         mimeType: image.mime_type,
         kind: image.kind,
         sortOrder: image.sort_order,

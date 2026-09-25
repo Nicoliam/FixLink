@@ -125,10 +125,11 @@ Request:
 - Refresh token: opaque random value (hex), 30-day expiry by default
   (`REFRESH_TOKEN_TTL_SECONDS`). Only its SHA-256 hash is stored
   server-side — never the raw token.
-- Refresh sessions are kept in a server-side in-memory store in Stage 5A,
-  so no database schema change was required. Known limitation: sessions do
-  not survive restarts and are per-process. A persistent `refresh_tokens`
-  table is the planned hardening for multi-instance production use.
+- Refresh sessions use the in-memory store in memory mode and the hashed
+  MySQL `refresh_tokens` table in production mode. The presented token is
+  consumed atomically before a replacement is issued, so concurrent replay
+  cannot create multiple successor sessions. Production deployments should
+  use MySQL mode so sessions survive restarts and are shared by instances.
 
 ### Refresh
 
@@ -1628,12 +1629,11 @@ Request fields:
 - `resolution` — required 1–1000 characters for `RESOLVED` or `CLOSED`;
   optional or null for `OPEN` and `IN_REVIEW`
 
-The current backend guard rejects a same-status update, any update to
-`CLOSED`, and `IN_REVIEW` → `OPEN`. It otherwise accepts another valid
-status combination when the body rules pass; the current implementation
-does not reject `RESOLVED` → `OPEN` or `RESOLVED` → `IN_REVIEW`. Invalid
-bodies or missing resolutions return `422`, and the updated dispute is
-returned with `200`.
+The backend rejects same-status updates, terminal `RESOLVED` or `CLOSED`
+updates, and `IN_REVIEW` → `OPEN`. `RESOLVED` and `CLOSED` are terminal;
+invalid transition bodies return `409`, while invalid status/body values or
+missing resolutions return `422`. The updated dispute is returned with
+`200`.
 
 ## 23.8 Audit logs
 

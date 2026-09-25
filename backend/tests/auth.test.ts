@@ -16,6 +16,7 @@ import { MemoryUserRepository } from '../src/modules/auth/memory-user.repository
 import { MemoryRefreshStore } from '../src/modules/auth/refresh.store';
 import { signAccessToken } from '../src/utils/tokens';
 import { verifyPassword } from '../src/utils/password';
+import { isStrongProductionSecret } from '../src/config/env';
 
 const SENSITIVE_KEYS = ['password', 'password_hash', 'passwordHash', 'hash'];
 
@@ -254,6 +255,16 @@ describe('POST /api/v1/auth/refresh + POST /api/v1/auth/logout', () => {
     assert.equal(me.status, 200);
   });
 
+  it('allows only one concurrent use of a refresh token', async () => {
+    const first = await registerLogin(app, 'concurrent-refresh@example.co.za');
+    const responses = await Promise.all([
+      request(app).post('/api/v1/auth/refresh').send({ refreshToken: first.refreshToken }),
+      request(app).post('/api/v1/auth/refresh').send({ refreshToken: first.refreshToken }),
+    ]);
+    assert.equal(responses.filter((response) => response.status === 200).length, 1);
+    assert.equal(responses.filter((response) => response.status === 401).length, 1);
+  });
+
   it('rejects unknown refresh tokens with 401', async () => {
     const res = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: 'deadbeef'.repeat(16) });
     assert.equal(res.status, 401);
@@ -274,6 +285,15 @@ describe('POST /api/v1/auth/refresh + POST /api/v1/auth/logout', () => {
   it('logout without any credential is 401', async () => {
     const res = await request(app).post('/api/v1/auth/logout').send({});
     assert.equal(res.status, 401);
+  });
+});
+
+describe('production secret validation', () => {
+  it('rejects short and known example secrets', () => {
+    assert.equal(isStrongProductionSecret('short'), false);
+    assert.equal(isStrongProductionSecret('dev-only-change-me'), false);
+    assert.equal(isStrongProductionSecret('fixlink-test-secret'), false);
+    assert.equal(isStrongProductionSecret('a'.repeat(32)), true);
   });
 });
 

@@ -18,6 +18,15 @@ function numberOr(name: string, fallback: number): number {
   return Math.floor(parsed);
 }
 
+const productionEnvironments = new Set(['production', 'prod']);
+const knownExampleSecrets = new Set([
+  'dev-only-change-me',
+  'fixlink-test-secret',
+  'change-me',
+  'secret',
+  'password',
+]);
+
 export const env = {
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
   port: numberOr('PORT', 3000),
@@ -42,9 +51,14 @@ export const env = {
   bcryptCost: numberOr('BCRYPT_COST', 12),
 };
 
+export function isStrongProductionSecret(secret: string): boolean {
+  return secret.length >= 32 && !knownExampleSecrets.has(secret);
+}
+
 export function assertProdSecrets(): void {
-  if (env.nodeEnv === 'production' && env.jwt.accessSecret === 'dev-only-change-me') {
-    throw new Error('JWT_ACCESS_SECRET must be set to a strong random value in production.');
+  if (!productionEnvironments.has(env.nodeEnv)) return;
+  if (!isStrongProductionSecret(env.jwt.accessSecret)) {
+    throw new Error('JWT_ACCESS_SECRET must be a strong random value of at least 32 characters in production.');
   }
 }
 

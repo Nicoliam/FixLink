@@ -118,7 +118,7 @@ export class MemoryJobsStore implements JobsStore {
     pageSize: number,
   ): Promise<{ items: JobDto[]; total: number }> {
     const owned = [...this.jobs.values()]
-      .filter((job) => job.customerId === customerId)
+      .filter((job) => job.customerId === customerId && job.source === 'MARKETPLACE')
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     const start = (page - 1) * pageSize;
     return { items: owned.slice(start, start + pageSize), total: owned.length };

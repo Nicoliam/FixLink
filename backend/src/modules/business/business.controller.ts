@@ -297,7 +297,8 @@ export function makeBusinessController(service: BusinessService) {
         }
         res.setHeader('Content-Type', result.data.mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
         res.status(200).send(result.data.buffer);
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
@@ -377,7 +378,8 @@ export function makeBusinessController(service: BusinessService) {
         }
         res.setHeader('Content-Type', result.data.mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
         res.status(200).send(result.data.buffer);
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the voice note. Please try again.', 500);
@@ -433,7 +435,8 @@ export function makeBusinessController(service: BusinessService) {
         }
         res.setHeader('Content-Type', result.data.mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
         res.status(200).send(result.data.buffer);
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
@@ -471,7 +474,8 @@ export function makeBusinessController(service: BusinessService) {
         }
         res.setHeader('Content-Type', result.data.mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
         res.status(200).send(result.data.buffer);
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the voice note. Please try again.', 500);
@@ -542,7 +546,8 @@ export function makeBusinessController(service: BusinessService) {
         }
         res.setHeader('Content-Type', result.data.mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
         res.status(200).send(result.data.buffer);
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);
@@ -584,7 +589,8 @@ export function makeBusinessController(service: BusinessService) {
         }
         res.setHeader('Content-Type', result.data.mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${safeDownloadName(result.data.filename)}"`);
-        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.setHeader('Pragma', 'no-cache');
         res.status(200).send(result.data.buffer);
       } catch {
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve the photo. Please try again.', 500);

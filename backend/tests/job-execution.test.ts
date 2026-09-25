@@ -326,7 +326,9 @@ describe('GET /api/v1/jobs/:jobId/images (photo retrieval)', () => {
       .get(`/api/v1/jobs/${job.jobId}/images/${imageId}/file`)
       .set('Authorization', `Bearer ${customerToken}`);
     assert.equal(res.status, 200);
-    assert.equal(res.headers['content-type'], 'image/png');
+     assert.equal(res.headers['content-type'], 'image/png');
+     assert.equal(res.headers['cache-control'], 'no-store, no-cache, must-revalidate, private');
+     assert.equal(res.headers.pragma, 'no-cache');
   });
 });
 

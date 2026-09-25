@@ -240,14 +240,14 @@ export class MysqlJobsStore implements JobsStore {
       total: number;
     }
     const [countRows] = await this.pool.query<CountRow[]>(
-      'SELECT COUNT(*) AS `total` FROM `jobs` WHERE `customer_id` = ? AND `deleted_at` IS NULL',
+      "SELECT COUNT(*) AS `total` FROM `jobs` WHERE `customer_id` = ? AND `source` = 'MARKETPLACE' AND `deleted_at` IS NULL",
       [customerId],
     );
     const total = Number((countRows[0] as CountRow | undefined)?.total ?? 0);
     if (total === 0) return { items: [], total: 0 };
     const offset = (page - 1) * pageSize;
     const [rows] = await this.pool.query<JobRow[]>(
-      `${JOB_DETAIL_SELECT} WHERE j.\`customer_id\` = ? AND j.\`deleted_at\` IS NULL ORDER BY j.\`created_at\` DESC LIMIT ? OFFSET ?`,
+      `${JOB_DETAIL_SELECT} WHERE j.\`customer_id\` = ? AND j.\`source\` = 'MARKETPLACE' AND j.\`deleted_at\` IS NULL ORDER BY j.\`created_at\` DESC LIMIT ? OFFSET ?`,
       [customerId, pageSize, offset],
     );
     return { items: (rows as JobRow[]).map(mapRow), total };

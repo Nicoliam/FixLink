@@ -235,6 +235,36 @@ describe('POST /api/v1/jobs (customer job request)', () => {
   });
 });
 
+describe('marketplace source boundary', () => {
+  it('does not expose an internal job through customer endpoints', async () => {
+    const users = new MemoryUserRepository();
+    const jobs = new MemoryJobsStore();
+    const app = createApp({
+      users,
+      refreshStore: new MemoryRefreshStore(),
+      marketplace: new MemoryMarketplaceStore(),
+      jobs,
+    });
+    const token = await registerCustomer(app, 'source-boundary@example.co.za');
+    const created = await request(app)
+      .post('/api/v1/jobs')
+      .set('Authorization', `Bearer ${token}`)
+      .send(validJob());
+    assert.equal(created.status, 201);
+    jobs.debugSetJobSource(created.body.data.id as string, 'INTERNAL');
+
+    const list = await request(app).get('/api/v1/jobs').set('Authorization', `Bearer ${token}`);
+    assert.equal(list.status, 200);
+    assert.equal(list.body.data.total, 0);
+
+    const detail = await request(app)
+      .get(`/api/v1/jobs/${created.body.data.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 404);
+    assert.equal(detail.body.error.code, 'NOT_FOUND');
+  });
+});
+
 describe('GET /api/v1/jobs + /api/v1/jobs/:id (customer retrieval)', () => {
   let app: Express;
   let tokenA: string;

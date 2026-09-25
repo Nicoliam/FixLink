@@ -197,7 +197,7 @@ export class JobsService {
     const job = customer ? await this.jobs.getJobById(jobId.trim()) : null;
     // Ownership is part of existence: another customer's job reads as 404
     // so job ids cannot be probed across accounts.
-    if (!job || job.customerId !== customer?.id) {
+    if (!job || job.source !== 'MARKETPLACE' || job.customerId !== customer?.id) {
       return fail(404, 'NOT_FOUND', 'Job not found.');
     }
     const quotes = this.quotes ? await this.quotes.listQuotesByJobId(job.id) : [];

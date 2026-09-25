@@ -48,6 +48,7 @@ function getConfig() {
     user: process.env.DB_USER || 'fixlink',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'fixlink',
+    connectTimeout: 5000,
   };
 }
 

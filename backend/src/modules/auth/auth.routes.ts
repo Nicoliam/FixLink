@@ -23,9 +23,31 @@ export function makeAuthRoutes(users: UserRepository, refreshStore: RefreshStore
   });
   router.use(authLimiter);
 
-  router.post('/register', controller.register);
-  router.post('/login', controller.login);
-  router.post('/refresh', controller.refresh);
+  const registrationLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many registration attempts. Please try again later.' } },
+  });
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Please try again later.' } },
+  });
+  const refreshLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 60,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many refresh attempts. Please try again later.' } },
+  });
+
+  router.post('/register', registrationLimiter, controller.register);
+  router.post('/login', loginLimiter, controller.login);
+  router.post('/refresh', refreshLimiter, controller.refresh);
   // Logout works with a refresh token in the body, an access token, or both.
   router.post('/logout', optionalAuth(users), controller.logout);
   router.get('/me', requireAuth(users), controller.me);

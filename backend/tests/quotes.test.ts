@@ -300,6 +300,24 @@ describe('POST /api/v1/jobs/:jobId/quotes (quote submission)', () => {
     }
   });
 
+  it('rejects non-ZAR quote currency', async () => {
+    const res = await request(ctx.app)
+      .post(`/api/v1/jobs/${jobId}/quotes`)
+      .set('Authorization', `Bearer ${proToken}`)
+      .send(validQuote({ currency: 'USD' }));
+    assert.equal(res.status, 422);
+    assertErrorEnvelope(res, 'VALIDATION_ERROR');
+  });
+
+  it('rejects a quote total that does not match its line items', async () => {
+    const res = await request(ctx.app)
+      .post(`/api/v1/jobs/${jobId}/quotes`)
+      .set('Authorization', `Bearer ${proToken}`)
+      .send(validQuote({ total: 999, items: [{ description: 'Labour', quantity: 1, unitPrice: 950 }] }));
+    assert.equal(res.status, 422);
+    assertErrorEnvelope(res, 'VALIDATION_ERROR');
+  });
+
   it('13. invalid quote items are rejected (422)', async () => {
     const cases: Record<string, unknown>[] = [
       { items: [{ description: 'Labour', quantity: 0, unitPrice: 100 }] },

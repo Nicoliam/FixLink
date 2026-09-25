@@ -5,6 +5,7 @@ import { getPool } from './config/db';
 import { env } from './config/env';
 import { makeAuthRoutes } from './modules/auth/auth.routes';
 import { MemoryRefreshStore, type RefreshStore } from './modules/auth/refresh.store';
+import { MysqlRefreshStore } from './modules/auth/mysql-refresh.store';
 import { MemoryUserRepository } from './modules/auth/memory-user.repository';
 import { MysqlUserRepository } from './modules/auth/mysql-user.repository';
 import { makeMarketplaceRoutes } from './modules/marketplace/marketplace.routes';
@@ -96,7 +97,7 @@ export function resolveDeps(): AppDeps {
   const jobs = new MysqlJobsStore(pool);
   return {
     users: new MysqlUserRepository(pool),
-    refreshStore,
+    refreshStore: new MysqlRefreshStore(pool),
     marketplace: new MysqlMarketplaceStore(pool),
     jobs,
     quotes: new MysqlQuotesStore(pool),
