@@ -1,5 +1,44 @@
 # FixLink — Changelog
 
+## Stage 12 — Client UAT and Handover Preparation (2026-09-25)
+
+- Added client-facing UAT instructions, test accounts and a practical UAT
+  test matrix covering the current marketplace, business, technician,
+  admin, media, privacy and isolation surfaces.
+- Added deployment, environment, production checklist, post-deployment
+  smoke-test, technical handover, client acceptance and documentation
+  index documents.
+- Reconciled deployment, storage, migration/seed, permissions and current
+  limitation notes with the implemented repository. No product feature,
+  role, job engine, payment flow or admin settings capability was added.
+- Documented the local filesystem MVP adapter, private media controls,
+  production secret requirements, MySQL backup/restore flow and the
+  requirement to back up database metadata together with files.
+- The Angular automated test runner remains environment-limited in this
+  development environment; frontend typecheck and production build are
+  the available Stage 11 evidence. No commit or push is part of this
+  documentation-only stage.
+
+## Stage 11 — Full System Validation (2026-09-25)
+
+- Recorded the Stage 11 full-system test report against the Stage 10
+  security implementation. Result: **PASS WITH LIMITATIONS**.
+- Database tests and backend tests passed; frontend typecheck and
+  production build passed. Angular tests did not reach execution in the
+  Stage 11 environment. `/admin/settings` remains an explicit limitation.
+- No Stage 11 commit or push is represented by the historical report's
+  working-tree note; current repository history is authoritative for Git
+  state.
+
+## Stage 10 — Security Hardening and QA (2026-09-25)
+
+- Hardened authentication and platform boundaries, authoritative role
+  loading, rotating hashed refresh sessions, production secret validation,
+  rate limiting, private file responses, business isolation and safe API
+  error handling.
+- Security controls and known limitations are documented in
+  `docs/SECURITY.md` and covered by the Stage 11 test report.
+
 ## Stage 9 — Admin / Platform Operations (2026-09-25)
 
 - Completed the active-admin platform operations surface on the existing

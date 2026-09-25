@@ -1,5 +1,14 @@
 # FixLink — API Specification
 
+## Current implementation note
+
+This document contains the API contract and historical/planned route
+notes from the project stages. For the current release, verify every
+endpoint against the routers in `backend/src/` and the implemented route
+lists in `docs/CLIENT-UAT.md` and `docs/HANDOVER.md`. The current API uses
+`/api/v1`, standard success/error envelopes, server-side authorization and
+business isolation. The `/admin/settings` surface is not implemented.
+
 ## 1. API Base
 
 All API routes use:

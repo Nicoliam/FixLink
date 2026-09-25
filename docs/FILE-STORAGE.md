@@ -130,3 +130,42 @@ single seam for a future S3-compatible implementation: routes,
 services and the database schema do not change when the adapter is
 swapped. Cloud/object storage is NOT implemented in Stage 6F — no S3
 dependency, credentials or buckets exist.
+
+## 3. Current Stage 7D–Stage 12 storage coverage
+
+The local adapter also supports the current implementation's:
+
+- technician voice notes under `job-voice-notes/`, with a 10 MB service
+  limit and WebM, MP4/M4A, MP3, WAV and Ogg content signatures;
+- optional parts-request evidence photos under the image rules above;
+- protected verification and certificate document references under
+  `verification/` and `certificates/` when documents have been stored
+  through the current adapter.
+
+The current frontend has no profile-photo, portfolio, certificate or
+identity-verification upload form. Seed rows contain metadata and legacy
+file references but a fresh seed does not create matching binary files;
+seeded private downloads may therefore return not found until real files
+are provisioned through a supported process.
+
+All current downloads are authorized API responses. Job media, voice
+notes, parts photos and admin documents use private/no-cache response
+headers where implemented; they are not public static URLs. Active admins
+may access verification/certificate documents through protected routes,
+and document views are audited. Customer/provider/technician media access
+is limited to the owning job's authorised actors.
+
+### Production local-storage checklist
+
+- set `FILE_STORAGE_DIR` to a durable protected volume;
+- keep the directory outside the static web root;
+- restrict permissions to the API service account;
+- back up the directory together with MySQL metadata;
+- test authorised and unauthorised downloads after restore;
+- monitor disk capacity and permissions;
+- do not publish private documents or storage keys;
+- plan a migration to encrypted cloud/object storage if multi-instance or
+  geographic redundancy is required.
+
+Cloud/object storage remains future infrastructure. The current repository
+has no cloud bucket, S3 dependency or production object-storage adapter.

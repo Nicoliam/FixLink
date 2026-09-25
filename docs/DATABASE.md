@@ -807,12 +807,14 @@ stores client-supplied line math.
 future addition that must not break this column (additive table, e.g.
 `message_reads`).
 
-### 40.8 Seed password hashes are placeholders
+### 40.8 Seed password hashes are development-only bcrypt hashes
 
-Development seeds use scrypt hashes of the fictional password
-`FixLink-dev-001`. They exist only to prove "no plaintext" handling.
-Production authentication (later stage) standardises on bcrypt and its own
-hashing/verification service.
+Development seeds use bcrypt hashes of the fictional password
+`FixLink-dev-001`. They exist only to support isolated development/UAT
+accounts and prove that plaintext passwords are not stored. The seeded
+hashes are compatible with the current authentication implementation.
+They are not production credentials and must never be deployed to a
+production environment.
 
 ### 40.9 Migration and seed conventions
 
@@ -860,3 +862,13 @@ NEEDS_INFO / CANCELLED values. `job_approvals` (migration 006) is
 reused unchanged for the Stage 7F decision records
 (`request_type = PARTS`); `jobs` / `job_status_history` carry the
 IN_PROGRESS → AWAITING_PARTS → IN_PROGRESS moves.
+
+### 40.13 Refresh sessions and review-note length (migrations 012–013)
+
+Migration `012_refresh_sessions.sql` adds `refresh_tokens` for hashed,
+rotating and revocable opaque refresh sessions in MySQL deployments.
+Migration `013_parts_review_notes_length.sql` increases
+`parts_requests.review_notes` from 500 to 1000 characters to match the
+current backend validation. The versioned migrations are authoritative;
+the checked-in `database/schema/schema.sql` snapshot must be regenerated
+before it is used as a current no-data schema export.

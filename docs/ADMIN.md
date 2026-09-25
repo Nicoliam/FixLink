@@ -344,11 +344,16 @@ The implemented admin screens provide:
 - No platform settings, review moderation, job intervention, role
   management or technician-assignment deployment is included.
 
-## 13. Stage 10 boundary
+## 13. Current boundary after Stages 10–12
 
-Stage 9 is complete for the documented admin/platform-operations scope.
-Stage 10 is next and has not been started by this documentation update.
-Any Stage 10 scope must be specified and approved before implementation;
-this document does not claim settings, review moderation, job
-intervention, role management, technician assignment, payment processing
-or new notification contexts.
+Stage 9 completed the documented admin/platform-operations surface. Stage
+10 security hardening and Stage 11 full-system validation are recorded in
+`docs/SECURITY.md` and `docs/STAGE-11-FULL-SYSTEM-TEST-REPORT.md`.
+Stage 12 is client UAT and handover preparation; it does not add admin
+settings or other product features.
+
+The current Angular navigation/route includes `/admin/settings`, but it
+is a not-configured placeholder and no backend settings API exists. No
+settings, review moderation, job intervention, role management, technician
+assignment, payment processing or new admin notification contexts are
+claimed by this document.

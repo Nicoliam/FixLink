@@ -4,6 +4,15 @@
 
 This document defines the technical architecture of FixLink.
 
+## Current implementation note
+
+The implemented MVP uses an Angular web application, a Node.js/TypeScript
+REST API, MySQL 8 and a protected local filesystem adapter. The file and
+notification concepts below include the intended platform architecture;
+cloud/object storage, external notification channels and several product
+features remain future scope. For release-specific facts, use
+`docs/HANDOVER.md` and `docs/DEPLOYMENT.md`.
+
 The architecture must support:
 
 - Customer marketplace

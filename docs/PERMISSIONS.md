@@ -4,7 +4,15 @@
 
 This document defines FixLink access control.
 
-Frontend visibility is not security.
+## Current implementation note
+
+The permission sections contain both current implemented boundaries and
+broader product-direction capabilities. For UAT and handover, the
+authoritative current summary is `docs/HANDOVER.md` and the exact API
+route/role enforcement. In particular, the current frontend does not
+implement customer review submission, quote decline, messaging, saved
+providers, provider profile/certificate/portfolio management, or admin
+settings. Frontend visibility is not security.
 
 All permissions must be enforced by the backend.
 

@@ -48,6 +48,25 @@ suspected; it was not needed for this fix. If `~/.npm` permission
 errors appear, fix ownership first (`chown -R $(id -u):$(id -g) ~/.npm`)
 rather than using sudo npm.
 
+## Current runtime variables
+
+The backend reads the exact variables documented in `docs/DEPLOYMENT.md`:
+`NODE_ENV`, `PORT`, `AUTH_STORE`, `DB_HOST`, `DB_PORT`, `DB_USER`,
+`DB_PASSWORD`, `DB_NAME`, `JWT_ACCESS_SECRET`,
+`JWT_ACCESS_TTL_SECONDS`, `REFRESH_TOKEN_TTL_SECONDS`, `BCRYPT_COST`,
+`CORS_ORIGIN` and `FILE_STORAGE_DIR`.
+
+For local development, use the fictional values in `.env.example` and
+`backend/.env.example`. `AUTH_STORE=mysql` is the normal application
+mode; `AUTH_STORE=memory` is reserved for isolated tests or memory-mode
+development. Production must set `NODE_ENV=production`, a strong random
+`JWT_ACCESS_SECRET` of at least 32 characters, and a production database
+password. The example Docker Compose values are not production secrets.
+
+The Angular production build uses same-origin `/api/v1`; the Angular
+development build uses `http://localhost:3000/api/v1`. No additional
+frontend runtime secret is defined by the current implementation.
+
 ## Notes
 
 - `.angular/` cache is gitignored; safe to delete when the dev server

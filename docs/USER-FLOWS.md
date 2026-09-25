@@ -1,5 +1,14 @@
 # FixLink — User Flows
 
+## Current implementation note
+
+This document records the broader product flow history and planned user
+journeys alongside stage implementation notes. The current UAT and
+handover sources are `docs/CLIENT-UAT.md` and `docs/HANDOVER.md`.
+Workflows not marked as implemented there are not treated as current UI
+capabilities, including review submission, quote decline, messaging,
+profile/certificate/portfolio management and admin settings.
+
 ## 1. Purpose
 
 This document defines the main FixLink user journeys.

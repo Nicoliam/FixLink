@@ -298,21 +298,15 @@ If a visual implementation decision conflicts with security, permissions, archit
 
 ## 14. Current Stage
 
-**Stage 3 — Marketplace UI foundation**
+**Stage 12 — Client UAT and handover preparation**
 
-Immediate implementation priority:
+This mapping originally documented the Stage 3 marketplace UI foundation.
+The current implementation has since progressed through the marketplace,
+provider, business, technician, notification and admin surfaces. The
+approved Stitch/Oceanic design remains the visual source of truth; Stage
+12 changes documentation and deployment preparation only.
 
-1. Establish shared design-system components.
-2. Establish the marketplace layout.
-3. Implement the homepage.
-4. Implement marketplace search.
-5. Implement professional profile.
-6. Implement Request a Job.
-7. Connect screens to the backend API as endpoints are implemented.
-8. Add tests for each completed feature.
-9. Keep documentation updated as implementation progresses.
-
-No additional product functionality should be introduced solely because it appears visually useful in the Stitch design.
+No additional product functionality should be introduced solely because it appears visually useful in the Stitch design. Current functionality and known limitations are recorded in `docs/HANDOVER.md`, `docs/CLIENT-UAT.md` and `docs/PRODUCTION-CHECKLIST.md`.
 
 ---
 

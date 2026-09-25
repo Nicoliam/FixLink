@@ -62,13 +62,15 @@ so events are delivered exactly once and the bus is never drained
 for delivery. The header mapping note in `parts-request-events.ts`
 records the final reference decision (job-navigable rows).
 
-## What remains after Stage 8
+## What remains after Stage 8 and Stage 9
 
-1. Admin/platform notification contexts (Stage 9) — the
-   recipient-scoping and reference vocabulary already support
-   them; only new event types and admin surfacing are needed.
-2. Future delivery channels (email/SMS/WhatsApp/push) and
-   idempotent retry if delivery retries are introduced — the
-   central service is the single place to add them.
-3. Extend the seam with review and dispute event types as those
-   workflows land.
+1. Admin/platform notification contexts were not added by the current
+   Stage 9 admin implementation. They remain future scope if approved.
+2. Future delivery channels (email/SMS/WhatsApp/push) and idempotent retry
+   if delivery retries are introduced — the central service is the single
+   place to add them.
+3. Extend the seam with review and dispute event types as those workflows
+   land.
+
+Stage 12 is documentation and handover preparation only; it does not add
+notification channels or admin notification contexts.
