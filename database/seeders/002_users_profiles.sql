@@ -1,21 +1,21 @@
 -- FixLink seeder 002 — Users, roles, profiles, businesses, technicians.
 -- ALL data is fictional (example.co.za emails, 555-range phones). No real people.
--- password_hash values are scrypt hashes of the fictional dev password
--- 'FixLink-dev-001'. Production authentication (Stage 5+) will use bcrypt.
+-- password_hash values are bcrypt hashes of the fictional dev password
+-- 'FixLink-dev-001'.
 
 INSERT INTO `users` (`id`, `email`, `phone`, `password_hash`, `status`, `email_verified_at`, `phone_verified_at`, `created_at`) VALUES
-  (1, 'admin@fixlink.example.co.za', '+27825550100', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-08-01 08:00:00', '2026-08-01 08:05:00', '2026-08-01 08:00:00'),
-  (2, 'naledi.dlamini@example.co.za', '+27825550101', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-01 09:00:00', NULL, '2026-09-01 09:00:00'),
-  (3, 'pieter.vdm@example.co.za', '+27825550102', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-02 10:00:00', NULL, '2026-09-02 10:00:00'),
-  (4, 'aisha.patel@example.co.za', '+27825550103', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-03 11:00:00', NULL, '2026-09-03 11:00:00'),
-  (5, 'sipho.ndlovu@example.co.za', '+27825550104', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-01 12:00:00', '2026-09-05 12:00:00', '2026-09-01 12:00:00'),
-  (6, 'johan.botha@example.co.za', '+27825550105', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-01 12:30:00', NULL, '2026-09-01 12:30:00'),
-  (7, 'maria.santos@example.co.za', '+27825550106', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-04 08:00:00', NULL, '2026-09-04 08:00:00'),
-  (8, 'thabo.maseko@example.co.za', '+27825550107', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-08-20 09:00:00', '2026-08-20 09:10:00', '2026-08-20 09:00:00'),
-  (9, 'lerato.khumalo@example.co.za', '+27825550108', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-08-21 09:00:00', NULL, '2026-08-21 09:00:00'),
-  (10, 'bongani.zulu@example.co.za', '+27825550109', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-08-22 09:00:00', NULL, '2026-08-22 09:00:00'),
-  (11, 'karin.meyer@example.co.za', '+27825550110', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-08-23 09:00:00', NULL, '2026-08-23 09:00:00'),
-  (12, 'david.naidoo@example.co.za', '+27825550111', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-10 09:00:00', NULL, '2026-09-10 09:00:00');
+  (1, 'admin@fixlink.example.co.za', '+27825550100', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-01 08:00:00', '2026-08-01 08:05:00', '2026-08-01 08:00:00'),
+  (2, 'naledi.dlamini@example.co.za', '+27825550101', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 09:00:00', NULL, '2026-09-01 09:00:00'),
+  (3, 'pieter.vdm@example.co.za', '+27825550102', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-02 10:00:00', NULL, '2026-09-02 10:00:00'),
+  (4, 'aisha.patel@example.co.za', '+27825550103', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-03 11:00:00', NULL, '2026-09-03 11:00:00'),
+  (5, 'sipho.ndlovu@example.co.za', '+27825550104', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 12:00:00', '2026-09-05 12:00:00', '2026-09-01 12:00:00'),
+  (6, 'johan.botha@example.co.za', '+27825550105', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 12:30:00', NULL, '2026-09-01 12:30:00'),
+  (7, 'maria.santos@example.co.za', '+27825550106', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-04 08:00:00', NULL, '2026-09-04 08:00:00'),
+  (8, 'thabo.maseko@example.co.za', '+27825550107', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-20 09:00:00', '2026-08-20 09:10:00', '2026-08-20 09:00:00'),
+  (9, 'lerato.khumalo@example.co.za', '+27825550108', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-21 09:00:00', NULL, '2026-08-21 09:00:00'),
+  (10, 'bongani.zulu@example.co.za', '+27825550109', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-22 09:00:00', NULL, '2026-08-22 09:00:00'),
+  (11, 'karin.meyer@example.co.za', '+27825550110', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-23 09:00:00', NULL, '2026-08-23 09:00:00'),
+  (12, 'david.naidoo@example.co.za', '+27825550111', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-10 09:00:00', NULL, '2026-09-10 09:00:00');
 
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
   (1, 6),

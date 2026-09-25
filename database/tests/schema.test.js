@@ -307,6 +307,12 @@ describe('seeded relationships', () => {
     }
   });
 
+  it('uses bcrypt-compatible password hashes for seeded users', async () => {
+    const [rows] = await db.query('SELECT `password_hash` FROM `users`');
+    assert.ok(rows.length > 0);
+    for (const row of rows) assert.match(row.password_hash, /^\$2[aby]\$\d{2}\$/);
+  });
+
   it('links a marketplace job across customer, professional and service', async () => {
     const [rows] = await db.query(
       `SELECT j.reference, j.source, j.status, c.first_name, p.display_name, s.name AS service

@@ -1,7 +1,7 @@
 -- FixLink seeder 005 — Stage 6A marketplace discovery data.
 -- ALL data is fictional (example.co.za emails, 555-range phones). No real people.
 -- password_hash values reuse the dev placeholder convention from seeder 002
--- (scrypt hash of the fictional dev password 'FixLink-dev-001').
+-- (bcrypt hash of the fictional dev password 'FixLink-dev-001').
 --
 -- Purpose: enough Joburg-North providers (Fourways, Sandton, Bryanston,
 -- Randburg, Midrand) to exercise search, location filters, provider-type
@@ -11,10 +11,10 @@
 -- to prove the public API hides them.
 
 INSERT INTO `users` (`id`, `email`, `phone`, `password_hash`, `status`, `email_verified_at`, `created_at`) VALUES
-  (13, 'kabelo.mahlangu@example.co.za', '+27825550113', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-05 08:00:00', '2026-09-05 08:00:00'),
-  (14, 'ayanda.sithole@example.co.za', '+27825550114', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-06 08:00:00', '2026-09-06 08:00:00'),
-  (15, 'pieter.jacobs@example.co.za', '+27825550115', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-18 08:00:00', '2026-09-18 08:00:00'),
-  (16, 'thandi.khumalo@example.co.za', '+27825550116', 'scrypt$0fef142001574ba7be28cc2bf5c7f8f3$3f709decacec4a523df443dca0eb849449a96e088b27a6c8b926453436c41b650f37b2108a901be941b76f0f3a65af41435f5c369ad615e805deda23e84bed97', 'ACTIVE', '2026-09-07 08:00:00', '2026-09-07 08:00:00');
+  (13, 'kabelo.mahlangu@example.co.za', '+27825550113', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-05 08:00:00', '2026-09-05 08:00:00'),
+  (14, 'ayanda.sithole@example.co.za', '+27825550114', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-06 08:00:00', '2026-09-06 08:00:00'),
+  (15, 'pieter.jacobs@example.co.za', '+27825550115', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-18 08:00:00', '2026-09-18 08:00:00'),
+  (16, 'thandi.khumalo@example.co.za', '+27825550116', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-07 08:00:00', '2026-09-07 08:00:00');
 
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
   (13, 2), (14, 2), (15, 2),
