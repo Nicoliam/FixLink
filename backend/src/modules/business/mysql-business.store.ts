@@ -859,7 +859,7 @@ export class MysqlBusinessStore implements BusinessStore {
   ): Promise<{ items: BusinessCustomerDto[]; total: number }> {
     const needle = search === null ? null : `%${escapeLike(search)}%`;
     const scope = '`business_id` = ? AND `user_id` IS NULL AND `deleted_at` IS NULL';
-    const searchSql = needle === null ? '' : ' AND (`first_name` LIKE ? ESCAPE \'\\\' OR `last_name` LIKE ? ESCAPE \'\\\' OR `email` LIKE ? ESCAPE \'\\\' OR `phone` LIKE ? ESCAPE \'\\\')';
+    const searchSql = needle === null ? '' : " AND (`first_name` LIKE ? ESCAPE '\\\\' OR `last_name` LIKE ? ESCAPE '\\\\' OR `email` LIKE ? ESCAPE '\\\\' OR `phone` LIKE ? ESCAPE '\\\\')";
     const countParams = needle === null ? [businessId] : [businessId, needle, needle, needle, needle];
     const [countRows] = await this.pool.query<RowDataPacket[]>(
       `SELECT COUNT(*) AS \`total\` FROM \`customer_profiles\` WHERE ${scope}${searchSql}`,
@@ -1042,7 +1042,7 @@ export class MysqlBusinessStore implements BusinessStore {
       params.push(toDbDateTime(new Date(query.to)));
     }
     if (query.search !== null) {
-      filter += ' AND (j.`reference` LIKE ? ESCAPE \'\\\' OR j.`description` LIKE ? ESCAPE \'\\\' OR j.`title` LIKE ? ESCAPE \'\\\' OR cp.`first_name` LIKE ? ESCAPE \'\\\' OR cp.`last_name` LIKE ? ESCAPE \'\\\' OR cp.`email` LIKE ? ESCAPE \'\\\' OR cp.`phone` LIKE ? ESCAPE \'\\\' OR s.`name` LIKE ? ESCAPE \'\\\')';
+      filter += " AND (j.`reference` LIKE ? ESCAPE '\\\\' OR j.`description` LIKE ? ESCAPE '\\\\' OR j.`title` LIKE ? ESCAPE '\\\\' OR cp.`first_name` LIKE ? ESCAPE '\\\\' OR cp.`last_name` LIKE ? ESCAPE '\\\\' OR cp.`email` LIKE ? ESCAPE '\\\\' OR cp.`phone` LIKE ? ESCAPE '\\\\' OR s.`name` LIKE ? ESCAPE '\\\\')";
       const needle = `%${escapeLike(query.search)}%`;
       params.push(needle, needle, needle, needle, needle, needle, needle, needle);
     }
