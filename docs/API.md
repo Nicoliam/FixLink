@@ -106,8 +106,24 @@ Rules:
 - Duplicate email returns `409 EMAIL_EXISTS`. Validation failures return
   `422 VALIDATION_ERROR`. Success returns `201` with the safe user
   (no password or hash fields).
+- `users` has a unique key on `phone` as well as on `email`. A duplicate
+  phone number returns `409 CONFLICT` with a message naming the phone number
+  — it is never reported as a duplicate email, because that would block a
+  legitimate registration behind a message telling the user to log in with an
+  account that does not exist. If the database driver rejects an insert
+  without naming the violated key, the response is `409 CONFLICT` with
+  "An account with this email or phone number already exists."
+- Rate limited to 10 attempts per IP per 15 minutes; further attempts return
+  `429 RATE_LIMITED`.
 - Registration creates the `users` row and the `user_roles` assignment only.
   Customer/professional/business profile creation belongs to a later stage.
+
+Errors raised before a controller runs (malformed JSON, oversized body) are
+answered by the global error handler with the same envelope rather than an
+HTML error page: `400 VALIDATION_ERROR` for unparseable JSON and
+`413 VALIDATION_ERROR` for a body over 100 kB. Unexpected server errors
+return `500 INTERNAL_ERROR` and are logged server-side with the error name
+only — never a stack trace, SQL text or request body.
 
 ### Login
 

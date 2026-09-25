@@ -22,25 +22,49 @@ frontend, backend, database and testing implementation.
 
 ## 2.1 Customer Registration
 
+Registration is a two-step process at `/register`.
+
+Step 1 — account type
+
 Customer
 ↓
-Register
+Open /register
 ↓
-Enter name
+Step 1: "I am joining as"
 ↓
-Enter phone
+Select one account type
+  - Customer
+  - Professional
+  - Business owner
 ↓
+Continue
+
+Step 1 shows only the account types. The email, phone and password fields are
+not rendered until an account type has been selected. The selection maps to
+the backend roles CUSTOMER, PROFESSIONAL and BUSINESS_OWNER. ADMIN,
+BUSINESS_MANAGER and TECHNICIAN are never offered.
+
+Step 2 — account details
+
 Enter email
 ↓
-Create password
+Enter phone (optional)
 ↓
-Submit registration
+Enter password
 ↓
-Verify email/phone where required
+Confirm password
 ↓
-Account created
+Create account
+↓
+Account created (PENDING)
+↓
+Log in
 ↓
 Customer dashboard
+
+The selected account type is retained when moving between the steps, so Back
+returns to step 1 with the chosen type still highlighted and allows it to be
+changed. Step 2 values entered before pressing Back are also retained.
 
 
 ## 2.2 Customer Login

@@ -14,9 +14,32 @@ export interface ServiceResult<T> {
   data?: T;
 }
 
-function isDuplicateEmail(err: unknown): boolean {
-  const code = (err as { code?: unknown } | null)?.code;
-  return code === 'ER_DUP_ENTRY';
+/**
+ * Which unique key an `ER_DUP_ENTRY` violated.
+ *
+ * `users` has two unique keys — `uq_users_email` and `uq_users_phone` — so a
+ * plain `ER_DUP_ENTRY` is NOT proof of a duplicate email. Reporting a phone
+ * collision as `EMAIL_EXISTS` blocks a legitimate registration behind a
+ * message that tells the user to log in with an account that does not exist.
+ *
+ * The mysql2 driver exposes the key name on the error, so classify precisely
+ * and fall back to `null` (unidentifiable) when the driver did not supply it.
+ */
+export type DuplicateKeyKind = 'email' | 'phone' | null;
+
+export function duplicateKeyKind(err: unknown): DuplicateKeyKind {
+  const e = err as { code?: unknown; sqlMessage?: unknown } | null;
+  if (!e || e.code !== 'ER_DUP_ENTRY') return null;
+  // "Duplicate entry 'x' for key 'users.uq_users_phone'"
+  const message = typeof e.sqlMessage === 'string' ? e.sqlMessage : '';
+  if (/uq_users_phone|users\.phone|\bphone\b/i.test(message)) return 'phone';
+  if (/uq_users_email|users\.email|\bemail\b/i.test(message)) return 'email';
+  return null;
+}
+
+/** True for any duplicate-entry violation, whether or not the key is known. */
+function isDuplicateEntry(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === 'ER_DUP_ENTRY';
 }
 
 export class AuthService {
@@ -52,9 +75,28 @@ export class AuthService {
       const roles = await this.users.getRoles(created.id);
       return { status: 201, data: { user: this.users.toSafeUser(created, roles) } };
     } catch (err) {
-      if (isDuplicateEmail(err)) {
-        // Race-safe: unique constraint won the check-then-insert race.
+      // Race-safe: a unique constraint won the check-then-insert race.
+      // Report the constraint that actually fired so the user is not told
+      // their email is taken when it is their phone number.
+      const key = duplicateKeyKind(err);
+      if (key === 'phone') {
+        return {
+          status: 409,
+          code: 'CONFLICT',
+          message: 'This phone number is already registered to another account.',
+        };
+      }
+      if (key === 'email') {
         return { status: 409, code: 'EMAIL_EXISTS', message: 'An account with this email already exists.' };
+      }
+      if (isDuplicateEntry(err)) {
+        // A unique constraint fired but the driver did not name the key.
+        // Answer honestly rather than guessing (or surfacing a 500).
+        return {
+          status: 409,
+          code: 'CONFLICT',
+          message: 'An account with this email or phone number already exists.',
+        };
       }
       throw err;
     }

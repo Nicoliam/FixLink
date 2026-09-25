@@ -12,136 +12,123 @@
       <p class="fl-success-text">
         Your account for <strong>{{ registeredEmail() }}</strong> is ready. Log in to get started.
       </p>
-      <a
-        class="fl-btn fl-btn-primary fl-btn-block"
-        routerLink="/login"
-        [queryParams]="{ email: registeredEmail() }"
-        data-testid="register-continue-login"
-      >
+      <a class="fl-btn fl-btn-primary fl-btn-block" routerLink="/login"
+        [queryParams]="{ email: registeredEmail() }" data-testid="register-continue-login">
         Continue to login
       </a>
     </div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="fl-form">
-      @if (apiError()) {
-        <div class="fl-alert fl-alert-error" role="alert" data-testid="register-error">
-          {{ apiError() }}
-        </div>
-      }
+    @if (onStepOne) {
+      <!-- STEP 1 — account type only. No email/password fields are rendered. -->
+      <form [formGroup]="roleForm" (ngSubmit)="continueToDetails()" novalidate class="fl-form">
+        <p class="fl-step-hint" data-testid="register-step-indicator">Step 1 of 2</p>
 
-      <fieldset class="fl-field">
-        <legend class="fl-label">I am joining as</legend>
-        <div class="fl-role-grid" role="radiogroup" aria-label="Account type">
-          @for (option of roleOptions; track option.value) {
-            <label class="fl-role-card" [class.fl-role-card-selected]="role.value === option.value">
-              <input
-                type="radio"
-                class="fl-visually-hidden"
-                formControlName="role"
-                [value]="option.value"
-                [attr.data-testid]="'register-role-' + option.value"
-              />
-              <span class="fl-role-label">{{ option.label }}</span>
-              <span class="fl-role-description">{{ option.description }}</span>
-            </label>
+        <fieldset class="fl-field">
+          <legend class="fl-label">I am joining as</legend>
+          <div class="fl-role-grid" role="radiogroup" aria-label="Account type">
+            @for (option of roleOptions; track option.value) {
+              <label class="fl-role-card" [class.fl-role-card-selected]="role.value === option.value">
+                <input type="radio" class="fl-visually-hidden" formControlName="role"
+                  [value]="option.value" [attr.data-testid]="'register-role-' + option.value" />
+                <span class="fl-role-label">{{ option.label }}</span>
+                <span class="fl-role-description">{{ option.description }}</span>
+              </label>
+            }
+          </div>
+          @if (role.touched && role.hasError('required')) {
+            <p class="fl-field-error" role="alert" data-testid="register-role-error">
+              Select an account type to continue.
+            </p>
+          }
+        </fieldset>
+
+        <button type="submit" class="fl-btn fl-btn-primary fl-btn-block"
+          data-testid="register-continue">
+          Continue
+        </button>
+      </form>
+    } @else {
+      <!-- STEP 2 — account details. The selected account type is shown and retained. -->
+      <form [formGroup]="detailsForm" (ngSubmit)="submit()" novalidate class="fl-form">
+        <p class="fl-step-hint" data-testid="register-step-indicator">Step 2 of 2</p>
+
+        <p class="fl-step-summary">
+          Joining as <strong data-testid="register-selected-role">{{ selectedRoleLabel }}</strong>
+        </p>
+
+        @if (apiError()) {
+          <div class="fl-alert fl-alert-error" role="alert" data-testid="register-error">
+            {{ apiError() }}
+          </div>
+        }
+
+        <div class="fl-field">
+          <label class="fl-label" for="register-email">Email address</label>
+          <input id="register-email" class="fl-input" type="email" autocomplete="email"
+            placeholder="you@example.co.za" formControlName="email" data-testid="register-email"
+            [attr.aria-invalid]="email.invalid && email.touched"
+            [attr.aria-describedby]="email.invalid && email.touched ? 'register-email-error' : null" />
+          @if (email.touched && email.hasError('required')) {
+            <p id="register-email-error" class="fl-field-error" role="alert">Email address is required.</p>
+          } @else if (email.touched && email.hasError('email')) {
+            <p id="register-email-error" class="fl-field-error" role="alert">Enter a valid email address.</p>
           }
         </div>
-      </fieldset>
 
-      <div class="fl-field">
-        <label class="fl-label" for="register-email">Email address</label>
-        <input
-          id="register-email"
-          class="fl-input"
-          type="email"
-          autocomplete="email"
-          placeholder="you@example.co.za"
-          formControlName="email"
-          [attr.aria-invalid]="email.invalid && email.touched"
-          [attr.aria-describedby]="email.invalid && email.touched ? 'register-email-error' : null"
-        />
-        @if (email.touched && email.hasError('required')) {
-          <p id="register-email-error" class="fl-field-error" role="alert">Email address is required.</p>
-        } @else if (email.touched && email.hasError('email')) {
-          <p id="register-email-error" class="fl-field-error" role="alert">Enter a valid email address.</p>
-        }
-      </div>
+        <div class="fl-field">
+          <label class="fl-label" for="register-phone">Phone number <span class="fl-optional">(optional)</span></label>
+          <input id="register-phone" class="fl-input" type="tel" autocomplete="tel"
+            placeholder="+27 82 555 0101" formControlName="phone" data-testid="register-phone"
+            [attr.aria-invalid]="phone.invalid && phone.touched"
+            [attr.aria-describedby]="phone.invalid && phone.touched ? 'register-phone-error' : null" />
+          @if (phone.touched && phone.hasError('pattern')) {
+            <p id="register-phone-error" class="fl-field-error" role="alert">Enter a valid phone number.</p>
+          }
+        </div>
 
-      <div class="fl-field">
-        <label class="fl-label" for="register-phone">Phone number <span class="fl-optional">(optional)</span></label>
-        <input
-          id="register-phone"
-          class="fl-input"
-          type="tel"
-          autocomplete="tel"
-          placeholder="+27 82 555 0101"
-          formControlName="phone"
-          [attr.aria-invalid]="phone.invalid && phone.touched"
-          [attr.aria-describedby]="phone.invalid && phone.touched ? 'register-phone-error' : null"
-        />
-        @if (phone.touched && phone.hasError('pattern')) {
-          <p id="register-phone-error" class="fl-field-error" role="alert">Enter a valid phone number.</p>
-        }
-      </div>
+        <div class="fl-field">
+          <label class="fl-label" for="register-password">Password</label>
+          <input id="register-password" class="fl-input" type="password" autocomplete="new-password"
+            placeholder="At least 8 characters" formControlName="password" data-testid="register-password"
+            [attr.aria-invalid]="password.invalid && password.touched"
+            [attr.aria-describedby]="password.invalid && password.touched ? 'register-password-error' : null" />
+          @if (password.touched && password.hasError('required')) {
+            <p id="register-password-error" class="fl-field-error" role="alert">Password is required.</p>
+          } @else if (password.touched && (password.hasError('minlength') || password.hasError('maxlength'))) {
+            <p id="register-password-error" class="fl-field-error" role="alert">
+              Password must be between 8 and 128 characters.
+            </p>
+          }
+        </div>
 
-      <div class="fl-field">
-        <label class="fl-label" for="register-password">Password</label>
-        <input
-          id="register-password"
-          class="fl-input"
-          type="password"
-          autocomplete="new-password"
-          placeholder="At least 8 characters"
-          formControlName="password"
-          [attr.aria-invalid]="password.invalid && password.touched"
-          [attr.aria-describedby]="password.invalid && password.touched ? 'register-password-error' : null"
-        />
-        @if (password.touched && password.hasError('required')) {
-          <p id="register-password-error" class="fl-field-error" role="alert">Password is required.</p>
-        } @else if (password.touched && (password.hasError('minlength') || password.hasError('maxlength'))) {
-          <p id="register-password-error" class="fl-field-error" role="alert">
-            Password must be between 8 and 128 characters.
-          </p>
-        }
-      </div>
+        <div class="fl-field">
+          <label class="fl-label" for="register-confirm">Confirm password</label>
+          <input id="register-confirm" class="fl-input" type="password" autocomplete="new-password"
+            placeholder="Repeat your password" formControlName="confirmPassword" data-testid="register-confirm"
+            [attr.aria-invalid]="(confirmPassword.invalid || detailsForm.hasError('passwordsMismatch')) && confirmPassword.touched"
+            [attr.aria-describedby]="(confirmPassword.invalid || detailsForm.hasError('passwordsMismatch')) && confirmPassword.touched ? 'register-confirm-error' : null" />
+          @if (confirmPassword.touched && confirmPassword.hasError('required')) {
+            <p id="register-confirm-error" class="fl-field-error" role="alert">Please confirm your password.</p>
+          } @else if (confirmPassword.touched && detailsForm.hasError('passwordsMismatch')) {
+            <p id="register-confirm-error" class="fl-field-error" role="alert">Passwords do not match.</p>
+          }
+        </div>
 
-      <div class="fl-field">
-        <label class="fl-label" for="register-confirm">Confirm password</label>
-        <input
-          id="register-confirm"
-          class="fl-input"
-          type="password"
-          autocomplete="new-password"
-          placeholder="Repeat your password"
-          formControlName="confirmPassword"
-          [attr.aria-invalid]="(confirmPassword.invalid || form.hasError('passwordsMismatch')) && confirmPassword.touched"
-          [attr.aria-describedby]="
-            (confirmPassword.invalid || form.hasError('passwordsMismatch')) && confirmPassword.touched
-              ? 'register-confirm-error'
-              : null
-          "
-        />
-        @if (confirmPassword.touched && confirmPassword.hasError('required')) {
-          <p id="register-confirm-error" class="fl-field-error" role="alert">Please confirm your password.</p>
-        } @else if (confirmPassword.touched && form.hasError('passwordsMismatch')) {
-          <p id="register-confirm-error" class="fl-field-error" role="alert">Passwords do not match.</p>
-        }
-      </div>
+        <button type="submit" class="fl-btn fl-btn-primary fl-btn-block"
+          [disabled]="isSubmitting()" [attr.aria-busy]="isSubmitting()" data-testid="register-submit">
+          {{ isSubmitting() ? 'Creating account…' : 'Create account' }}
+        </button>
 
-      <button
-        type="submit"
-        class="fl-btn fl-btn-primary fl-btn-block"
-        [disabled]="isSubmitting()"
-        [attr.aria-busy]="isSubmitting()"
-        data-testid="register-submit"
-      >
-        {{ isSubmitting() ? 'Creating account…' : 'Create account' }}
-      </button>
+        <button type="button" class="fl-btn fl-btn-secondary fl-btn-block"
+          [disabled]="isSubmitting()" (click)="back()" data-testid="register-back">
+          Back
+        </button>
 
-      <p class="fl-form-note">
-        By creating an account you agree to use FixLink for requesting and quoting home services.
-        Payment is arranged directly with your professional.
-      </p>
-    </form>
+        <p class="fl-form-note">
+          By creating an account you agree to use FixLink for requesting and quoting home services.
+          Payment is arranged directly with your professional.
+        </p>
+      </form>
+    }
   }
 </app-auth-shell>

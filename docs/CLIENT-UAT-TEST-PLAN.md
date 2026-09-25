@@ -13,9 +13,16 @@ Use the test accounts in [`CLIENT-UAT.md`](CLIENT-UAT.md). Never record password
 | 1 | Open the login page | Login form is reachable and guest-only |  |  |  |
 | 2 | Log in with a valid seeded customer | Customer session is created and account page is shown |  |  |  |
 | 3 | Log in with an invalid password | Safe generic error is shown and no session is created |  |  |  |
-| 4 | Register a customer | Customer account is created and the user can log in |  |  |  |
+| 4 | Register a customer | Step 1 shows only the account types; after selecting Customer and continuing, the details step creates the account and the user can log in |  |  |  |
 | 5 | Register a professional | Professional registration succeeds without privileged-role self-assignment |  |  |  |
-| 6 | Attempt to self-register as ADMIN, TECHNICIAN, or BUSINESS_MANAGER | Registration is rejected |  |  |  |
+| 6 | Attempt to self-register as ADMIN, TECHNICIAN, or BUSINESS_MANAGER | Those options are not offered at all; a role sent directly to the API is rejected |  |  |  |
+| 6a | Open `/register` | Step 1 shows only "I am joining as" and Continue; no email or password fields are visible |  |  |  |
+| 6b | Press Continue with no account type selected | The user stays on step 1 and is told to select an account type |  |  |  |
+| 6c | Select a type, continue, then press Back | Step 1 is shown again with the same type still selected, and it can be changed |  |  |  |
+| 6d | Enter a different password in Confirm password | Submission is blocked with "Passwords do not match" |  |  |  |
+| 6e | Enter an invalid email address | Submission is blocked with a format error |  |  |  |
+| 6f | Register with an email that is already registered | A clear "account with this email already exists" message is shown |  |  |  |
+| 6g | Register a second account using a phone number already on another account | A clear message naming the phone number is shown, and does NOT claim the email is taken |  |  |  |
 | 7 | Refresh a protected page while logged in | Session is restored where the token remains valid |  |  |  |
 | 8 | Log out | Local session is cleared and protected pages are no longer accessible |  |  |  |
 | 9 | Use a suspended account | Account is rejected by the backend |  |  |  |

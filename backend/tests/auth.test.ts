@@ -14,6 +14,8 @@ import type { Express } from 'express';
 import { createApp } from '../src/app';
 import { MemoryUserRepository } from '../src/modules/auth/memory-user.repository';
 import { MemoryRefreshStore } from '../src/modules/auth/refresh.store';
+import { duplicateKeyKind } from '../src/modules/auth/auth.service';
+import { toSafeUser, type UserRepository } from '../src/modules/users/user.repository';
 import { signAccessToken } from '../src/utils/tokens';
 import { verifyPassword } from '../src/utils/password';
 import { isStrongProductionSecret } from '../src/config/env';
@@ -144,6 +146,102 @@ describe('POST /api/v1/auth/register', () => {
     assert.match(stored.passwordHash, /^\$2[aby]\$/);
     assert.equal(await verifyPassword(password, stored.passwordHash), true);
     assert.equal(await verifyPassword('wrong-password', stored.passwordHash), false);
+  });
+});
+
+describe('POST /api/v1/auth/register — unique constraint classification', () => {
+  /**
+   * `users` has two unique keys. The MySQL repository surfaces a duplicate as
+   * ER_DUP_ENTRY plus the key name, so the endpoint can report the constraint
+   * that actually fired instead of always blaming the email.
+   */
+  function dupEntryError(key: string, value: string): Error {
+    const err = new Error(`Duplicate entry '${value}' for key 'users.${key}'`) as Error & { code?: string; sqlMessage?: string };
+    err.code = 'ER_DUP_ENTRY';
+    err.sqlMessage = `Duplicate entry '${value}' for key 'users.${key}'`;
+    return err;
+  }
+
+  /** Repository whose create() always fails with the given driver error. */
+  function repoFailingWith(err: Error): UserRepository {
+    return {
+      findByEmail: async () => null,
+      findById: async () => null,
+      create: async () => {
+        throw err;
+      },
+      setRoles: async () => undefined,
+      getRoles: async () => [],
+      listAdminUsers: async () => ({ items: [], total: 0, page: 1, pageSize: 20 }),
+      touchLogin: async () => undefined,
+      setStatus: async () => undefined,
+      toSafeUser: (user, roles) => toSafeUser(user, roles),
+    };
+  }
+
+  function appWith(repo: UserRepository): Express {
+    return createApp({ users: repo, refreshStore: new MemoryRefreshStore() });
+  }
+
+  it('reports a duplicate PHONE as 409 CONFLICT, not a duplicate email', async () => {
+    const app = appWith(repoFailingWith(dupEntryError('uq_users_phone', '+27825550101')));
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'fresh.email@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      phone: '+27825550101',
+    });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'CONFLICT');
+    assert.match(res.body.error.message, /phone number is already registered/i);
+    // The user must NOT be told their email is taken.
+    assert.doesNotMatch(res.body.error.message, /email already exists/i);
+  });
+
+  it('still reports a duplicate EMAIL as 409 EMAIL_EXISTS', async () => {
+    const app = appWith(repoFailingWith(dupEntryError('uq_users_email', 'race@example.co.za')));
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'race@example.co.za',
+      password: 'Str0ngPassw0rd!',
+    });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error.code, 'EMAIL_EXISTS');
+  });
+
+  it('answers 409 (never 500) when the driver does not name the violated key', async () => {
+    const anonymousDup = Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY' });
+    const app = appWith(repoFailingWith(anonymousDup));
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'unknown.key@example.co.za',
+      password: 'Str0ngPassw0rd!',
+    });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error.code, 'CONFLICT');
+    assert.match(res.body.error.message, /email or phone number already exists/i);
+  });
+
+  it('classifies duplicate keys correctly and ignores other errors', () => {
+    assert.equal(duplicateKeyKind(dupEntryError('uq_users_phone', '+27')), 'phone');
+    assert.equal(duplicateKeyKind(dupEntryError('uq_users_email', 'a@b.co.za')), 'email');
+    assert.equal(duplicateKeyKind(Object.assign(new Error('x'), { code: 'ER_DUP_ENTRY' })), null);
+    assert.equal(duplicateKeyKind(new Error('connection lost')), null);
+    assert.equal(duplicateKeyKind(null), null);
+  });
+
+  it('never leaks driver internals to the client on an unexpected failure', async () => {
+    const app = appWith(
+      repoFailingWith(Object.assign(new Error('ER_ACCESS_DENIED: user@host SELECT'), { code: 'ER_ACCESS_DENIED' })),
+    );
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'boom@example.co.za',
+      password: 'Sup3rSecretPw!',
+    });
+    assert.equal(res.status, 500);
+    assert.equal(res.body.error.code, 'INTERNAL_ERROR');
+    const text = JSON.stringify(res.body);
+    assert.doesNotMatch(text, /ER_ACCESS_DENIED/);
+    assert.doesNotMatch(text, /Sup3rSecretPw!/);
+    assert.doesNotMatch(text, /SELECT/);
   });
 });
 
@@ -322,5 +420,36 @@ describe('sensitive data is never returned', () => {
     }
     // And the raw JSON contains no suspicious substrings either.
     assert.ok(!JSON.stringify(bodies).toLowerCase().includes('password_hash'));
+  });
+});
+
+describe('standard error envelope for non-controller failures', () => {
+  let app: Express;
+  beforeEach(() => {
+    ({ app } = buildApp());
+  });
+
+  it('answers malformed JSON with the envelope, not an HTML error page', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .set('Content-Type', 'application/json')
+      .send('{"email": "a@b.co.za", ');
+    assert.equal(res.status, 400);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+    assert.match(res.body.error.message, /valid JSON/i);
+    // Express's default HTML page must never reach the client.
+    assert.equal(res.headers['content-type']?.includes('text/html'), false);
+  });
+
+  it('answers an oversized body with the envelope (413)', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ email: 'a@b.co.za', password: 'x'.repeat(200 * 1024) }));
+    assert.equal(res.status, 413);
+    assert.equal(res.body.success, false);
+    assert.match(res.body.error.message, /too large/i);
+    assert.equal(res.headers['content-type']?.includes('text/html'), false);
   });
 });

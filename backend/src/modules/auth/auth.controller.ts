@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { fail, ok } from '../../utils/response';
+import { logError } from '../../utils/logger';
 import type { AuthService, ServiceResult } from './auth.service';
 
 function send(res: Response, result: ServiceResult<never>, successMessage: string): void {
@@ -21,7 +22,10 @@ export function makeAuthController(service: AuthService) {
       try {
         const result = await service.register(req.body);
         send(res, result as ServiceResult<never>, 'Registration successful.');
-      } catch {
+      } catch (error) {
+        // The client only ever sees the generic envelope; the cause is logged
+        // here so an unexpected 500 is diagnosable (AGENTS.md §34, §35).
+        logError('auth.register_failed', error, { method: req.method, path: req.path });
         fail(res, 'INTERNAL_ERROR', 'Registration failed. Please try again.', 500);
       }
     },
@@ -30,7 +34,8 @@ export function makeAuthController(service: AuthService) {
       try {
         const result = await service.login(req.body);
         send(res, result as ServiceResult<never>, 'Login successful.');
-      } catch {
+      } catch (error) {
+        logError('auth.login_failed', error, { method: req.method, path: req.path });
         fail(res, 'INTERNAL_ERROR', 'Login failed. Please try again.', 500);
       }
     },
@@ -39,7 +44,8 @@ export function makeAuthController(service: AuthService) {
       try {
         const result = await service.refresh(req.body);
         send(res, result as ServiceResult<never>, 'Token refreshed.');
-      } catch {
+      } catch (error) {
+        logError('auth.refresh_failed', error, { method: req.method, path: req.path });
         fail(res, 'INTERNAL_ERROR', 'Token refresh failed. Please try again.', 500);
       }
     },
@@ -49,7 +55,8 @@ export function makeAuthController(service: AuthService) {
         const authUserId = (req as Request & { user?: { id: string } }).user?.id ?? null;
         const result = await service.logout(req.body ?? {}, authUserId);
         send(res, result as ServiceResult<never>, 'Logout successful.');
-      } catch {
+      } catch (error) {
+        logError('auth.logout_failed', error, { method: req.method, path: req.path });
         fail(res, 'INTERNAL_ERROR', 'Logout failed. Please try again.', 500);
       }
     },
@@ -63,7 +70,8 @@ export function makeAuthController(service: AuthService) {
         }
         const result = await service.me(authUserId);
         send(res, result as ServiceResult<never>, 'User retrieved.');
-      } catch {
+      } catch (error) {
+        logError('auth.me_failed', error, { method: req.method, path: req.path });
         fail(res, 'INTERNAL_ERROR', 'Could not retrieve user. Please try again.', 500);
       }
     },

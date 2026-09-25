@@ -37,6 +37,7 @@ import { NotificationService } from './modules/notifications/notifications.servi
 import { LocalFileStorage, type FileStorage } from './services/file-storage';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
+import { errorHandler } from './middleware/error';
 import { makeAdminRoutes } from './modules/admin/admin.routes';
 import { MemoryAdminStore } from './modules/admin/memory-admin.store';
 import { MysqlAdminStore } from './modules/admin/mysql-admin.store';
@@ -166,6 +167,11 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   app.use('/api', (_req, res) => {
     fail(res, 'NOT_FOUND', 'Resource not found.', 404);
   });
+
+  // Final error handler. Must stay last so every route's async failure and
+  // every body-parser rejection still answers with the standard envelope
+  // (docs/API.md §18) instead of Express's HTML error page.
+  app.use(errorHandler());
 
   return app;
 }

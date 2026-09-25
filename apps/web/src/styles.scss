@@ -340,9 +340,46 @@ body {
   border-color: var(--fl-primary);
 }
 
-.fl-role-card-selected {
-  border-color: var(--fl-primary);
+/* The radio itself is visually hidden, so the focus ring is drawn on the card. */
+.fl-role-card:has(:focus-visible) {
   box-shadow: var(--fl-focus-ring);
+}
+
+.fl-role-card-selected {
+  position: relative;
+  background: #eff6ff;
+  border: 2px solid var(--fl-primary);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+  /* The thicker border must not shift the label or change the card height. */
+  padding: calc(0.875rem - 1px) calc(1rem - 1px);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.fl-role-card-selected:hover {
+  border-color: var(--fl-primary);
+}
+
+/* #0284C7 on #EFF6FF is only 3.8:1, so the label uses the hover shade (5.4:1). */
+.fl-role-card-selected .fl-role-label {
+  color: var(--fl-primary-hover);
+}
+
+/* Non-colour selected indicator (the radio input is visually hidden). */
+.fl-role-card-selected::after {
+  content: '\2713';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: var(--fl-primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .fl-role-label {
@@ -354,6 +391,27 @@ body {
   font-size: 14px;
   line-height: 20px;
   color: #475569;
+}
+
+/* ---------- Two-step auth (registration) ---------- */
+
+.fl-step-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #64748b;
+}
+
+.fl-step-summary {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: #475569;
+}
+
+.fl-step-summary strong {
+  color: var(--fl-ink);
 }
 
 /* ---------- Pills ---------- */
