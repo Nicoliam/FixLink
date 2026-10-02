@@ -1,5 +1,5 @@
 /**
- * FixLink notification models — Stage 8 (in-app only).
+ * Fixlynk notification models — Stage 8 (in-app only).
  *
  * The recipient is always the authenticated user (resolved server-side);
  * the frontend never sends ownership. Notifications referencing a job

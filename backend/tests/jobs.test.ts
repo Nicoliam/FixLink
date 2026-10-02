@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — customer job request / job creation tests.
+ * Fixlynk Stage 6B — customer job request / job creation tests.
  *
  * Run: npm test (no MySQL required — uses the in-memory jobs +
  * marketplace stores with the same rules as the MySQL implementation).
@@ -45,10 +45,12 @@ async function registerCustomer(app: Express, email: string): Promise<string> {
 }
 
 async function registerWithRole(app: Express, email: string, role: string): Promise<string> {
+  // A PROFESSIONAL must supply the display name its profile is created with.
   const register = await request(app).post('/api/v1/auth/register').send({
     email,
     password: CUSTOMER_PASSWORD,
     role,
+    displayName: 'Sipho Ndlovu',
   });
   assert.equal(register.status, 201, `register failed for ${email}: ${JSON.stringify(register.body)}`);
   const login = await request(app).post('/api/v1/auth/login').send({

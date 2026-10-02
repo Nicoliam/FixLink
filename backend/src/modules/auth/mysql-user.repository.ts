@@ -1,6 +1,7 @@
-import type { Pool } from 'mysql2/promise';
+import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import {
   toSafeUser,
+  type CreateAccountInput,
   type CreateUserInput,
   type UserRecord,
   type UserRepository,
@@ -58,7 +59,7 @@ export class MysqlUserRepository implements UserRepository {
   }
 
   async create(input: CreateUserInput): Promise<UserRecord> {
-    await this.pool.query('INSERT INTO `users` (`email`, `phone`, `password_hash`, `status`) VALUES (?, ?, ?, \'PENDING\')', [
+    await this.pool.query('INSERT INTO `users` (`email`, `phone`, `password_hash`, `status`) VALUES (?, ?, ?, \'ACTIVE\')', [
       input.email,
       input.phone,
       input.passwordHash,
@@ -66,6 +67,51 @@ export class MysqlUserRepository implements UserRepository {
     const created = await this.findByEmail(input.email);
     if (!created) throw new Error('User creation failed: row not found after insert.');
     return created;
+  }
+
+  /**
+   * Account + role + provider profile in one transaction.
+   *
+   * Registration is not verification-gated, so the new account is ACTIVE and
+   * the provider profile is created immediately (verification_status stays
+   * UNVERIFIED — that is a public badge, not an access gate). Rolling back on
+   * any error means a failed registration does not burn the email address.
+   */
+  async createAccount(input: CreateAccountInput): Promise<UserRecord> {
+    const connection = await this.pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [insert] = await connection.query(
+        'INSERT INTO `users` (`email`, `phone`, `password_hash`, `status`) VALUES (?, ?, ?, \'ACTIVE\')',
+        [input.email, input.phone, input.passwordHash],
+      );
+      const userId = String((insert as ResultSetHeader).insertId);
+      await connection.query(
+        'INSERT INTO `user_roles` (`user_id`, `role_id`) SELECT ?, `id` FROM `roles` WHERE `name` = ?',
+        [userId, input.role],
+      );
+      const profile = input.profile;
+      if (profile?.kind === 'PROFESSIONAL') {
+        await connection.query(
+          'INSERT INTO `professional_profiles` (`user_id`, `display_name`, `verification_status`) VALUES (?, ?, \'UNVERIFIED\')',
+          [userId, profile.displayName],
+        );
+      } else if (profile?.kind === 'BUSINESS_OWNER') {
+        await connection.query(
+          'INSERT INTO `business_profiles` (`owner_user_id`, `business_name`, `slug`, `email`, `phone`, `verification_status`) VALUES (?, ?, ?, ?, ?, \'UNVERIFIED\')',
+          [userId, profile.businessName, profile.slug, profile.email, profile.phone],
+        );
+      }
+      const [rows] = await connection.query<RowDataPacket[]>('SELECT * FROM `users` WHERE `id` = ? LIMIT 1', [userId]);
+      if (rows.length === 0) throw new Error('Account creation failed: row not found after insert.');
+      await connection.commit();
+      return mapRow(rows[0] as UserRow);
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }
 
   async setRoles(userId: string, roles: string[]): Promise<void> {

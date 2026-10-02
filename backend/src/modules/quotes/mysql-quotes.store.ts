@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — MySQL quotes store (production implementation).
+ * Fixlynk Stage 6C — MySQL quotes store (production implementation).
  *
  * Reuses the existing `quotes`, `quote_items`, `jobs` and
  * `job_status_history` tables — no migration was required. Every value is

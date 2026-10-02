@@ -73,7 +73,7 @@ export class AdminResourcePage implements OnInit {
   protected hasNext(): boolean { return this.page() * this.pageSize() < this.total(); }
   protected title(): string { return ({ users: 'Users', customers: 'Customers', professionals: 'Professionals', businesses: 'Businesses', technicians: 'Technicians', services: 'Services', jobs: 'Jobs', verifications: 'Verification', certificates: 'Certificates', reviews: 'Reviews', reports: 'Reports', disputes: 'Disputes', 'audit-logs': 'Audit logs' } satisfies Record<AdminResource, string>)[this.resource()]; }
   protected eyebrow(): string { return 'Operations / ' + this.title(); }
-  protected subtitle(): string { return `Review and manage FixLink ${this.title().toLowerCase()}.`; }
+  protected subtitle(): string { return `Review and manage Fixlynk ${this.title().toLowerCase()}.`; }
   protected filterFields(): readonly AdminFilterField[] {
     const search: AdminFilterField = { key: 'search', label: 'Search', type: 'text' };
     const text = (key: Exclude<AdminFilterKey, 'search' | 'status' | 'role' | 'source' | 'type' | 'isActive' | 'rating' | 'minRating' | 'maxRating' | 'visibility'>, label: string): AdminFilterField => ({ key, label, type: 'text' });

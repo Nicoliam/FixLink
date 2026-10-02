@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7F — manager approval + technician response validation.
+ * Fixlynk Stage 7F — manager approval + technician response validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Only the manager's comment (and the technician's response note) are

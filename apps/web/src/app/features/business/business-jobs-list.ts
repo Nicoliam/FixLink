@@ -37,7 +37,7 @@ const PRIORITY_OPTIONS: readonly ('' | BusinessJobPriority)[] = ['', 'LOW', 'NOR
 const SORT_OPTIONS: readonly BusinessJobBoardSort[] = ['RECENT', 'SCHEDULED', 'PRIORITY'];
 
 /**
- * FixLink business job board — Stage 7G (`/business/jobs`, authenticated
+ * Fixlynk business job board — Stage 7G (`/business/jobs`, authenticated
  * BUSINESS_OWNER / BUSINESS_MANAGER).
  *
  * The operational board for the business's INTERNAL jobs (marketplace

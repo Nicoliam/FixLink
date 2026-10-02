@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — job execution & work-documentation routes.
+ * Fixlynk Stage 6F — job execution & work-documentation routes.
  *
  * POST   /api/v1/jobs/:jobId/images              provider uploads a BEFORE/DURING/AFTER photo (IN_PROGRESS only)
  * GET    /api/v1/jobs/:jobId/images              authorized photo metadata (owning customer or addressed provider)

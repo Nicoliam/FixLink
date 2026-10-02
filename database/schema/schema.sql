@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 9.6.0, for macos26.3 (arm64)
 --
--- Host: 127.0.0.1    Database: fixlink
+-- Host: 127.0.0.1    Database: fixlynk
 -- ------------------------------------------------------
 -- Server version	8.0.46
 

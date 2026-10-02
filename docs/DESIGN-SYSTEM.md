@@ -1,14 +1,14 @@
-# FixLink Design System
+# Fixlynk Design System
 
 ## 1. Purpose
 
-This document defines the approved visual system for FixLink.
+This document defines the approved visual system for Fixlynk.
 
 Approved visual direction:
 
 **Oceanic Modern Marketplace**
 
-The Stitch design export is the visual source of truth for the FixLink interface. Production Angular components should implement this system rather than introducing unrelated visual patterns.
+The Stitch design export is the visual source of truth for the Fixlynk interface. Production Angular components should implement this system rather than introducing unrelated visual patterns.
 
 ---
 
@@ -16,7 +16,7 @@ The Stitch design export is the visual source of truth for the FixLink interface
 
 ### Product
 
-FixLink
+Fixlynk
 
 ### Slogan
 
@@ -26,7 +26,7 @@ Connect. Quote. Fix.
 
 Official logo:
 
-`design/stitch/assets/brand/fixlink-logo.svg`
+`design/stitch/assets/brand/fixlynk-logo.svg`
 
 Do not recreate, distort, stretch, recolor, or modify the logo without an approved design change.
 
@@ -34,7 +34,7 @@ Do not recreate, distort, stretch, recolor, or modify the logo without an approv
 
 ## 3. Visual Direction
 
-FixLink uses the Oceanic Modern Marketplace direction.
+Fixlynk uses the Oceanic Modern Marketplace direction.
 
 The visual language is:
 
@@ -279,7 +279,7 @@ Used for identity checks and security-related actions.
 
 ## 11. Search
 
-The FixLink marketplace uses a dual-input search pattern:
+The Fixlynk marketplace uses a dual-input search pattern:
 
 **Service + Location / Suburb + Search**
 
@@ -390,7 +390,7 @@ Avoid excessive animation.
 
 ## 16. Photography
 
-FixLink should use authentic, professional home-service imagery where imagery is required.
+Fixlynk should use authentic, professional home-service imagery where imagery is required.
 
 Photography should communicate:
 
@@ -446,7 +446,7 @@ Approved visual direction:
 
 Official logo:
 
-`design/stitch/assets/brand/fixlink-logo.svg`
+`design/stitch/assets/brand/fixlynk-logo.svg`
 
 When the Stitch design and implementation differ, review the implementation against the approved Stitch design before introducing a new visual pattern.
 

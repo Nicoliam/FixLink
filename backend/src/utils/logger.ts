@@ -17,6 +17,7 @@ const SAFE_KEYS = new Set([
   'errno',
   'sqlState',
   'userId',
+  'notificationId',
   'role',
   'method',
   'path',

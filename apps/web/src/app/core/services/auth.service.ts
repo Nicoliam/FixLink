@@ -16,7 +16,7 @@ import type {
 } from '../models/auth.model';
 
 /**
- * FixLink authentication service — Stage 5B.
+ * Fixlynk authentication service — Stage 5B.
  *
  * Single owner of client-side authentication state:
  *   register / login / logout / refresh / getCurrentUser
@@ -45,9 +45,10 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this._status() === 'authenticated' && this._user() !== null);
 
   /**
-   * Register a new account. The backend returns the safe user only
-   * (no tokens), so this does NOT establish a session — the caller should
-   * direct the user to the login page afterwards.
+   * Register a new account. The backend returns the safe user AND a token
+   * pair, so a successful registration is a logged-in session — the caller
+   * redirects straight to the new account's landing route. No verification
+   * step is required to reach it.
    */
   register(payload: RegisterRequest): Observable<AuthUser> {
     const body: Record<string, string> = {
@@ -56,9 +57,18 @@ export class AuthService {
     };
     if (payload.phone?.trim()) body['phone'] = payload.phone.trim();
     if (payload.role) body['role'] = payload.role;
+    if (payload.displayName?.trim()) body['displayName'] = payload.displayName.trim();
+    if (payload.businessName?.trim()) body['businessName'] = payload.businessName.trim();
     return this.http
       .post<ApiSuccess<RegisterResponseData>>(`${this.baseUrl}/auth/register`, body)
-      .pipe(map((res) => res.data.user));
+      .pipe(
+        tap((res) => {
+          this.tokens.save(res.data.accessToken, res.data.refreshToken);
+          this._user.set(res.data.user);
+          this._status.set('authenticated');
+        }),
+        map((res) => res.data.user),
+      );
   }
 
   /** Authenticate with email + password and establish a session. */

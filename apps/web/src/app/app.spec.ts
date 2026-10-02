@@ -27,11 +27,11 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render the FixLink header with auth entry points when anonymous', () => {
+  it('should render the Fixlynk header with auth entry points when anonymous', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    const logo = compiled.querySelector('img[alt="FixLink"]');
+    const logo = compiled.querySelector('img[alt="Fixlynk"]');
     expect(logo).toBeTruthy();
     expect(compiled.textContent).toContain('Log in');
     expect(compiled.textContent).toContain('Sign up');

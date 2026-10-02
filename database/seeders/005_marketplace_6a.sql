@@ -1,7 +1,7 @@
--- FixLink seeder 005 — Stage 6A marketplace discovery data.
+-- Fixlynk seeder 005 — Stage 6A marketplace discovery data.
 -- ALL data is fictional (example.co.za emails, 555-range phones). No real people.
 -- password_hash values reuse the dev placeholder convention from seeder 002
--- (bcrypt hash of the fictional dev password 'FixLink-dev-001').
+-- (bcrypt hash of the fictional dev password 'Fixlynk-dev-001').
 --
 -- Purpose: enough Joburg-North providers (Fourways, Sandton, Bryanston,
 -- Randburg, Midrand) to exercise search, location filters, provider-type

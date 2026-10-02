@@ -1,11 +1,11 @@
-# FixLink Client Acceptance and Sign-off
+# Fixlynk Client Acceptance and Sign-off
 
 ## 1. Acceptance details
 
 | Item | Value |
 |---|---|
 | Client name | `[Client legal or trading name]` |
-| Project | FixLink |
+| Project | Fixlynk |
 | UAT period | `[Start date] to [End date]` |
 | Version/build | `[Version, commit or build identifier]` |
 | Test environment | `[UAT URL / deployment reference]` |
@@ -14,7 +14,7 @@
 
 ## 2. Acceptance statement
 
-The parties acknowledge that this document records the result of the agreed FixLink user acceptance testing and deployment-readiness review for the version identified above.
+The parties acknowledge that this document records the result of the agreed Fixlynk user acceptance testing and deployment-readiness review for the version identified above.
 
 Client acceptance is based on the documented current MVP scope, the agreed UAT test plan and the recorded outstanding issues and known limitations. Signing indicates that the client has reviewed the supplied UAT evidence and accepts the release at the stated level, subject to the limitations recorded below.
 
@@ -54,7 +54,7 @@ Severity guidance:
 The following limitations are part of the current release context unless the client agrees otherwise in writing:
 
 1. `/admin/settings` exists in the Angular navigation/route, but platform settings management is not implemented.
-2. The MVP does not process customer payments. Payment is arranged directly with the professional or business; FixLink records the agreed quote but does not process the money.
+2. The MVP does not process customer payments. Payment is arranged directly with the professional or business; Fixlynk records the agreed quote but does not process the money.
 3. Verification documents are private and are not exposed on public profiles.
 4. Technicians are business team members and are not automatically marketplace professionals.
 5. The Angular automated test runner has environment/runtime limitations in the current development environment. Stage 11 did not reach Angular test execution; frontend typecheck and production build passed in that report.

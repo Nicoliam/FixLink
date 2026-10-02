@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7E — technician parts-request tests.
+ * Fixlynk Stage 7E — technician parts-request tests.
  *
  * Run: npm test (no MySQL required — in-memory business store with the
  * same rules as the MySQL implementation, plus an isolated local-storage
@@ -41,7 +41,7 @@ interface TestContext {
 function buildApp(): TestContext {
   const users = new MemoryUserRepository();
   const business = new MemoryBusinessStore();
-  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlink-7e-')));
+  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlynk-7e-')));
   const app = createApp({
     users,
     refreshStore: new MemoryRefreshStore(),

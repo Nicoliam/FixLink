@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 8 — authenticated notification controllers.
+ * Fixlynk Stage 8 — authenticated notification controllers.
  *
  * Authentication is enforced by `requireAuth`; the recipient is always
  * the session user id inside the service — the request never carries

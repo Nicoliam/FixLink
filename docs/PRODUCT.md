@@ -1,18 +1,18 @@
-# FixLink — Product Definition
+# Fixlynk — Product Definition
 
 ## 1. Product Overview
 
-FixLink is a South African home-services marketplace and job-management
+Fixlynk is a South African home-services marketplace and job-management
 platform.
 
 Slogan:
 
 **Connect. Quote. Fix.**
 
-FixLink connects customers who need work done at their homes or properties
+Fixlynk connects customers who need work done at their homes or properties
 with individual service professionals and service businesses.
 
-FixLink also gives service businesses a workspace to manage their existing
+Fixlynk also gives service businesses a workspace to manage their existing
 customers, jobs, technicians, work updates, parts requests and job history.
 
 The product therefore has two connected sides:
@@ -23,7 +23,7 @@ The product therefore has two connected sides:
 
 ## 2. Core Product Idea
 
-FixLink is designed around the following journey:
+Fixlynk is designed around the following journey:
 
 Find
 ↓
@@ -62,7 +62,7 @@ Close
 
 ## 3. Target Customers
 
-FixLink customers may include:
+Fixlynk customers may include:
 
 - Homeowners
 - Tenants
@@ -70,13 +70,13 @@ FixLink customers may include:
 - Property owners
 - Property managers
 
-A customer may use FixLink when they need a home or property service,
+A customer may use Fixlynk when they need a home or property service,
 including planned maintenance, repairs, installations or improvements.
 
 
 ## 4. Service Professionals
 
-FixLink supports individual service professionals such as:
+Fixlynk supports individual service professionals such as:
 
 - Plumbers
 - Electricians
@@ -98,7 +98,7 @@ configuration.
 A service business is a company that provides home services and may have
 multiple employees or technicians.
 
-A business can use FixLink in two ways:
+A business can use Fixlynk in two ways:
 
 ### Marketplace
 
@@ -151,7 +151,7 @@ Technicians can:
 
 ## 7. Marketplace
 
-The FixLink marketplace allows customers to discover service providers.
+The Fixlynk marketplace allows customers to discover service providers.
 
 The marketplace experience should allow customers to:
 
@@ -195,9 +195,9 @@ Private verification information must never be displayed publicly.
 
 ## 9. Trust and Verification
 
-Trust is an important part of the FixLink marketplace.
+Trust is an important part of the Fixlynk marketplace.
 
-FixLink uses progressive verification rather than requiring heavy
+Fixlynk uses progressive verification rather than requiring heavy
 verification at basic registration.
 
 Potential verification areas include:
@@ -216,7 +216,7 @@ has been approved by the platform.
 
 ## 10. Job Management
 
-FixLink uses one job architecture for both marketplace and internal jobs.
+Fixlynk uses one job architecture for both marketplace and internal jobs.
 
 A job may originate from:
 
@@ -249,7 +249,7 @@ Both job types use the same core concepts:
 
 ## 11. Before / During / After
 
-Before/During/After work documentation is a core FixLink capability.
+Before/During/After work documentation is a core Fixlynk capability.
 
 ### Before
 
@@ -343,7 +343,7 @@ Quote status must be controlled by the backend.
 
 ## 14. MVP Payment Model
 
-FixLink does not process customer payments in the MVP.
+Fixlynk does not process customer payments in the MVP.
 
 The MVP flow is:
 
@@ -363,7 +363,7 @@ Customer confirms
 ↓
 Review
 
-FixLink records the agreed quote amount but does not process the transaction.
+Fixlynk records the agreed quote amount but does not process the transaction.
 
 
 ## 15. Business Job Management
@@ -419,7 +419,7 @@ The parts request becomes part of the job history.
 
 ## 17. Messaging
 
-FixLink supports communication around jobs.
+Fixlynk supports communication around jobs.
 
 Messaging may be used between:
 
@@ -451,7 +451,7 @@ Reviews should be associated with the relevant job.
 
 ## 19. Notifications
 
-FixLink may notify users about important events.
+Fixlynk may notify users about important events.
 
 Examples:
 
@@ -563,7 +563,7 @@ Businesses should be able to:
 
 ## 24. Mobile-First Operational Areas
 
-Technicians may use FixLink while physically working at a property.
+Technicians may use Fixlynk while physically working at a property.
 
 Technician workflows should therefore prioritize:
 
@@ -604,7 +604,7 @@ Private information includes:
 
 ## 26. Future Direction
 
-The architecture should allow FixLink to expand later into:
+The architecture should allow Fixlynk to expand later into:
 
 - Platform payment processing
 - Subscription plans
@@ -620,7 +620,7 @@ These are not part of the current MVP unless explicitly added to scope.
 
 ## 27. Product Success
 
-The MVP should demonstrate that FixLink can successfully support the
+The MVP should demonstrate that Fixlynk can successfully support the
 complete operational loop:
 
 Customer needs a service
@@ -664,7 +664,7 @@ Job closed
 
 ## 28. Product Principle
 
-FixLink should make it easier for people to:
+Fixlynk should make it easier for people to:
 
 Find the right service.
 

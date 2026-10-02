@@ -14,7 +14,7 @@ import type { NotificationItem } from '../../core/models/notification.model';
 type NotificationsStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 /**
- * FixLink notifications inbox — Stage 8 (`/notifications`,
+ * Fixlynk notifications inbox — Stage 8 (`/notifications`,
  * authenticated, in-app only).
  *
  * Lists the session user's notifications newest first with

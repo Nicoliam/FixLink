@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7G — business job board + history tests.
+ * Fixlynk Stage 7G — business job board + history tests.
  *
  * Run: npm test (no MySQL required — uses the in-memory business store
  * with the same rules as the MySQL implementation).

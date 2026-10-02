@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — in-memory execution store for automated tests.
+ * Fixlynk Stage 6F — in-memory execution store for automated tests.
  *
  * Mirrors the MySQL implementation's rules (IN_PROGRESS gating for work
  * documentation, uploader-only deletion, completion-note requirement,

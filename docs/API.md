@@ -1,4 +1,4 @@
-# FixLink — API Specification
+# Fixlynk — API Specification
 
 ## Current implementation note
 
@@ -90,7 +90,9 @@ Request:
   "email": "user@example.co.za",
   "password": "at least 8 characters",
   "phone": "+27825550101 (optional)",
-  "role": "CUSTOMER (optional, default)"
+  "role": "CUSTOMER (optional, default)",
+  "displayName": "Sipho Ndlovu (PROFESSIONAL only, required)",
+  "businessName": "Mokoena Plumbing (BUSINESS_OWNER only, required)"
 }
 
 Rules:
@@ -115,8 +117,24 @@ Rules:
   "An account with this email or phone number already exists."
 - Rate limited to 10 attempts per IP per 15 minutes; further attempts return
   `429 RATE_LIMITED`.
-- Registration creates the `users` row and the `user_roles` assignment only.
-  Customer/professional/business profile creation belongs to a later stage.
+- **Verification is not a requirement.** A successful registration returns
+  the same session as login — `user`, `accessToken` and `refreshToken` — and
+  the account is created `ACTIVE`, so the new customer or provider can use
+  the API immediately. There is no confirmation interstitial between
+  registering and using the account.
+- The account, its role and its provider profile are created in one
+  transaction, so a failed registration never leaves a half-provisioned
+  account or consumes the email address.
+  - `CUSTOMER`: `users` + `user_roles` only. `customer_profiles` is still
+    provisioned lazily on the first job request.
+  - `PROFESSIONAL`: also creates `professional_profiles` using the required
+    `displayName` (`verification_status` `UNVERIFIED`).
+  - `BUSINESS_OWNER`: also creates `business_profiles` using the required
+    `businessName`, with a deterministic slug derived from the business name
+    and the account email (`verification_status` `UNVERIFIED`).
+  - A name sent for a role that has no profile is ignored rather than
+    rejected; a missing name for `PROFESSIONAL` / `BUSINESS_OWNER` is
+    `422 VALIDATION_ERROR`. Names are trimmed and capped at 255 characters.
 
 Errors raised before a controller runs (malformed JSON, oversized body) are
 answered by the global error handler with the same envelope rather than an
@@ -142,6 +160,10 @@ Request:
   cannot be enumerated. Suspended/deleted accounts receive the same response.
 - Success returns `200` with `{ user, accessToken, refreshToken }`.
   `last_login_at` is updated.
+- A successful login lands the user on the route for their highest-priority
+  role (admin → business → technician → professional → customer, falling back
+  to `/account`). This is a client-side routing decision only; the backend
+  authorizes every request independently.
 
 ### Tokens
 
@@ -837,6 +859,14 @@ execution, messaging, reviews and payment belong to later stages.
   arrives in a later stage.
 - Customer profiles are auto-provisioned on first request (Stage 5A
   registration creates `users` + `user_roles` only).
+- Stage 13: after the job commits, the selected provider is notified
+  in-app (`JOB_REQUEST`) and — when the provider's account is an
+  `ACTIVE` provider-side account with an email address — by email
+  carrying the service, reference, location, preferred date/time, the
+  customer's description and a deep link to `GET /api/v1/provider/requests/:id`.
+  No customer contact details are included. The email is best-effort: a
+  mail failure never changes the `201` response or the created job
+  (see §22).
 - Validation: malformed provider/service ids → `400 VALIDATION_ERROR`;
   unknown provider or service → `404 NOT_FOUND`; provider does not offer
   the service → `422 VALIDATION_ERROR`; description/location/date/time
@@ -1099,7 +1129,7 @@ Quote retrieval:
   owning customer or the addressed provider (others → `404`).
 - `GET /api/v1/quotes/:id` → `200` quote under the same authorization.
 
-MVP payment position (unchanged): FixLink does not process customer
+MVP payment position (unchanged): Fixlynk does not process customer
 payment. Quote submission does not charge the customer; the customer
 pays the professional directly outside the platform. Quote acceptance
 is NOT part of Stage 6C.
@@ -1144,7 +1174,7 @@ sends `status = ACCEPTED`.
   accepted quote and `ACCEPTED` status on
   `GET /api/v1/provider/requests/:id` but cannot change it.
 
-MVP payment position (unchanged and explicit): FixLink does NOT
+MVP payment position (unchanged and explicit): Fixlynk does NOT
 process customer payment in Stage 6D. The accepted quote represents
 the agreed price only; payment is arranged directly between customer
 and professional. No payment gateway, escrow, transaction id or
@@ -1248,14 +1278,31 @@ POST /api/v1/verification/certificates
 GET /api/v1/verification/certificates
 
 
-# 22. Notifications (Stage 8 — in-app only)
+# 22. Notifications (Stage 8 — in-app; Stage 13 adds email for providers)
 
-MVP delivery is in-app only: no email, SMS, WhatsApp, push or
+In-app delivery is the base channel: no SMS, WhatsApp, push or
 WebSockets. The frontend polls `unread-count` modestly (60s) for
 badge freshness. The recipient is always the session user —
 ownership is never accepted from the request, and another user's
 notification id reads as `404` (never `403`), so ids cannot be
 probed across accounts.
+
+Stage 13 adds an **email** channel for provider-side recipients. It is
+an addition to the same notification row, not a separate API: no request
+or response shape changed, and no new endpoint exists. Eligibility is
+resolved per recipient from the recipient's own account (an
+`ACTIVE` account holding `PROFESSIONAL`, `BUSINESS_OWNER`,
+`BUSINESS_MANAGER` or `TECHNICIAN` with an email address on file);
+`CUSTOMER`-only recipients are not emailed. The email carries the
+notification title/message, an optional details block (job request
+supplies service, reference, location, preferred date/time and the
+customer's description) and a role-specific deep link into the app.
+Customer contact details, verification documents and admin-only
+information are never included — the reply happens on the platform.
+Attempts are recorded in `notifications.email_status` / `emailed_at` /
+`email_error` (not exposed by the API yet) and logged. Email failures
+never roll back the committed operation, exactly like in-app delivery.
+See `docs/NOTIFICATIONS.md` for the full design and configuration.
 
 GET /api/v1/notifications
 
@@ -1302,7 +1349,9 @@ and an authoritative `ADMIN` role loaded from the user repository. The
 account must also be `ACTIVE`. A stale token claim is not trusted. Missing
 or invalid authentication, including `SUSPENDED` or `DELETED` users, returns
 `401 UNAUTHORIZED`; an authenticated `PENDING` account or a non-admin
-account returns `403 FORBIDDEN_ROLE`.
+account returns `403 FORBIDDEN_ROLE`. Self-registration now creates `ACTIVE`
+accounts, so in practice only a platform-created or explicitly deactivated
+admin account can be non-`ACTIVE` here.
 
 Admin responses use the standard envelope defined in §2. List responses use:
 

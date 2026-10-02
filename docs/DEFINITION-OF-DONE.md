@@ -1,6 +1,6 @@
-# FixLink — Definition of Done
+# Fixlynk — Definition of Done
 
-A FixLink feature is complete only when the relevant implementation and
+A Fixlynk feature is complete only when the relevant implementation and
 release evidence are present. This checklist is scoped to the current
 MVP and does not require future features.
 

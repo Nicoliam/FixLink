@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Shared helpers for FixLink database tooling (migrate.js, seed.js, tests).
+ * Shared helpers for Fixlynk database tooling (migrate.js, seed.js, tests).
  * - Minimal .env loader (no external dependency).
  * - Connection config from environment.
  * - Naive-but-safe SQL statement splitter (statements end with `;` at EOL).
@@ -45,9 +45,9 @@ function getConfig() {
   return {
     host: process.env.DB_HOST || '127.0.0.1',
     port: Number(process.env.DB_PORT || 3307),
-    user: process.env.DB_USER || 'fixlink',
+    user: process.env.DB_USER || 'fixlynk',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'fixlink',
+    database: process.env.DB_NAME || 'fixlynk',
     connectTimeout: 5000,
   };
 }

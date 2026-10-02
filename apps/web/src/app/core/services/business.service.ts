@@ -41,7 +41,7 @@ import type {
 } from '../models/business.model';
 
 /**
- * FixLink business API client — Stage 7A (business foundation +
+ * Fixlynk business API client — Stage 7A (business foundation +
  * technician management) + Stage 7B (business-managed customers and
  * internal jobs) + Stage 7C (technician assignment) + Stage 7D
  * (read-only execution visibility: photos, notes, voice notes,

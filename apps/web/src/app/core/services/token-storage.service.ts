@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 
-const ACCESS_TOKEN_KEY = 'fixlink.access_token';
-const REFRESH_TOKEN_KEY = 'fixlink.refresh_token';
+const ACCESS_TOKEN_KEY = 'fixlynk.access_token';
+const REFRESH_TOKEN_KEY = 'fixlynk.refresh_token';
 
 function safeGet(key: string): string | null {
   try {
@@ -20,7 +20,7 @@ function safeSet(key: string, value: string): void {
 }
 
 /**
- * Persistence for the FixLink token pair.
+ * Persistence for the Fixlynk token pair.
  *
  * Only opaque tokens are stored here — never passwords or user data.
  * All reads/writes are guarded so server-side rendering or blocked storage

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — execution data-access contract.
+ * Fixlynk Stage 6F — execution data-access contract.
  *
  * The MySQL implementation serves production (transactional complete /
  * confirm with guarded status updates); the memory implementation serves

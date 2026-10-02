@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — customer job request service.
+ * Fixlynk Stage 6B — customer job request service.
  *
  * Owns the marketplace job-creation rules. The authenticated customer is
  * derived server-side from the session user id — any `customer_id`,
@@ -12,6 +12,7 @@
  */
 import type { MarketplaceStore } from '../marketplace/marketplace.store';
 import type { NotificationService } from '../notifications/notifications.service';
+import type { NotificationEmailDetail } from '../notifications/notifications.types';
 import type { UserRepository } from '../users/user.repository';
 import type { JobQuotesReader } from '../quotes/quotes.store';
 import type { JobWithQuotes } from '../quotes/quotes.types';
@@ -45,7 +46,7 @@ export function provisionNames(email: string): { firstName: string; lastName: st
     .map((part) => part.trim())
     .filter(Boolean);
   const capitalise = (value: string): string => value.charAt(0).toUpperCase() + value.slice(1);
-  if (parts.length === 0) return { firstName: 'FixLink', lastName: 'Customer' };
+  if (parts.length === 0) return { firstName: 'Fixlynk', lastName: 'Customer' };
   if (parts.length === 1) return { firstName: capitalise(parts[0] as string), lastName: 'Customer' };
   return {
     firstName: capitalise(parts[0] as string),
@@ -54,6 +55,42 @@ export function provisionNames(email: string): { firstName: string; lastName: st
       .map(capitalise)
       .join(' '),
   };
+}
+
+/**
+ * Stage 13 — extract the `HH:MM` part of a scheduled slot.
+ *
+ * The two stores report `scheduled_at` in different shapes (the MySQL row
+ * as `YYYY-MM-DD HH:MM:SS`, the in-memory one as an ISO string), so the
+ * time is parsed from either separator rather than assumed.
+ */
+export function scheduledTimeOfDay(scheduledAt: string | null): string | null {
+  if (!scheduledAt) return null;
+  const separator = Math.max(scheduledAt.indexOf(' '), scheduledAt.indexOf('T'));
+  if (separator < 0) return null;
+  return /^\d{2}:\d{2}/.exec(scheduledAt.slice(separator + 1))?.[0] ?? null;
+}
+
+/**
+ * Stage 13 — the job details a provider needs in order to decide whether
+ * to quote, taken from the job the customer just submitted.
+ *
+ * Every value is a display fact the provider is already entitled to see on
+ * the request itself. Nothing here identifies the customer: no name, no
+ * email, no phone. The description is the customer's own free text, which
+ * the renderer escapes and truncates.
+ */
+export function jobRequestEmailDetails(job: JobDto): NotificationEmailDetail[] {
+  const details: NotificationEmailDetail[] = [
+    { label: 'Job reference', value: job.reference },
+    { label: 'Service', value: job.service.name },
+    { label: 'Location', value: job.location },
+  ];
+  if (job.preferredDate) details.push({ label: 'Preferred date', value: job.preferredDate });
+  const time = scheduledTimeOfDay(job.scheduledAt);
+  if (time) details.push({ label: 'Preferred time', value: time });
+  details.push({ label: 'What the customer needs', value: job.description });
+  return details;
 }
 
 export class JobsService {
@@ -146,6 +183,15 @@ export class JobsService {
    * provider directory. The message carries only the service, the
    * customer-supplied location the provider already sees on the
    * request, and the reference — no private customer contact data.
+   *
+   * Stage 13: the same event is emailed to provider-side recipients
+   * (see `docs/NOTIFICATIONS.md`). The email carries the details a
+   * professional needs to decide whether to quote — service, reference,
+   * location, preferred date and the customer's description — plus a link
+   * to this exact request. The customer is referred to only as
+   * "Customer": the request detail screen shows the privacy-limited
+   * display name, and contact details stay out of email entirely so the
+   * conversation and its audit trail remain on the platform.
    */
   private async emitJobRequest(job: JobDto): Promise<void> {
     if (!this.notify || !this.providerDirectory) return;
@@ -160,6 +206,7 @@ export class JobsService {
         message: `${job.service.name} requested at ${job.location} (${job.reference}).`,
         referenceType: 'JOB',
         referenceId: job.id,
+        email: { details: jobRequestEmailDetails(job) },
       });
     } catch {
       // Notification delivery is best-effort — the job request stands.

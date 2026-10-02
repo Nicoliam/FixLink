@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6E — scheduling & job execution start tests.
+ * Fixlynk Stage 6E — scheduling & job execution start tests.
  *
  * Run: npm test (no MySQL required — uses the in-memory jobs + quotes
  * stores with the same rules as the MySQL implementation).
@@ -51,8 +51,20 @@ const PASSWORD = 'Str0ngPassw0rd!';
 const FUTURE_SLOT = '2026-10-05T10:00:00+02:00';
 const FUTURE_SLOT_INSTANT = new Date(FUTURE_SLOT).toISOString();
 
+/**
+ * Registration creates the provider profile in the same transaction, so a
+ * provider role must also supply the name that profile is created with.
+ */
+function registrationBody(email: string, role?: string): Record<string, unknown> {
+  const body: Record<string, unknown> = { email, password: PASSWORD };
+  if (role === 'PROFESSIONAL') body['displayName'] = 'Sipho Ndlovu';
+  if (role === 'BUSINESS_OWNER') body['businessName'] = 'Mokoena Services';
+  if (role) body['role'] = role;
+  return body;
+}
+
 async function register(app: Express, email: string, role?: string): Promise<{ token: string; userId: string }> {
-  const res = await request(app).post('/api/v1/auth/register').send(role ? { email, password: PASSWORD, role } : { email, password: PASSWORD });
+  const res = await request(app).post('/api/v1/auth/register').send(registrationBody(email, role));
   assert.equal(res.status, 201, `register failed for ${email}: ${JSON.stringify(res.body)}`);
   const login = await request(app).post('/api/v1/auth/login').send({ email, password: PASSWORD });
   assert.equal(login.status, 200);

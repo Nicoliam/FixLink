@@ -11,7 +11,7 @@ import type { AdminDashboard } from '../../core/models/admin.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="admin-page">
-      <header class="admin-page-header"><div><p class="admin-eyebrow">Operations overview</p><h1>Dashboard</h1><p>Monitor FixLink activity and the work that needs attention.</p></div><span class="admin-live"><i></i> Live data</span></header>
+      <header class="admin-page-header"><div><p class="admin-eyebrow">Operations overview</p><h1>Dashboard</h1><p>Monitor Fixlynk activity and the work that needs attention.</p></div><span class="admin-live"><i></i> Live data</span></header>
       @if (loading()) { <div class="admin-state" role="status">Loading dashboard…</div> }
       @else if (error()) { <div class="admin-state admin-state-error" role="alert"><h2>Dashboard unavailable</h2><p>{{ error() }}</p><button class="admin-btn" type="button" (click)="load()">Try again</button></div> }
       @else if (dashboard(); as data) {

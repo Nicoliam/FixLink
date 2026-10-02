@@ -12,7 +12,7 @@ type DetailStatus = 'loading' | 'ready' | 'error';
 const MANAGER_ROLES = ['BUSINESS_OWNER', 'BUSINESS_MANAGER'];
 
 /**
- * FixLink technician detail — Stage 7A
+ * Fixlynk technician detail — Stage 7A
  * (`/business/technicians/:id`, authenticated owner/manager, or the
  * technician themself via the backend self-access rule).
  *

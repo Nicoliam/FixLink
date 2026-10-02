@@ -1,4 +1,4 @@
-# FixLink — Development Workflow
+# Fixlynk — Development Workflow
 
 ## 1. Before starting work
 

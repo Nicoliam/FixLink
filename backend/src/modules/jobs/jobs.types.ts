@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — customer job request (job creation) types.
+ * Fixlynk Stage 6B — customer job request (job creation) types.
  *
  * Marketplace jobs and internal business jobs share the ONE `jobs` table
  * (see database/migrations/004_jobs_core.sql). Stage 6B only creates

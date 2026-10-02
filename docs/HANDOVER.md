@@ -1,8 +1,8 @@
-# FixLink Handover
+# Fixlynk Handover
 
 ## 1. Project overview
 
-FixLink is a South African home-services marketplace and job-management platform. Customers discover independent professionals and service businesses, request work, receive quotes, accept an agreed price, track work, review documentation and confirm completion. Businesses manage private customers, internal jobs and technicians through the same job engine.
+Fixlynk is a South African home-services marketplace and job-management platform. Customers discover independent professionals and service businesses, request work, receive quotes, accept an agreed price, track work, review documentation and confirm completion. Businesses manage private customers, internal jobs and technicians through the same job engine.
 
 **Connect. Quote. Fix.**
 
@@ -119,8 +119,14 @@ The backend enforces the currently available workflows. Marketplace confirmation
 ## 8. Authentication and sessions
 
 - Email/password login and supported self-registration;
+- registration establishes a session — the new customer or provider is signed
+  in and lands on their own role surface with no verification or approval
+  step;
+- registration creates the `professional_profiles` / `business_profiles` row
+  for provider roles in the same transaction as the account;
 - bcrypt password hashing;
-- `PENDING`, `ACTIVE`, `SUSPENDED` and `DELETED` user states;
+- `ACTIVE`, `PENDING`, `SUSPENDED` and `DELETED` user states (self-registration
+  lands `ACTIVE`, because verification is not a prerequisite for access);
 - short-lived signed JWT access tokens;
 - opaque refresh tokens stored as SHA-256 hashes;
 - refresh rotation and replay rejection;
@@ -128,7 +134,7 @@ The backend enforces the currently available workflows. Marketplace confirmation
 - authoritative user and role loading on protected requests;
 - process-local rate limits for auth, marketplace and admin routes.
 
-Privileged roles `ADMIN`, `TECHNICIAN` and `BUSINESS_MANAGER` cannot be self-assigned during registration.
+Privileged roles `ADMIN`, `TECHNICIAN` and `BUSINESS_MANAGER` cannot be self-assigned during registration. `PROFESSIONAL` registrations must include a display name and `BUSINESS_OWNER` registrations a business name, because those profiles are created with the account.
 
 Current limitation: the Angular client stores bearer tokens in local storage. A multi-instance production deployment must also provide a shared rate-limit strategy at the gateway or replace the process-local limiter.
 
@@ -227,7 +233,11 @@ Notifications are in-app database records. The authenticated shell polls the unr
 
 Implemented events cover marketplace requests, quotes, acceptance, scheduling, start, completion and confirmation, plus technician assignment/reassignment, work updates, parts requests and parts decisions.
 
-There is no email, SMS, WhatsApp, push notification, WebSocket or external notification worker.
+Provider-side recipients (`PROFESSIONAL`, `BUSINESS_OWNER`, `BUSINESS_MANAGER`, `TECHNICIAN` on `ACTIVE` accounts) are also emailed the same event, with the job details and a link back to the exact screen for their role, so a provider who is not signed in still learns about a job request and can reply on the platform. Customer contact details are never included in the email.
+
+**Operational note:** email is off until `MAIL_ENABLED=true` and `MAIL_HOST` are configured (see `docs/NOTIFICATIONS.md` and `docs/DEPLOYMENT.md` §6). Without that configuration the deployment is in-app only and the rendered message is written to the log. The `notifications.email_status` / `emailed_at` / `email_error` columns (migration 014) record each attempt; no admin screen reads them yet.
+
+There is no SMS, WhatsApp, push notification, WebSocket, email retry queue or external notification worker.
 
 ## 15. Admin
 

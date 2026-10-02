@@ -1,4 +1,4 @@
--- FixLink migration 004 — Jobs core (jobs, job_assignments, job_status_history)
+-- Fixlynk migration 004 — Jobs core (jobs, job_assignments, job_status_history)
 -- There is exactly ONE jobs table. Source distinguishes MARKETPLACE / INTERNAL.
 -- Status transitions are validated by the backend; every transition is
 -- appended to job_status_history (never overwritten). Assignments are

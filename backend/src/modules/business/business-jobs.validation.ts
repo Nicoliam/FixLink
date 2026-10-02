@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7B — internal business job validation.
+ * Fixlynk Stage 7B — internal business job validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Fields the frontend must never control (`business_id`, `customer

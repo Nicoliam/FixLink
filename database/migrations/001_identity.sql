@@ -1,4 +1,4 @@
--- FixLink migration 001 — Identity (roles, users, user_roles)
+-- Fixlynk migration 001 — Identity (roles, users, user_roles)
 -- Up section creates tables; Down section drops them (reverse order).
 -- Idempotent: uses IF NOT EXISTS so re-running a pending apply is safe.
 

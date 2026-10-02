@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — business + technician validation.
+ * Fixlynk Stage 7A — business + technician validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Fields the frontend must never control (business_id, owner_id,

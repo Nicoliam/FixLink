@@ -1,4 +1,4 @@
-# FixLink Client UAT Report
+# Fixlynk Client UAT Report
 
 ## 1. Test Environment
 
@@ -6,10 +6,10 @@
 - Platform: macOS on Darwin
 - Node.js: v24.16.0; npm: 11.13.0
 - Documented prerequisite: Node.js 22.12.0
-- Repository: FixLink
+- Repository: Fixlynk
 - API: `http://localhost:3000`
 - Web: `http://localhost:4200`
-- Database: MySQL 8 in Docker, `fixlink-mysql`, host port `3307`, database `fixlink`
+- Database: MySQL 8 in Docker, `fixlynk-mysql`, host port `3307`, database `fixlynk`
 - Backend authentication store: `AUTH_STORE=mysql`
 - Database state: existing development/UAT database retained; no destructive reset performed
 - Migrations: 13 applied, 0 pending
@@ -43,7 +43,7 @@ The following documented fictional development accounts were used. Passwords and
 | Technician | `bongani.zulu@example.co.za` |
 | Isolated technician | `karin.meyer@example.co.za` |
 | Second business owner | `thandi.khumalo@example.co.za` |
-| Admin | `admin@fixlink.example.co.za` |
+| Admin | `admin@fixlynk.example.co.za` |
 
 All documented seeded roles authenticated successfully. Additional time-stamped fictional customer and professional registrations were created for registration testing.
 

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 8 — notification routes (in-app only).
+ * Fixlynk Stage 8 — notification routes (in-app only).
  *
  * GET  /api/v1/notifications             list own notifications
  *                                         (?unreadOnly, ?page, ?pageSize)

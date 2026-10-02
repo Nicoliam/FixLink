@@ -1,4 +1,4 @@
--- FixLink migration 008 — Messaging, reviews, notifications, saved providers,
+-- Fixlynk migration 008 — Messaging, reviews, notifications, saved providers,
 -- reports, disputes, audit logs.
 --
 -- Messaging read model (MVP simplification): messages.read_at records when a

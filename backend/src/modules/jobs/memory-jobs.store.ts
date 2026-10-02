@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — in-memory jobs store for automated tests.
+ * Fixlynk Stage 6B — in-memory jobs store for automated tests.
  *
  * Mirrors the MySQL implementation's rules (server-side ownership,
  * MARKETPLACE source, REQUESTED status, active-service check) without

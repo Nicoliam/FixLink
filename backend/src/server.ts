@@ -7,5 +7,5 @@ const app = createApp();
 
 app.listen(env.port, () => {
   // Intentionally minimal — no sensitive values logged (see AGENTS.md §35).
-  console.log(`FixLink API listening on port ${env.port} (${env.nodeEnv}).`);
+  console.log(`Fixlynk API listening on port ${env.port} (${env.nodeEnv}).`);
 });

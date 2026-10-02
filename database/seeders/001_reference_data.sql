@@ -1,4 +1,4 @@
--- FixLink seeder 001 — Reference data: roles, service categories, services.
+-- Fixlynk seeder 001 — Reference data: roles, service categories, services.
 -- Fictional catalogue data only.
 
 INSERT INTO `roles` (`id`, `name`, `description`) VALUES

@@ -81,7 +81,7 @@ describe('AuthService', () => {
     expect(tokens.getRefreshToken()).toBeNull();
   });
 
-  it('registers successfully without establishing a session (backend issues no tokens)', () => {
+  it('registers and establishes a session — no second login step', () => {
     let result: AuthUser | null = null;
     service
       .register({ email: 'new@example.co.za', password: 'password123', role: 'CUSTOMER' })
@@ -92,14 +92,53 @@ describe('AuthService', () => {
     const req = httpMock.expectOne(`${API}/auth/register`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ email: 'new@example.co.za', password: 'password123', role: 'CUSTOMER' });
-    req.flush({ success: true, data: { user: mockUser } });
+    req.flush({ success: true, data: { user: mockUser, accessToken: 'access-9', refreshToken: 'refresh-9' } });
 
     expect(result).toEqual(mockUser);
-    expect(service.isAuthenticated()).toBe(false);
-    expect(tokens.getAccessToken()).toBeNull();
+    expect(tokens.getAccessToken()).toBe('access-9');
+    expect(tokens.getRefreshToken()).toBe('refresh-9');
+    expect(service.isAuthenticated()).toBe(true);
+    expect(service.currentUser()).toEqual(mockUser);
   });
 
-  it('propagates registration conflicts (duplicate email)', () => {
+  it('sends the provider profile name required by the role', () => {
+    service
+      .register({ email: 'pro@example.co.za', password: 'password123', role: 'PROFESSIONAL', displayName: '  Sipho Ndlovu  ' })
+      .subscribe();
+    const req = httpMock.expectOne(`${API}/auth/register`);
+    // Trimmed by the service so the name is sent exactly as typed, minus padding.
+    expect(req.request.body).toEqual({
+      email: 'pro@example.co.za',
+      password: 'password123',
+      role: 'PROFESSIONAL',
+      displayName: 'Sipho Ndlovu',
+    });
+    req.flush({ success: true, data: { user: mockUser, accessToken: 'a', refreshToken: 'r' } });
+  });
+
+  it('sends the business name for a BUSINESS_OWNER registration', () => {
+    service
+      .register({ email: 'owner@example.co.za', password: 'password123', role: 'BUSINESS_OWNER', businessName: 'Mokoena Plumbing' })
+      .subscribe();
+    const req = httpMock.expectOne(`${API}/auth/register`);
+    expect(req.request.body).toEqual({
+      email: 'owner@example.co.za',
+      password: 'password123',
+      role: 'BUSINESS_OWNER',
+      businessName: 'Mokoena Plumbing',
+    });
+    req.flush({ success: true, data: { user: mockUser, accessToken: 'a', refreshToken: 'r' } });
+  });
+
+  it('omits provider names that the chosen role does not need', () => {
+    service.register({ email: 'cust@example.co.za', password: 'password123', role: 'CUSTOMER' }).subscribe();
+    const req = httpMock.expectOne(`${API}/auth/register`);
+    expect(req.request.body).not.toHaveProperty('displayName');
+    expect(req.request.body).not.toHaveProperty('businessName');
+    req.flush({ success: true, data: { user: mockUser, accessToken: 'a', refreshToken: 'r' } });
+  });
+
+  it('propagates registration conflicts (duplicate email) without a session', () => {
     let failureCode: string | null = null;
     service.register({ email: 'taken@example.co.za', password: 'password123' }).subscribe({
       next: () => {},
@@ -116,6 +155,7 @@ describe('AuthService', () => {
 
     expect(failureCode).toBe('EMAIL_EXISTS');
     expect(service.isAuthenticated()).toBe(false);
+    expect(tokens.getAccessToken()).toBeNull();
   });
 
   it('restores a persisted session via GET /auth/me', () => {

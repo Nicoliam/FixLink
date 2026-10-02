@@ -1,4 +1,94 @@
-# FixLink — Changelog
+# Fixlynk — Changelog
+
+## Project rename — FixLink → Fixlynk (2026-09-30)
+
+- The domain `fixlink` was already taken, so the project has been renamed
+  from **FixLink** to **Fixlynk** across all documentation, configuration,
+  source code, seed data, asset filenames and package names.
+- The product slogan remains: *Connect. Quote. Fix.*
+
+## Stage 13 — Provider notification email (2026-09-27)
+
+- Providers no longer need to be signed in to the web app to learn that a
+  customer has requested work. Provider-side recipients (`PROFESSIONAL`,
+  `BUSINESS_OWNER`, `BUSINESS_MANAGER`, `TECHNICIAN` on an `ACTIVE`
+  account) are emailed every provider-facing event that already had an
+  in-app notification, with the job details and a link to the exact
+  screen for their role — so the reply (a quote, a question) happens on
+  the platform, in-app, where it is recorded.
+- The email is a second channel on the same notification row, delivered
+  from the central `NotificationService` after the in-app row is written.
+  The in-app notification remains the record of what happened: a mail
+  failure is recorded and swallowed, and never rolls back a job request,
+  quote, assignment or approval.
+- A job-request email carries the job reference, service, location,
+  preferred date/time and the customer's description. It deliberately
+  contains **no customer contact details** — no email address, no phone —
+  which preserves the existing rule that a provider sees only a
+  privacy-limited customer display name, and keeps the conversation and
+  its audit trail on Fixlynk.
+- Eligibility is resolved per recipient from the recipient's own account,
+  never from the request, so a customer is never emailed and the same
+  event can be in-app for one party and email for another. Suspended
+  accounts and accounts without an email address are not emailed.
+- New transport seam `backend/src/services/mailer.ts` (`Mailer`
+  contract, `SmtpMailer` via nodemailer, `LogMailer`, `MemoryMailer`),
+  mirroring the existing file-storage adapter pattern, plus
+  `backend/src/services/notification-email.ts` for rendering. Customer
+  text and notification content are HTML-escaped and truncated, and
+  subjects are collapsed to a single bounded line.
+- New dependency: `nodemailer` (SMTP to any relay, no vendor lock-in),
+  used only behind the `Mailer` adapter. No framework, database,
+  authentication, storage or API architecture changed, and no API
+  request/response shape changed.
+- New configuration: `WEB_BASE_URL`, `MAIL_ENABLED`, `MAIL_HOST`,
+  `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM`,
+  `MAIL_FROM_NAME`. Email is off until configured, so an unconfigured
+  deployment behaves exactly as before; enabling mail without a host
+  fails fast at startup.
+- Migration `014_notification_email_delivery.sql` adds
+  `notifications.email_status` (`PENDING`/`SENT`/`FAILED`/`SKIPPED`),
+  `emailed_at` and `email_error`, with a reversible down section. `NULL`
+  means the channel was never attempted, so a deliberate skip is
+  distinguishable from a send failure. No admin endpoint exposes these
+  columns yet.
+- Tests: `backend/tests/notification-email.test.ts` (17 cases) covering
+  delivery content, the login-linked reply path, customer privacy,
+  per-role eligibility, escaping, failure isolation, tracking and the
+  unconfigured-deployment path. Backend suite: 448 tests passing.
+- Documentation updated: `NOTIFICATIONS.md` (new Stage 13 section and
+  revised "what remains"), `API.md` (§10.1 and §22), `ARCHITECTURE.md`
+  (channel design and the dependency decision), `DATABASE.md`,
+  `ENVIRONMENT.md`, `DEPLOYMENT.md`, `HANDOVER.md`, both `.env.example`
+  templates.
+- Not verified in this environment: migration 014 was not applied to a
+  live MySQL instance (the local database port was unreachable from the
+  development sandbox). Run `npm run db:migrate` and the database tests
+  before deploying.
+
+## Sign-up without a verification gate (2026-09-27)
+
+- `POST /api/v1/auth/register` now returns a session (`accessToken` +
+  `refreshToken`) alongside the safe user, and creates the account as
+  `ACTIVE`. A new customer or provider is signed in at the moment of
+  registration — there is no separate login step and no verification or
+  approval wait before the account can be used.
+- Registration creates the account, its role and its provider profile in one
+  transaction (`createAccount`), so a failed registration never consumes the
+  email address or leaves a half-provisioned account.
+- `PROFESSIONAL` registrations must supply a `displayName` and
+  `BUSINESS_OWNER` registrations a `businessName`; the matching
+  `professional_profiles` / `business_profiles` row is created with the
+  account (deterministic business slug, `verification_status` `UNVERIFIED`).
+  `CUSTOMER` still provisions `customer_profiles` lazily on the first job
+  request.
+- Web: the registration success interstitial was removed. The client stores
+  the new session and redirects to the role landing route, shared with login
+  (`roleLandingRoute`): `/my-jobs`, `/requests`, `/business`,
+  `/technician/jobs`, `/admin`, falling back to `/account`. Provider roles get
+  a name field on step 2.
+- Documentation updated: `API.md`, `USER-FLOWS.md`, `PERMISSIONS.md`,
+  `DATABASE.md`, `HANDOVER.md`, `TEST-PLAN.md`.
 
 ## Stage 12 — Client UAT and Handover Preparation (2026-09-25)
 

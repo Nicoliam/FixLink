@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — business foundation + technician management tests.
+ * Fixlynk Stage 7A — business foundation + technician management tests.
  *
  * Run: npm test (no MySQL required — uses the in-memory business store
  * with the same rules as the MySQL implementation).
@@ -187,7 +187,7 @@ describe('Stage 7A — authentication & role gating', () => {
   });
 
   it('3b. admin has no business identity in this stage (403)', async () => {
-    const admin = await provisionUser(ctx, 'admin@fixlink.example.co.za', ['ADMIN']);
+    const admin = await provisionUser(ctx, 'admin@fixlynk.example.co.za', ['ADMIN']);
     const me = await request(ctx.app).get('/api/v1/business/me').set('Authorization', `Bearer ${admin.token}`);
     assert.equal(me.status, 403);
     assertErrorEnvelope(me, 'FORBIDDEN_ROLE');

@@ -1,4 +1,4 @@
-# FixLink Post-Deployment Smoke Test
+# Fixlynk Post-Deployment Smoke Test
 
 This is the short smoke test to run after every deployment. Use a dedicated smoke account and fictional UAT data. Record the release version, date, operator and result.
 

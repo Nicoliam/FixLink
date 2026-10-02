@@ -12,7 +12,7 @@ type RosterStatus = 'loading' | 'ready' | 'empty' | 'error';
 const MANAGER_ROLES = ['BUSINESS_OWNER', 'BUSINESS_MANAGER'];
 
 /**
- * FixLink technician roster — Stage 7A (`/business/technicians`,
+ * Fixlynk technician roster — Stage 7A (`/business/technicians`,
  * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
  *
  * Lists the technicians belonging to the caller's business with an

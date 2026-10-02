@@ -1,8 +1,8 @@
-# FixLink Client User Acceptance Testing (UAT)
+# Fixlynk Client User Acceptance Testing (UAT)
 
-## 1. What is FixLink?
+## 1. What is Fixlynk?
 
-FixLink is a South African home-services marketplace and job-management platform. It helps customers find and hire service professionals or service businesses. It also gives businesses a private place to manage their customers, technicians and internal jobs.
+Fixlynk is a South African home-services marketplace and job-management platform. It helps customers find and hire service professionals or service businesses. It also gives businesses a private place to manage their customers, technicians and internal jobs.
 
 The main marketplace journey is:
 
@@ -22,7 +22,7 @@ You need:
 - A modern browser
 - The repository checked out locally
 
-## 3. Start FixLink locally
+## 3. Start Fixlynk locally
 
 Run these commands from the repository root.
 
@@ -90,7 +90,7 @@ Open `http://localhost:4200` in the browser.
 
 ## 4. Development test accounts
 
-These accounts are created by the fictional repository seed data. The shared password is `FixLink-dev-001`; it is a development credential and must never be used in production.
+These accounts are created by the fictional repository seed data. The shared password is `Fixlynk-dev-001`; it is a development credential and must never be used in production.
 
 | Role | Email | Purpose | Important restrictions |
 |---|---|---|---|
@@ -103,7 +103,7 @@ These accounts are created by the fictional repository seed data. The shared pas
 | Technician | `bongani.zulu@example.co.za` | Assigned My Jobs, photos, notes, voice notes and parts requests | Only actively assigned Ubuntu Plumbing jobs are visible |
 | Technician | `karin.meyer@example.co.za` | Technician isolation and reassignment testing | Cannot see jobs assigned to another technician or another business |
 | Second business owner | `thandi.khumalo@example.co.za` | Business isolation testing | Limited to Randburg Volt & Solar; must not see Ubuntu Plumbing data |
-| Admin | `admin@fixlink.example.co.za` | Platform dashboard, users, verification, certificates, reports, disputes and audit logs | Platform-wide access; use only for authorised testing |
+| Admin | `admin@fixlynk.example.co.za` | Platform dashboard, users, verification, certificates, reports, disputes and audit logs | Platform-wide access; use only for authorised testing |
 
 If a seeded account cannot log in, recreate the development data according to the repository procedure rather than changing production credentials.
 
@@ -299,7 +299,7 @@ Do not send passwords, access tokens, database passwords, API keys, identity doc
 
 ## 9. Important MVP boundaries
 
-- FixLink does not process customer payments, hold funds, operate escrow, or settle transactions.
+- Fixlynk does not process customer payments, hold funds, operate escrow, or settle transactions.
 - The customer pays the professional or business directly.
 - Verification documents are private and must only be opened by authorised administrators.
 - Technicians are not automatically marketplace professionals.

@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * FixLink migration runner.
+ * Fixlynk migration runner.
  *
  * Usage (from repo root):
  *   DB_PASSWORD=... node database/migrate.js up        # apply pending migrations

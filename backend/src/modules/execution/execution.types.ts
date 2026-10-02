@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — job execution & work-documentation types.
+ * Fixlynk Stage 6F — job execution & work-documentation types.
  *
  * Covers the IN_PROGRESS → COMPLETED → CONFIRMED → CLOSED segment of the
  * marketplace lifecycle plus the BEFORE → DURING → AFTER work record.

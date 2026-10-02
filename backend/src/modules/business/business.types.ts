@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — business foundation + technician management types.
+ * Fixlynk Stage 7A — business foundation + technician management types.
  *
  * Businesses and technicians reuse the existing tables
  * (`business_profiles`, `business_members`, `technicians`, `users`) —
@@ -85,7 +85,7 @@ export interface UpdateTechnicianInput {
 }
 
 /**
- * FixLink Stage 7B — business-managed customers + internal jobs.
+ * Fixlynk Stage 7B — business-managed customers + internal jobs.
  *
  * Business-managed customers reuse `customer_profiles` with
  * `user_id = NULL` and `business_id` set (see migration 003). Internal
@@ -245,7 +245,7 @@ export interface InternalJobsSummary {
 }
 
 /**
- * FixLink Stage 7G — business job board + history.
+ * Fixlynk Stage 7G — business job board + history.
  *
  * The board reuses the ONE shared `jobs` table (`source = INTERNAL`)
  * plus `job_assignments`, `job_status_history`, `job_updates`,
@@ -325,7 +325,7 @@ export interface BusinessBoardSummary {
 }
 
 /**
- * FixLink Stage 7C — technician assignment.
+ * Fixlynk Stage 7C — technician assignment.
  *
  * Assignments reuse the existing `job_assignments` table with
  * `assignment_type = TECHNICIAN`. The active assignment is the row
@@ -377,7 +377,7 @@ export interface AssignTechnicianInput {
 }
 
 /**
- * FixLink Stage 7D — technician execution + voice notes.
+ * Fixlynk Stage 7D — technician execution + voice notes.
  *
  * Reuses the ONE shared architecture: `jobs` (source = INTERNAL),
  * `job_images` (phase BEFORE/DURING/AFTER), `job_updates` (phase +
@@ -463,7 +463,7 @@ export interface TechnicianExecutionTimelineDto {
 }
 
 /**
- * FixLink Stage 7E — technician parts requests.
+ * Fixlynk Stage 7E — technician parts requests.
  *
  * Reuses the existing `parts_requests` / `parts_request_items` tables
  * (migration 006) on the ONE shared job engine — no new tables were

@@ -2,7 +2,7 @@
 
 ## Node.js (verified)
 
-FixLink web (`apps/web`, Angular 21) is verified with:
+Fixlynk web (`apps/web`, Angular 21) is verified with:
 
 - Node: `22.12.0` (see `.nvmrc` at repo root and in `apps/web`)
 - npm: `>=10` (`10.9.0` ships with Node 22.12.0; `11.13.0` also works)
@@ -54,7 +54,18 @@ The backend reads the exact variables documented in `docs/DEPLOYMENT.md`:
 `NODE_ENV`, `PORT`, `AUTH_STORE`, `DB_HOST`, `DB_PORT`, `DB_USER`,
 `DB_PASSWORD`, `DB_NAME`, `JWT_ACCESS_SECRET`,
 `JWT_ACCESS_TTL_SECONDS`, `REFRESH_TOKEN_TTL_SECONDS`, `BCRYPT_COST`,
-`CORS_ORIGIN` and `FILE_STORAGE_DIR`.
+`CORS_ORIGIN`, `FILE_STORAGE_DIR`, `WEB_BASE_URL`, `MAIL_ENABLED`,
+`MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`,
+`MAIL_PASSWORD`, `MAIL_FROM` and `MAIL_FROM_NAME`.
+
+Provider notification email is off until it is configured: with
+`MAIL_ENABLED` unset or `false` the rendered message is only written to
+the log and nothing is sent, so local development and tests never need a
+mail server. Set `MAIL_ENABLED=true` with `MAIL_HOST` (plus
+`MAIL_USER`/`MAIL_PASSWORD` when the relay needs them) and `WEB_BASE_URL`
+(the Angular dev origin, `http://localhost:4200`, is the default) to
+send provider emails with working in-app links. Use a fictional sender
+such as `no-reply@example.co.za` locally; never a real address.
 
 For local development, use the fictional values in `.env.example` and
 `backend/.env.example`. `AUTH_STORE=mysql` is the normal application

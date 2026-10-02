@@ -1,5 +1,5 @@
 {
-  "name": "fixlink",
+  "name": "fixlynk",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Nicoliam/FixLink.git"
+    "url": "git+https://github.com/Nicoliam/Fixlynk.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Nicoliam/FixLink/issues"
+    "url": "https://github.com/Nicoliam/Fixlynk/issues"
   },
-  "homepage": "https://github.com/Nicoliam/FixLink#readme"
+  "homepage": "https://github.com/Nicoliam/Fixlynk#readme"
 }

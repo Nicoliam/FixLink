@@ -12,7 +12,7 @@ type JobsStatus = 'loading' | 'ready' | 'empty' | 'error';
 const STATUS_OPTIONS = ['', 'REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'AWAITING_PARTS', 'COMPLETED'] as const;
 
 /**
- * FixLink technician My Jobs — Stage 7C (`/technician/jobs`,
+ * Fixlynk technician My Jobs — Stage 7C (`/technician/jobs`,
  * authenticated TECHNICIAN).
  *
  * Lists INTERNAL jobs with an active TECHNICIAN assignment to the

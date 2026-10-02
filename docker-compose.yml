@@ -1,17 +1,17 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: fixlink-mysql
+    container_name: fixlynk-mysql
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: fixlink
-      MYSQL_USER: fixlink
-      MYSQL_PASSWORD: fixlink_dev_password
+      MYSQL_DATABASE: fixlynk
+      MYSQL_USER: fixlynk
+      MYSQL_PASSWORD: fixlynk_dev_password
       MYSQL_ROOT_PASSWORD: root_dev_password
     ports:
       - "3307:3306"
     volumes:
-      - fixlink_mysql_data:/var/lib/mysql
+      - fixlynk_mysql_data:/var/lib/mysql
 
 volumes:
-  fixlink_mysql_data:
+  fixlynk_mysql_data:

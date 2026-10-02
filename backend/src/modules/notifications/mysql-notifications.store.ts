@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 8 — MySQL notifications store (production implementation).
+ * Fixlynk Stage 8 — MySQL notifications store (production implementation).
  *
  * Reuses the existing `notifications` table (migration 008) — no
  * migration was required. Every value is a bound parameter. All reads
@@ -9,6 +9,7 @@
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import type {
   CreateNotificationInput,
+  EmailDeliveryResult,
   NotificationDto,
   NotificationReferenceType,
   NotificationType,
@@ -123,5 +124,19 @@ export class MysqlNotificationsStore implements NotificationStore {
       [userId],
     );
     return result.affectedRows;
+  }
+
+  /**
+   * Stage 13 — email delivery metadata (migration 014). `emailed_at` is set
+   * only for a successful send, so a FAILED or SKIPPED row never claims a
+   * delivery time. The error string is truncated to the column width and
+   * is written by the service, never taken from an SMTP response body.
+   */
+  async markEmailDelivery(notificationId: string, result: EmailDeliveryResult): Promise<void> {
+    const error = result.error ? result.error.slice(0, 255) : null;
+    await this.pool.query(
+      'UPDATE `notifications` SET `email_status` = ?, `emailed_at` = ?, `email_error` = ? WHERE `id` = ?',
+      [result.status, result.status === 'SENT' ? new Date() : null, error, notificationId],
+    );
   }
 }

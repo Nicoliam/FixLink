@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — marketplace foundation tests.
+ * Fixlynk Stage 6A — marketplace foundation tests.
  *
  * Run: npm test (no MySQL required — uses the in-memory marketplace store
  * with the same visibility rules as the MySQL implementation).

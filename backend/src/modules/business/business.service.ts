@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — business foundation + technician management service.
+ * Fixlynk Stage 7A — business foundation + technician management service.
  *
  * Owns the authenticated business surface: profile read/update and the
  * technician roster. The business is always derived server-side from the

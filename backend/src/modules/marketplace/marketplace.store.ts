@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — marketplace data-access contract.
+ * Fixlynk Stage 6A — marketplace data-access contract.
  *
  * The MySQL implementation serves production; the memory implementation
  * serves automated tests (no database required) and mirrors the seeder

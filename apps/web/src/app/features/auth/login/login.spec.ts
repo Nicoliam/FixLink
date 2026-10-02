@@ -100,7 +100,7 @@ describe('LoginComponent', () => {
     });
   });
 
-  it('navigates to /account after successful login', async () => {
+  it('navigates to the role landing route after successful login', async () => {
     await setup();
     const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     component.form.setValue({ email: 'user@example.co.za', password: 'password123' });
@@ -108,7 +108,21 @@ describe('LoginComponent', () => {
 
     httpMock.expectOne(`${API}/auth/login`).flush({
       success: true,
-      data: { user: mockUser, accessToken: 'a', refreshToken: 'r' },
+      data: { user: { ...mockUser, roles: ['PROFESSIONAL'] }, accessToken: 'a', refreshToken: 'r' },
+    });
+
+    expect(navigateSpy).toHaveBeenCalledWith('/requests');
+  });
+
+  it('falls back to /account when the session has no recognised role', async () => {
+    await setup();
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    component.form.setValue({ email: 'user@example.co.za', password: 'password123' });
+    component.submit();
+
+    httpMock.expectOne(`${API}/auth/login`).flush({
+      success: true,
+      data: { user: { ...mockUser, roles: [] }, accessToken: 'a', refreshToken: 'r' },
     });
 
     expect(navigateSpy).toHaveBeenCalledWith('/account');

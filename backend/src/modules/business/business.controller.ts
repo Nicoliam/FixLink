@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — business + technician controllers.
+ * Fixlynk Stage 7A — business + technician controllers.
  * Authentication is enforced by `requireAuth`; business membership and
  * technician ownership are derived from the session user id inside the
  * service — never from the request body or parameters.
@@ -46,7 +46,7 @@ function uploadedFile(req: Request): UploadedFile | null {
 
 function safeDownloadName(name: string): string {
   const cleaned = name.replace(/["\r\n]/g, '').trim();
-  return cleaned === '' ? 'fixlink-file' : cleaned;
+  return cleaned === '' ? 'fixlynk-file' : cleaned;
 }
 
 export function makeBusinessController(service: BusinessService) {

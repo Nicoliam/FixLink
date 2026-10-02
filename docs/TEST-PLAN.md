@@ -1,4 +1,50 @@
-# FixLink — Test Plan
+# Fixlynk — Test Plan
+
+## Registration, sign-in and the absence of a verification gate
+
+Backend (`backend/tests/auth.test.ts`, in-memory stores, no MySQL
+required — run with `npm test` from `backend/`):
+
+- `POST /api/v1/auth/register` returns `201` with the safe user **and** a
+  token pair. The access token immediately opens a protected route
+  (`GET /api/v1/auth/me`) and the refresh token rotates normally, proving
+  registration establishes a real session rather than a stub.
+- A self-registered account is `ACTIVE`, not `PENDING`: verification is not
+  a prerequisite for access, so there is no intermediate gated state.
+- A `PROFESSIONAL` registration provisions `professional_profiles` from the
+  required `displayName`; a `BUSINESS_OWNER` registration provisions
+  `business_profiles` with the required `businessName`, a unique deterministic
+  slug, and the account contact details. Both start `UNVERIFIED`.
+- A `CUSTOMER` registration creates no profile (it is still provisioned
+  lazily on the first job request), and a provider name sent for a role with
+  no profile is ignored.
+- Missing `displayName` for `PROFESSIONAL` or missing `businessName` for
+  `BUSINESS_OWNER` is `422 VALIDATION_ERROR` and persists nothing, so a
+  rejected registration does not consume the email address.
+- Slug generation is unit-tested: lowercase, ASCII, hyphen separated,
+  deterministic for the same name + email.
+- Unchanged registration boundaries still hold: `403 FORBIDDEN_ROLE` for
+  `ADMIN`/`TECHNICIAN`/`BUSINESS_MANAGER`, `409 EMAIL_EXISTS` for duplicate
+  email, `409 CONFLICT` naming the phone number for a duplicate phone,
+  `409` (never `500`) for an unnamed duplicate key, bcrypt-only password
+  storage, and no password or hash material in any response body.
+
+Frontend (`apps/web`, run with `npm test`):
+
+- `auth.service.spec.ts`: a successful registration stores the token pair
+  and flips the client to `authenticated`; a failed registration leaves the
+  session untouched; the provider/business name is sent (and trimmed) only
+  for the role that needs it.
+- `register.spec.ts`: a successful submission navigates to the role landing
+  route (`/my-jobs`, `/requests`, `/business`) with no "now log in"
+  interstitial; the display-name field appears only for `PROFESSIONAL` and
+  the business-name field only for `BUSINESS_OWNER`; API errors keep the user
+  on the form with an explanation.
+- `role-landing.spec.ts`: role → landing mapping, provider-over-customer and
+  admin/business precedence for multi-role accounts, and the `/account`
+  fallback.
+- `login.spec.ts`: login lands on the role route, and an explicit
+  `?returnUrl=` still wins.
 
 ## Stage 6B — Customer Job Request / Job Creation
 
@@ -864,3 +910,49 @@ Stage 9 was confirmed by the current test runs:
   as implemented.
 
 No database migration is part of Stage 9.
+
+## Stage 13 — Provider Notification Email
+
+Backend (`backend/tests/notification-email.test.ts`, 17 cases —
+in-memory notifications store plus a `MemoryMailer` that records what
+would have been sent, so no MySQL and no SMTP server are required; run
+with `npm test` from `backend/`):
+
+- The provider is emailed the job request: subject, service, job
+  reference, location, preferred date and time, the customer's
+  description, and a link to that exact request
+  (`/requests/:id`) in both the text and HTML parts.
+- The emailed link is actionable: the provider opens the request from
+  their inbox and submits a quote, which reaches the customer in-app.
+- Privacy: no customer email address or phone appears anywhere in the
+  message, and the closing note directs the reply to the platform.
+- Eligibility (4–8): the customer is never emailed; a provider-facing
+  event addressed to the customer stays in-app only; business owner and
+  manager are both emailed for their business; a suspended provider is
+  not emailed and the attempt is recorded `SKIPPED`; with the log-only
+  adapter (mail unconfigured) nothing is sent and the tracking columns
+  stay `NULL`.
+- Safety and failure isolation (9–13): a mail failure still returns the
+  created job, the in-app notification still exists, the failure is
+  recorded as `FAILED` with no delivery time and only the error NAME
+  (never a relay response body); a provider can still quote after a mail
+  failure; a success is recorded `SENT` with a delivery time; customer
+  text cannot inject markup into the HTML body; role eligibility is
+  asserted directly.
+- Content and links (14–17): per-role deep links (provider, technician,
+  business internal job), no email at all for a notification with no job
+  to open, and a subject collapsed to a single bounded line.
+
+Regression: the full backend suite is green at 448/448, and
+`tsc --noEmit` passes.
+
+Manual verification still required (environment-limited here): apply
+migration `014_notification_email_delivery.sql` to MySQL
+(`npm run db:migrate` in `database/`) and run the database tests, then
+send one real message against a development SMTP relay with
+`MAIL_ENABLED=true` to confirm relay delivery and the `notifications`
+email columns.
+
+No frontend change is part of Stage 13: the email links into existing
+authenticated routes, and `authGuard` already preserves `returnUrl`
+through the login page.

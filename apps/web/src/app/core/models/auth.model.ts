@@ -66,6 +66,10 @@ export interface RegisterRequest {
   password: string;
   phone?: string;
   role?: SelfRegisterRole;
+  /** PROFESSIONAL only — the name shown to customers on the provider profile. */
+  displayName?: string;
+  /** BUSINESS_OWNER only — the name shown on the business profile. */
+  businessName?: string;
 }
 
 export interface AuthTokens {
@@ -79,8 +83,15 @@ export interface LoginResponseData {
   refreshToken: string;
 }
 
+/**
+ * Registration establishes a session: no verification step stands between
+ * creating an account and using it, so the response carries the same token
+ * pair as login.
+ */
 export interface RegisterResponseData {
   user: AuthUser;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface RefreshResponseData {

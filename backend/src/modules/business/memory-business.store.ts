@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — in-memory business store for automated tests.
+ * Fixlynk Stage 7A — in-memory business store for automated tests.
  *
  * Mirrors the MySQL implementation's rules (membership-derived access,
  * business-scoped roster, no double-linking, synced activation flags)

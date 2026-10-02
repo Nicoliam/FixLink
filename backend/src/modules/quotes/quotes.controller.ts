@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — provider request + quote controllers.
+ * Fixlynk Stage 6C — provider request + quote controllers.
  * Authentication is enforced by `requireAuth`; provider identity and job
  * ownership are derived from the session user id inside the service —
  * never from the request body or parameters.

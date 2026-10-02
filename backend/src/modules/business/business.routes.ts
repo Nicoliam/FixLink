@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A + 7B — business routes.
+ * Fixlynk Stage 7A + 7B — business routes.
  *
  * Stage 7A (foundation + technicians):
  * GET   /api/v1/business/me                  own business profile

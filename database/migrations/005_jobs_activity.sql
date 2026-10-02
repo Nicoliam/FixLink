@@ -1,4 +1,4 @@
--- FixLink migration 005 — Job activity (job_images, job_updates, job_voice_notes)
+-- Fixlynk migration 005 — Job activity (job_images, job_updates, job_voice_notes)
 -- File/audio binaries are NEVER stored in MySQL; only references + metadata.
 
 -- +migrate Up

@@ -29,7 +29,7 @@ type RequestDetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
 type WorkStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 /**
- * FixLink provider request detail — Stage 6C (`/requests/:id`) + Stage
+ * Fixlynk provider request detail — Stage 6C (`/requests/:id`) + Stage
  * 6D (accepted-quote display) + Stage 6E (scheduling and start) +
  * Stage 6F (work documentation and completion: IN_PROGRESS →
  * COMPLETED, read-only afterwards).

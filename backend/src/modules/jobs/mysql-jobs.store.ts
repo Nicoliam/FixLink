@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — MySQL jobs store (production implementation).
+ * Fixlynk Stage 6B — MySQL jobs store (production implementation).
  *
  * Persists marketplace job requests in the ONE shared `jobs` table with
  * `source = MARKETPLACE`, `status = REQUESTED`, plus the initial

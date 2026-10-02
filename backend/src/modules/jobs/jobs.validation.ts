@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — customer job request validation.
+ * Fixlynk Stage 6B — customer job request validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Fields the frontend must never control (`customer_id`, `source`,

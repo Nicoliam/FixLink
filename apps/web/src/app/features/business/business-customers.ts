@@ -9,7 +9,7 @@ import type { BusinessCustomer } from '../../core/models/business.model';
 type CustomersStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 /**
- * FixLink business customers — Stage 7B (`/business/customers`,
+ * Fixlynk business customers — Stage 7B (`/business/customers`,
  * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
  *
  * Lists the customers the business manages directly (private to the

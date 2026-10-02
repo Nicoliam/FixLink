@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * FixLink Stage 4 — Database foundation tests.
+ * Fixlynk Stage 4 — Database foundation tests.
  * Run: npm test (from database/) with DB_* env vars pointing at MySQL.
  * Read-only except for constraint checks, which run inside rolled-back
  * transactions and leave no residue.
@@ -272,7 +272,7 @@ describe('money, files and privacy rules', () => {
     assert.ok(rows.length > 0);
     for (const r of rows) {
       assert.ok(r.password_hash.length >= 50, 'password_hash suspiciously short');
-      assert.ok(!r.password_hash.includes('FixLink-dev-001'), 'plaintext password detected');
+      assert.ok(!r.password_hash.includes('Fixlynk-dev-001'), 'plaintext password detected');
     }
   });
 

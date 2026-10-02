@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — authenticated customer job routes.
+ * Fixlynk Stage 6B — authenticated customer job routes.
  *
  * POST /api/v1/jobs      create a MARKETPLACE job request (CUSTOMER only)
  * GET  /api/v1/jobs      list the authenticated customer's jobs

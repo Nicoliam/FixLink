@@ -2,16 +2,18 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { roleLandingRoute } from '../../../core/routing/role-landing';
 import { AuthShellComponent } from '../auth-shell/auth-shell';
 import { friendlyAuthMessage } from '../auth-errors';
 
 /**
- * FixLink login page (Stage 5B).
+ * Fixlynk login page (Stage 5B).
  *
  * Oceanic card layout with client-side validation, loading state, API error
- * state and post-login redirect (honours ?returnUrl=, falls back to
- * /account). Successful authentication state is the /account session page —
- * dashboards are out of scope for this stage.
+ * state and post-login redirect. An explicit ?returnUrl= wins; otherwise the
+ * user lands on the route for their highest-priority role (customer,
+ * provider, business, technician or admin). No verification step stands
+ * between logging in and reaching that surface.
  */
 @Component({
   selector: 'app-login',
@@ -55,9 +57,9 @@ export class LoginComponent {
     this.apiError.set(null);
 
     this.auth.login(this.form.getRawValue()).subscribe({
-      next: () => {
+      next: (user) => {
         const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-        void this.router.navigateByUrl(returnUrl && returnUrl.startsWith('/') ? returnUrl : '/account');
+        void this.router.navigateByUrl(returnUrl && returnUrl.startsWith('/') ? returnUrl : roleLandingRoute(user.roles));
       },
       error: (error: unknown) => {
         this.isSubmitting.set(false);

@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * FixLink seeder runner (development data only — fictional South African data).
+ * Fixlynk seeder runner (development data only — fictional South African data).
  *
  * Usage (from repo root):
  *   DB_PASSWORD=... node database/seed.js        # apply pending seed files

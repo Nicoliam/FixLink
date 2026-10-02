@@ -1,8 +1,8 @@
-# FixLink — File Storage
+# Fixlynk — File Storage
 
 ## 1. Purpose
 
-This document defines how FixLink stores user-uploaded files.
+This document defines how Fixlynk stores user-uploaded files.
 
 Rule:
 

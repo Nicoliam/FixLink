@@ -34,18 +34,43 @@ export interface CreateUserInput {
   passwordHash: string;
 }
 
+/**
+ * Role profile created in the same transaction as the account.
+ *
+ * A provider cannot function without one: `professional_profiles.display_name`
+ * and `business_profiles.business_name` are NOT NULL, and both provider
+ * resolvers (marketplace requests, business management) read these rows.
+ * Provisioning at registration is what makes a self-registering provider
+ * usable immediately without any verification step.
+ */
+export type ProfileProvision =
+  | { kind: 'PROFESSIONAL'; displayName: string }
+  | { kind: 'BUSINESS_OWNER'; businessName: string; slug: string; email: string; phone: string | null };
+
+export interface CreateAccountInput extends CreateUserInput {
+  /** Single self-registered role, e.g. CUSTOMER / PROFESSIONAL / BUSINESS_OWNER. */
+  role: string;
+  /** null for CUSTOMER (their profile is provisioned on first job request). */
+  profile: ProfileProvision | null;
+}
+
 export interface UserRepository {
   findByEmail(email: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
   create(input: CreateUserInput): Promise<UserRecord>;
+  /**
+   * Create an ACTIVE self-registered account with its role and provider
+   * profile atomically. Any failure rolls the whole unit back, so a failed
+   * registration never consumes the email address.
+   */
+  createAccount(input: CreateAccountInput): Promise<UserRecord>;
   setRoles(userId: string, roles: string[]): Promise<void>;
   getRoles(userId: string): Promise<string[]>;
   listAdminUsers(filters: AdminUserFilters): Promise<AdminList<AdminUserDto>>;
   touchLogin(userId: string): Promise<void>;
   /**
-   * Stage 7A — activate an invited technician login. Invited accounts
-   * land ACTIVE (registration still lands PENDING); suspension and
-   * deletion remain the caller's responsibility.
+   * Change an account status (e.g. admin suspend / reactivate). Registration
+   * and the technician invite flow both land ACTIVE.
    */
   setStatus(userId: string, status: UserStatus): Promise<void>;
   toSafeUser(user: UserRecord, roles: string[]): SafeUser;

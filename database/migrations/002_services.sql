@@ -1,4 +1,4 @@
--- FixLink migration 002 — Services catalogue (service_categories, services)
+-- Fixlynk migration 002 — Services catalogue (service_categories, services)
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS `service_categories` (

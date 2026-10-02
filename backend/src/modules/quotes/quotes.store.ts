@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — quotes data-access contract.
+ * Fixlynk Stage 6C — quotes data-access contract.
  *
  * The MySQL implementation serves production (transactional quote creation
  * + REQUESTED → QUOTED transition); the memory implementation serves

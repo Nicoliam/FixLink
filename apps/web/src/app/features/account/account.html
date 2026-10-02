@@ -2,7 +2,7 @@
   <div class="fl-auth-card" role="main" aria-labelledby="account-title">
     <span class="fl-pill fl-pill-verified" role="status">✓ Signed in</span>
     <h1 id="account-title" class="fl-auth-title">My account</h1>
-    <p class="fl-auth-subtitle">You are authenticated. Role dashboards arrive in the next stage.</p>
+    <p class="fl-auth-subtitle">Your account details and activity summary.</p>
 
     @if (currentUser(); as user) {
       <dl class="fl-account-list" data-testid="account-details">
@@ -22,9 +22,71 @@
           <dt>Status</dt>
           <dd>{{ user.status }}</dd>
         </div>
+        <div class="fl-account-row">
+          <dt>Member since</dt>
+          <dd>{{ memberSince() }}</dd>
+        </div>
       </dl>
     } @else {
       <p class="fl-auth-subtitle" role="status">Loading your session…</p>
+    }
+
+    @if (loading()) {
+      <p class="fl-state-text" role="status">Loading your activity…</p>
+    } @else if (error()) {
+      <div class="fl-state fl-state-error" role="alert">
+        <p class="fl-state-text">{{ error() }}</p>
+      </div>
+    } @else if (stats(); as s) {
+      <section class="fl-account-stats" aria-label="Account statistics">
+        <h2 class="fl-account-section-title">Overview</h2>
+        <div class="fl-stats-grid">
+          <div class="fl-stat">
+            <span class="fl-stat-value">{{ s.totalJobs }}</span>
+            <span class="fl-stat-label">Total jobs</span>
+          </div>
+          <div class="fl-stat">
+            <span class="fl-stat-value">{{ s.completedJobs }}</span>
+            <span class="fl-stat-label">Completed</span>
+          </div>
+          <div class="fl-stat">
+            <span class="fl-stat-value">{{ s.inProgressJobs }}</span>
+            <span class="fl-stat-label">In progress</span>
+          </div>
+          @if (isCustomer() || isProvider()) {
+            <div class="fl-stat">
+              <span class="fl-stat-value">{{ formatZar(s.totalSpent) }}</span>
+              <span class="fl-stat-label">Total spent</span>
+            </div>
+          }
+        </div>
+      </section>
+
+      @if (completedJobs().length > 0) {
+        <section class="fl-account-jobs" aria-label="Completed jobs">
+          <h2 class="fl-account-section-title">Completed jobs</h2>
+          <ul class="fl-job-list">
+            @for (job of completedJobs(); track job.id) {
+              <li class="fl-job-item">
+                <div class="fl-job-item-head">
+                  <span class="fl-job-ref">{{ job.reference }}</span>
+                  <span class="fl-pill fl-pill-success">{{ job.status }}</span>
+                </div>
+                <p class="fl-job-service">{{ job.service }}</p>
+                <div class="fl-job-item-meta">
+                  <span>{{ job.location }}</span>
+                  @if (job.amount) {
+                    <span>{{ formatZar(job.amount) }}</span>
+                  }
+                  @if (job.completedAt) {
+                    <span>{{ formatDate(job.completedAt) }}</span>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      }
     }
 
     <button

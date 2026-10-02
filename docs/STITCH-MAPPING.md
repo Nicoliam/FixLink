@@ -1,8 +1,8 @@
-# FixLink Stitch Screen Mapping
+# Fixlynk Stitch Screen Mapping
 
 ## 1. Purpose
 
-This document maps the approved Stitch designs to the FixLink application.
+This document maps the approved Stitch designs to the Fixlynk application.
 
 The Stitch export is the visual reference for the production Angular interface.
 
@@ -24,7 +24,7 @@ Design system:
 
 Official logo:
 
-`design/stitch/assets/brand/fixlink-logo.svg`
+`design/stitch/assets/brand/fixlynk-logo.svg`
 
 ---
 
@@ -38,7 +38,7 @@ Official logo:
 
 ### Purpose
 
-Introduce FixLink and provide the primary entry point into the marketplace.
+Introduce Fixlynk and provide the primary entry point into the marketplace.
 
 ### Primary User
 
@@ -261,7 +261,7 @@ Marketplace cards, forms, navigation and galleries must adapt to smaller screens
 
 1. Stitch is the visual reference.
 2. Oceanic Modern Marketplace is the approved design direction.
-3. Use the official FixLink logo.
+3. Use the official Fixlynk logo.
 4. Reuse design-system components.
 5. Do not create unnecessary one-off patterns.
 6. Keep spacing, typography, colours, radii and interaction patterns aligned with `docs/DESIGN-SYSTEM.md`.
@@ -322,7 +322,7 @@ Approved visual direction:
 
 Official logo:
 
-`design/stitch/assets/brand/fixlink-logo.svg`
+`design/stitch/assets/brand/fixlynk-logo.svg`
 
 When the Stitch design and implementation differ, review the implementation against the approved Stitch design before introducing a new visual pattern.
 

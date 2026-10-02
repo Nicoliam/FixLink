@@ -1,8 +1,8 @@
-# FixLink — Permissions Matrix
+# Fixlynk — Permissions Matrix
 
 ## 1. Purpose
 
-This document defines FixLink access control.
+This document defines Fixlynk access control.
 
 ## Current implementation note
 
@@ -238,6 +238,12 @@ continue to apply their own server-side checks. `ADMIN` does not by
 itself grant marketplace, business or technician capabilities. Conversely,
 another role does not grant admin access.
 
+The post-authentication landing route is chosen by the same precedence
+(admin → business owner/manager → technician → professional → customer,
+falling back to the account page). This is presentation only: the backend
+authorizes every subsequent request independently, so landing on a role
+surface grants nothing that the role does not already allow.
+
 ## Platform-wide visibility and scope
 
 The admin user, customer, professional, business, technician, service,
@@ -296,6 +302,27 @@ dispute updates and successful document views are recorded by the
 backend. A failed audit write rolls back the associated state change;
 there is no successful mutation without its audit record in the covered
 mutation paths.
+
+## Account creation and verification
+
+- Verification is NOT a prerequisite for using Fixlynk. Self-registration
+  creates an `ACTIVE` account and returns a session, so a new customer or
+  provider has full access to their own role surface immediately. There is no
+  "verify before you can continue" state.
+- Self-registration is limited to `CUSTOMER`, `PROFESSIONAL` and
+  `BUSINESS_OWNER`. `ADMIN`, `BUSINESS_MANAGER` and `TECHNICIAN` cannot be
+  self-assigned (`403 FORBIDDEN_ROLE`); they are granted by the platform or
+  provisioned by a business invite.
+- `PROFESSIONAL` must supply the `displayName` its profile is created with
+  and `BUSINESS_OWNER` the `businessName`; a missing name is
+  `422 VALIDATION_ERROR`. A name sent for a role with no profile is ignored.
+- Provider profiles are created `UNVERIFIED`. Verification is a public trust
+  badge, not an access gate: an unverified provider can work, quote and
+  complete jobs. A badge must still only render when the backend confirms the
+  corresponding verification state.
+- Suspension and deletion remain the only account states that deny access
+  (`401` on every authenticated route), and only an administrator can apply
+  them.
 
 ## Self-action and state rules
 

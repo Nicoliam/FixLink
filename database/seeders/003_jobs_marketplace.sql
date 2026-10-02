@@ -1,4 +1,4 @@
--- FixLink seeder 003 — Marketplace jobs, quotes, job activity, messaging, reviews.
+-- Fixlynk seeder 003 — Marketplace jobs, quotes, job activity, messaging, reviews.
 -- Amounts in ZAR. File references are external storage keys (metadata only).
 
 -- Job 1: Naledi x Sipho (leak repair), IN_PROGRESS with quote accepted.

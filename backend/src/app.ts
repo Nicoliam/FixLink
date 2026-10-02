@@ -35,6 +35,7 @@ import { MysqlNotificationsStore } from './modules/notifications/mysql-notificat
 import type { NotificationStore } from './modules/notifications/notifications.store';
 import { NotificationService } from './modules/notifications/notifications.service';
 import { LocalFileStorage, type FileStorage } from './services/file-storage';
+import { resolveMailer, type Mailer } from './services/mailer';
 import type { UserRepository } from './modules/users/user.repository';
 import { fail } from './utils/response';
 import { errorHandler } from './middleware/error';
@@ -72,6 +73,13 @@ export interface AppDeps {
    * best-effort in-app delivery.
    */
   notifications?: NotificationStore;
+  /**
+   * Stage 13 — email transport for provider notifications. Optional so
+   * pre-13 constructions keep compiling; `resolveMailer()` picks SMTP
+   * when mail is configured and a log-only adapter otherwise. Tests
+   * inject a `MemoryMailer` to assert what would have been sent.
+   */
+  mailer?: Mailer;
   admin?: AdminStore;
 }
 
@@ -151,9 +159,13 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   const storage = deps.storage ?? new LocalFileStorage();
   const business = deps.business ?? new MemoryBusinessStore();
   // Stage 8 — one central notification service shared by every
-  // feature service plus the notifications router below.
+  // feature service plus the notifications router below. Stage 13 gives
+  // it the recipient lookup and mail transport for the email channel;
+  // `resolveMailer()` returns a log-only adapter when mail is not
+  // configured, so an unconfigured deployment stays in-app only.
   const notifications = deps.notifications ?? new MemoryNotificationsStore();
-  const notify = new NotificationService(notifications);
+  const mailer = deps.mailer ?? resolveMailer();
+  const notify = new NotificationService(notifications, deps.users, mailer, env.webBaseUrl);
   const admin = deps.admin ?? new MemoryAdminStore(deps.users);
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore));

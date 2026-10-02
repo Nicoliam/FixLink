@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7B — internal business jobs + business-managed customers tests.
+ * Fixlynk Stage 7B — internal business jobs + business-managed customers tests.
  *
  * Run: npm test (no MySQL required — uses the in-memory business store
  * with the same rules as the MySQL implementation, plus the shared
@@ -277,7 +277,7 @@ describe('Stage 7B — role gating', () => {
   });
 
   it('admin has no business-customer or internal-job identity (403)', async () => {
-    const admin = await provisionUser(ctx, 'admin@fixlink.example.co.za', ['ADMIN']);
+    const admin = await provisionUser(ctx, 'admin@fixlynk.example.co.za', ['ADMIN']);
     const customers = await request(ctx.app)
       .get('/api/v1/business/customers')
       .set('Authorization', `Bearer ${admin.token}`);

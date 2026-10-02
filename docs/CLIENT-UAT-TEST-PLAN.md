@@ -1,4 +1,4 @@
-# FixLink Client UAT Test Plan
+# Fixlynk Client UAT Test Plan
 
 ## 1. How to use this plan
 

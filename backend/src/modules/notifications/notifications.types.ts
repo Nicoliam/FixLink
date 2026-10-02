@@ -1,13 +1,17 @@
 /**
- * FixLink Stage 8 — notification types.
+ * Fixlynk Stage 8 — notification types.
  *
- * MVP delivery is IN-APP ONLY (no email/SMS/WhatsApp/push, no
- * WebSockets — the frontend polls the unread count modestly).
+ * MVP delivery is IN-APP (the frontend polls the unread count modestly).
+ * Stage 13 adds an email channel for provider-side recipients on top of
+ * the same rows — see `docs/NOTIFICATIONS.md`; customers are not emailed.
+ * No SMS/WhatsApp/push and no WebSockets.
  * Every notification belongs to exactly one recipient user
  * (`user_id`), resolved server-side — the frontend never supplies
  * ownership. Messages carry only job/business display facts (service
  * name, reference, status); verification documents, private customer
- * contact details and admin-only information are never included.
+ * contact details and admin-only information are never included — this
+ * includes the Stage 13 email body, which links back into the app
+ * instead of exposing a way to contact the customer off-platform.
  *
  * Reference vocabulary (existing `notifications.reference_type` /
  * `reference_id` columns — no schema change):
@@ -95,4 +99,36 @@ export interface CreateNotificationInput {
   message: string | null;
   referenceType: NotificationReferenceType | null;
   referenceId: string | null;
+}
+
+/**
+ * Stage 13 — one label/value pair in the email body. Supplied by the
+ * emitting service so a provider can judge a job request from the email
+ * itself. Values are untrusted (a job description is customer text), so
+ * the renderer escapes and truncates them; nothing here is persisted.
+ */
+export interface NotificationEmailDetail {
+  label: string;
+  value: string;
+}
+
+/** Creation input accepted by the notification service (adds the email channel). */
+export interface NotificationRequest extends CreateNotificationInput {
+  email?: {
+    details: NotificationEmailDetail[];
+  };
+}
+
+/**
+ * Stage 13 — recorded outcome of the email channel for one notification
+ * row (migration 014). `SKIPPED` is a deliberate non-delivery (recipient
+ * not deliverable, or the notification has no addressable screen), which
+ * is deliberately distinct from `FAILED`.
+ */
+export type EmailDeliveryStatus = 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED';
+
+export interface EmailDeliveryResult {
+  status: EmailDeliveryStatus;
+  /** Non-sensitive failure reason; truncated before it is stored. */
+  error?: string | null;
 }

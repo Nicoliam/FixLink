@@ -14,7 +14,7 @@ import type {
 type ProfileStatus = 'loading' | 'ready' | 'error' | 'not-found';
 
 /**
- * FixLink provider profile page — Stage 6A (`/marketplace/providers/:id`).
+ * Fixlynk provider profile page — Stage 6A (`/marketplace/providers/:id`).
  *
  * Public trust profile: verification badges (backend-confirmed only),
  * services, service areas, portfolio with Before/After, approved

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — public marketplace provider controllers.
+ * Fixlynk Stage 6A — public marketplace provider controllers.
  * No authentication required: provider cards, profiles, portfolio,
  * approved certificates and visible reviews are public data.
  * Private data is excluded by the store projections, never by the client.

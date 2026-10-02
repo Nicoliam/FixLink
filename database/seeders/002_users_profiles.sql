@@ -1,10 +1,10 @@
--- FixLink seeder 002 — Users, roles, profiles, businesses, technicians.
+-- Fixlynk seeder 002 — Users, roles, profiles, businesses, technicians.
 -- ALL data is fictional (example.co.za emails, 555-range phones). No real people.
 -- password_hash values are bcrypt hashes of the fictional dev password
--- 'FixLink-dev-001'.
+-- 'Fixlynk-dev-001'.
 
 INSERT INTO `users` (`id`, `email`, `phone`, `password_hash`, `status`, `email_verified_at`, `phone_verified_at`, `created_at`) VALUES
-  (1, 'admin@fixlink.example.co.za', '+27825550100', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-01 08:00:00', '2026-08-01 08:05:00', '2026-08-01 08:00:00'),
+  (1, 'admin@fixlynk.example.co.za', '+27825550100', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-01 08:00:00', '2026-08-01 08:05:00', '2026-08-01 08:00:00'),
   (2, 'naledi.dlamini@example.co.za', '+27825550101', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 09:00:00', NULL, '2026-09-01 09:00:00'),
   (3, 'pieter.vdm@example.co.za', '+27825550102', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-02 10:00:00', NULL, '2026-09-02 10:00:00'),
   (4, 'aisha.patel@example.co.za', '+27825550103', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-03 11:00:00', NULL, '2026-09-03 11:00:00'),

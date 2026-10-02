@@ -7,6 +7,11 @@
  * These roles must NOT be self-assigned:
  *   BUSINESS_MANAGER, TECHNICIAN — provisioned by a business (invite flow, later stage)
  *   ADMIN — granted explicitly by the backend/platform (never via public registration)
+ *
+ * Registration is not gated on verification: a new CUSTOMER, PROFESSIONAL or
+ * BUSINESS_OWNER is immediately ACTIVE and receives a session. Provider roles
+ * must supply the name their customers see (displayName / businessName) so the
+ * matching profile row can be created in the same transaction.
  */
 
 export const SELF_REGISTER_ROLES = ['CUSTOMER', 'PROFESSIONAL', 'BUSINESS_OWNER'] as const;
@@ -22,16 +27,28 @@ export const ALL_KNOWN_ROLES = [
 ] as const;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const PHONE_RE = /^[+]?[0-9][0-9\s\-()]{5,18}[0-9]$/;
+const PHONE_RE = /^0\d{9}$/;
 
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
+/** Matches `professional_profiles.display_name` / `business_profiles.business_name`. */
+export const PROFILE_NAME_MAX = 255;
+
+/**
+ * A self-registering provider needs the name their customers see. Registration
+ * therefore collects it up front so the provider profile is complete and
+ * usable immediately — no verification step is required to use Fixlynk.
+ */
 export interface RegisterInput {
   email: string;
   password: string;
   phone: string | null;
   role: SelfRegisterRole;
+  /** PROFESSIONAL only — the public display name on the provider profile. */
+  displayName: string | null;
+  /** BUSINESS_OWNER only — the business name on the business profile. */
+  businessName: string | null;
 }
 
 export interface LoginInput {
@@ -48,9 +65,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+/** Trimmed profile name from the body, or an error message. */
+function readProfileName(
+  raw: unknown,
+  field: string,
+  { required }: { required: boolean },
+): { value: string | null } | { error: string } {
+  if (raw === undefined || raw === null || raw === '') {
+    return required ? { error: `${field} is required.` } : { value: null };
+  }
+  if (typeof raw !== 'string') return { error: `${field} must be text.` };
+  const trimmed = raw.trim();
+  if (trimmed === '') return required ? { error: `${field} is required.` } : { value: null };
+  if (trimmed.length > PROFILE_NAME_MAX) {
+    return { error: `${field} must be at most ${PROFILE_NAME_MAX} characters.` };
+  }
+  return { value: trimmed };
+}
+
 export function validateRegister(body: unknown): { input?: RegisterInput; error?: string } {
   if (!isRecord(body)) return { error: 'Request body must be a JSON object.' };
-  const { email, password, phone, role } = body;
+  const { email, password, phone, role, displayName, businessName } = body;
 
   if (typeof email !== 'string' || email.trim() === '') return { error: 'Email is required.' };
   const normalised = normalizeEmail(email);
@@ -69,7 +104,7 @@ export function validateRegister(body: unknown): { input?: RegisterInput; error?
   if (phone !== undefined && phone !== null && phone !== '') {
     if (typeof phone !== 'string') return { error: 'Phone must be a string.' };
     const trimmed = phone.trim();
-    if (!PHONE_RE.test(trimmed)) return { error: 'Phone format is invalid.' };
+    if (!PHONE_RE.test(trimmed)) return { error: 'Enter a valid South African cell number (10 digits starting with 0).' };
     normalisedPhone = trimmed;
   }
 
@@ -86,9 +121,24 @@ export function validateRegister(body: unknown): { input?: RegisterInput; error?
     }
   }
 
-  return { input: { email: normalised, password, phone: normalisedPhone, role: requestedRole } };
-}
+  // Provider/business names are role-scoped: a name sent for another role is
+  // ignored rather than rejected, so the same client form can post one body.
+  const display = readProfileName(displayName, 'Display name', { required: requestedRole === 'PROFESSIONAL' });
+  if ('error' in display) return { error: display.error };
+  const business = readProfileName(businessName, 'Business name', { required: requestedRole === 'BUSINESS_OWNER' });
+  if ('error' in business) return { error: business.error };
 
+  return {
+    input: {
+      email: normalised,
+      password,
+      phone: normalisedPhone,
+      role: requestedRole,
+      displayName: requestedRole === 'PROFESSIONAL' ? display.value : null,
+      businessName: requestedRole === 'BUSINESS_OWNER' ? business.value : null,
+    },
+  };
+}
 export function validateLogin(body: unknown): { input?: LoginInput; error?: string } {
   if (!isRecord(body)) return { error: 'Request body must be a JSON object.' };
   const { email, password } = body;

@@ -1,8 +1,8 @@
-# FixLink — Database Architecture
+# Fixlynk — Database Architecture
 
 ## 1. Database
 
-FixLink uses:
+Fixlynk uses:
 
 MySQL 8
 
@@ -525,6 +525,20 @@ Stage 8 vocabulary: `type` is one of `JOB_REQUEST`,
 exactly one job detail; `read_at` NULL means unread. No duplicate
 job data is stored — only the reference.
 
+Stage 13 adds three nullable columns (migration
+`014_notification_email_delivery.sql`) recording the outcome of the
+email channel for that row:
+
+- email_status — `PENDING`, `SENT`, `FAILED` or `SKIPPED`
+- emailed_at — when the send succeeded
+- email_error — a truncated, non-sensitive failure reason
+
+These columns describe delivery only. They are not part of the
+notification contract the API returns, they never gate the in-app
+notification, and no email body, recipient address or rendered template
+is stored — the row keeps referencing the job, and the recipient keeps
+belonging to `user_id`.
+
 
 ## 26. Saved Providers
 
@@ -749,7 +763,7 @@ Any structural database change must:
 
 ## 39. Database Principle
 
-The database should support the approved FixLink product without unnecessary
+The database should support the approved Fixlynk product without unnecessary
 complexity.
 
 Prefer a clear relational model over premature optimization.
@@ -786,8 +800,23 @@ table.
 
 ### 40.4 `users.status` values
 
-`PENDING` (registered, not yet verified), `ACTIVE`, `SUSPENDED`, `DELETED`
-(soft-deleted; row retained with `deleted_at` for history preservation).
+`PENDING`, `ACTIVE`, `SUSPENDED`, `DELETED` (soft-deleted; row retained with
+`deleted_at` for history preservation).
+
+Self-registration creates `ACTIVE` accounts: verification is not a
+prerequisite for using Fixlynk, so there is no intermediate state between
+"account created" and "account usable". `PENDING` remains a valid value in the
+`ENUM` for accounts that a platform decision has not activated yet, and
+`requireAdmin` still requires `ACTIVE` for administrator access.
+
+Registration writes the `users` row, the `user_roles` assignment and the role
+profile in a single transaction: `professional_profiles` for `PROFESSIONAL`
+(using the supplied `displayName`) and `business_profiles` for
+`BUSINESS_OWNER` (using the supplied `businessName` and a slug derived from
+the business name and account email). Both profiles start
+`verification_status = 'UNVERIFIED'`, which is a public badge state and not
+an access gate. `customer_profiles` is still created lazily on the customer's
+first job request.
 
 ### 40.5 `jobs.confirmed_at`
 
@@ -810,7 +839,7 @@ future addition that must not break this column (additive table, e.g.
 ### 40.8 Seed password hashes are development-only bcrypt hashes
 
 Development seeds use bcrypt hashes of the fictional password
-`FixLink-dev-001`. They exist only to support isolated development/UAT
+`Fixlynk-dev-001`. They exist only to support isolated development/UAT
 accounts and prove that plaintext passwords are not stored. The seeded
 hashes are compatible with the current authentication implementation.
 They are not production credentials and must never be deployed to a

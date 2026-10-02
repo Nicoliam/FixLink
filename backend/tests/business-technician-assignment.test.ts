@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7C — technician assignment + My Jobs tests.
+ * Fixlynk Stage 7C — technician assignment + My Jobs tests.
  *
  * Run: npm test (no MySQL required — in-memory business store +
  * shared in-memory jobs store).

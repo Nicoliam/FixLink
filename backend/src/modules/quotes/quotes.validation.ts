@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — provider quote validation.
+ * Fixlynk Stage 6C — provider quote validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Fields the frontend must never control (quote owner, job status,

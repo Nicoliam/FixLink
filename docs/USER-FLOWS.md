@@ -1,4 +1,4 @@
-# FixLink — User Flows
+# Fixlynk — User Flows
 
 ## Current implementation note
 
@@ -11,7 +11,7 @@ profile/certificate/portfolio management and admin settings.
 
 ## 1. Purpose
 
-This document defines the main FixLink user journeys.
+This document defines the main Fixlynk user journeys.
 
 The flows describe expected product behaviour and provide a reference for
 frontend, backend, database and testing implementation.
@@ -46,6 +46,9 @@ BUSINESS_MANAGER and TECHNICIAN are never offered.
 
 Step 2 — account details
 
+Enter display name (Professional only)
+Enter business name (Business owner only)
+↓
 Enter email
 ↓
 Enter phone (optional)
@@ -56,15 +59,23 @@ Confirm password
 ↓
 Create account
 ↓
-Account created (PENDING)
+Account created and signed in
 ↓
-Log in
-↓
-Customer dashboard
+Role dashboard (no verification step)
 
 The selected account type is retained when moving between the steps, so Back
 returns to step 1 with the chosen type still highlighted and allows it to be
 changed. Step 2 values entered before pressing Back are also retained.
+
+Professional and business owner accounts are asked for the name customers will
+see, because the backend creates `professional_profiles` / `business_profiles`
+in the same transaction as the account. Customers are asked for neither.
+
+Registration establishes a session: the response carries the same access and
+refresh tokens as login, so there is no separate login step and no
+verification/approval wait. The user lands on the route for the account type
+they registered as — `/my-jobs` for a customer, `/requests` for a
+professional, `/business` for a business owner.
 
 
 ## 2.2 Customer Login
@@ -80,6 +91,11 @@ Enter password
 Authentication
 ↓
 Customer dashboard
+
+Login lands on the same role route as registration (`/my-jobs` for a
+customer, `/requests` for a professional, `/business` for a business owner,
+`/technician/jobs` for a technician, `/admin` for an admin, `/account` as the
+fallback). An explicit `?returnUrl=` takes precedence.
 
 
 ## 2.3 Customer Searches for Service
@@ -1513,7 +1529,7 @@ membership role, real technician count; jobs shown as an explicit
 name, description, contact, city/province) → Technicians (roster
 with status and contact info) → Invite a technician (name, email,
 optional phone, initial password for brand-new accounts; existing
-FixLink accounts are linked without a password change) →
+Fixlynk accounts are linked without a password change) →
 Technician detail (rename, activate/deactivate; deactivation
 immediately revokes that technician's business access).
 

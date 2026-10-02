@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — MySQL business store (production implementation).
+ * Fixlynk Stage 7A — MySQL business store (production implementation).
  *
  * Reuses the existing `business_profiles`, `business_members`,
  * `technicians` and `users` tables — no migration was required. Every

@@ -1,4 +1,4 @@
--- FixLink seeder 004 — Internal business job, parts flow, portfolio,
+-- Fixlynk seeder 004 — Internal business job, parts flow, portfolio,
 -- certificates, verification and audit trail. All data fictional.
 
 -- Job 5: INTERNAL job by Ubuntu Plumbing for business-managed customer Jabulani.

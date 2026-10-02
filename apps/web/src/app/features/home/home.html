@@ -1,97 +1,348 @@
 <div class="fl-home">
-  <section class="fl-hero" aria-labelledby="fl-hero-title">
-    <div class="fl-hero-inner">
-      <img
-        ngSrc="brand/fixlink-logo.png"
-        width="178"
-        height="60"
-        priority
-        alt="FixLink — Connect. Quote. Fix."
-        class="fl-landing-logo"
-      />
-      <p class="fl-eyebrow">Connect. Quote. Fix.</p>
-      <h1 id="fl-hero-title" class="fl-landing-title">Trusted home services, across South Africa</h1>
-      <p class="fl-landing-text">
-        Find verified professionals and service businesses — from plumbing and electrical
-        to painting, building and more.
-      </p>
-
-      <app-marketplace-search (searched)="onSearch($event)" />
-
-      @if (auth.isRestoring()) {
-        <p class="fl-landing-text" role="status">Checking your session…</p>
-      } @else if (auth.isAuthenticated() && auth.currentUser()) {
-        <p class="fl-landing-text" role="status">
-          Signed in as <strong>{{ auth.currentUser()?.email }}</strong>
+  <!-- HERO SECTION -->
+  <section class="fl-hero-section">
+    <div class="fl-hero-glow-1"></div>
+    <div class="fl-hero-glow-2"></div>
+    <div class="fl-hero-grid">
+      <div class="fl-hero-copy">
+        <div class="fl-suburb-tag">
+          <span class="fl-suburb-tag-dot"></span>
+          <span class="fl-suburb-tag-text">Trusted Professionals in South Africa</span>
+        </div>
+        <h1 class="fl-hero-title">
+          Find a handyman you can <span class="text-primary">trust.</span>
+        </h1>
+        <p class="fl-hero-description">
+          Connect with skilled local professionals for repairs, maintenance and home improvement. Vetted background checks, upfront pricing, and real work photos.
         </p>
-        <div class="fl-landing-actions">
-          <a class="fl-btn fl-btn-primary" routerLink="/account">Go to my account</a>
-          <a class="fl-btn fl-btn-secondary" routerLink="/marketplace">Browse marketplace</a>
+        <div class="fl-search-card" id="search-anchor">
+          <form class="fl-search-form" (ngSubmit)="onSearch()">
+            <div class="fl-search-input-group">
+              <span class="material-symbols-outlined fl-search-input-icon">search</span>
+              <div class="fl-search-input-wrapper">
+                <label class="fl-search-input-label" for="need-input">What do you need?</label>
+                <input class="fl-search-input" id="need-input" type="text" placeholder="Plumbing, painting, electrical, tiling…" [(ngModel)]="searchNeed" name="need">
+              </div>
+            </div>
+            <div class="fl-search-divider"></div>
+            <div class="fl-search-divider-mobile"></div>
+            <div class="fl-search-input-group">
+              <span class="material-symbols-outlined fl-search-input-icon">location_on</span>
+              <div class="fl-search-input-wrapper">
+                <label class="fl-search-input-label" for="location-input">Where?</label>
+                <input class="fl-search-input" id="location-input" type="text" placeholder="Fourways, Sandton, Bryanston…" [(ngModel)]="searchLocation" name="location">
+              </div>
+            </div>
+            <button class="fl-search-button" type="submit">
+              <span>Find a Handyman</span>
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </button>
+          </form>
         </div>
-      } @else {
-        <div class="fl-landing-actions">
-          <a class="fl-btn fl-btn-primary" routerLink="/marketplace">Find a professional</a>
-          <a class="fl-btn fl-btn-secondary" routerLink="/register">Create an account</a>
-          <a class="fl-btn fl-btn-secondary" routerLink="/login">Log in</a>
+        <div class="fl-suburb-bar">
+          <div class="fl-suburb-links">
+            <span>Popular suburbs:</span>
+            <a href="#">Fourways</a>
+            <span aria-hidden="true">&bull;</span>
+            <a href="#">Sandton</a>
+            <span aria-hidden="true">&bull;</span>
+            <a href="#">Bryanston</a>
+            <span aria-hidden="true">&bull;</span>
+            <a href="#">Rosebank</a>
+          </div>
+          <a class="fl-artisan-link" routerLink="/register" [queryParams]="{ role: 'PROFESSIONAL' }">
+            <span>Are you a skilled artisan? Join as a Handyman</span>
+            <span class="material-symbols-outlined">chevron_right</span>
+          </a>
         </div>
-      }
-
-      <ul class="fl-trust-list" aria-label="Why FixLink">
-        <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Verified professionals</li>
-        <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Upfront quotes in Rand</li>
-        <li><span class="fl-trust-badge" aria-hidden="true">✓</span> Before / During / After photo proof</li>
-      </ul>
+      </div>
+      <div class="fl-hero-media">
+        <div class="fl-hero-image-wrapper">
+          <img class="fl-hero-image" src="/images/homepage/fixlynk-during.jpg" alt="A professional South African plumber fixing a leaking pipe under a sink">
+        </div>
+      </div>
     </div>
   </section>
 
-  <section class="fl-home-section" aria-labelledby="fl-categories-title">
-    <h2 id="fl-categories-title" class="fl-section-title">Browse by service</h2>
-    @if (categories().length > 0) {
-      <ul class="fl-category-grid">
-        @for (category of categories(); track category.id) {
-          <li>
-            <a
-              class="fl-category-card"
-              [routerLink]="['/marketplace']"
-              [queryParams]="{ category: category.slug }"
-            >
-              <strong>{{ category.name }}</strong>
-              @if (category.description) {
-                <span>{{ category.description }}</span>
-              }
-            </a>
-          </li>
-        }
-      </ul>
-    } @else if (categoriesFailed()) {
-      <p class="fl-state-text" role="status">
-        Service categories are unavailable right now — use search above instead.
-      </p>
-    } @else {
-      <p class="fl-state-text" role="status">Loading services…</p>
-    }
+  <!-- TRUST STRIP -->
+  <section class="fl-trust-strip">
+    <div class="fl-trust-strip-grid">
+      <div class="fl-trust-marker">
+        <div class="fl-trust-marker-icon secondary-container">
+          <span class="material-symbols-outlined fill-icon">verified</span>
+        </div>
+        <div>
+          <h4 class="fl-trust-marker-title">Verified Professionals</h4>
+          <p class="fl-trust-marker-text">ID &amp; SAPS background checked</p>
+        </div>
+      </div>
+      <div class="fl-trust-marker">
+        <div class="fl-trust-marker-icon primary-fixed">
+          <span class="material-symbols-outlined fill-icon">photo_library</span>
+        </div>
+        <div>
+          <h4 class="fl-trust-marker-title">Real Work Portfolios</h4>
+          <p class="fl-trust-marker-text">Proof of past South African jobs</p>
+        </div>
+      </div>
+      <div class="fl-trust-marker">
+        <div class="fl-trust-marker-icon secondary">
+          <span class="material-symbols-outlined fill-icon">near_me</span>
+        </div>
+        <div>
+          <h4 class="fl-trust-marker-title">Local Professionals</h4>
+          <p class="fl-trust-marker-text">Near Fourways &amp; Sandton</p>
+        </div>
+      </div>
+      <div class="fl-trust-marker">
+        <div class="fl-trust-marker-icon primary-fixed">
+          <span class="material-symbols-outlined fill-icon">star</span>
+        </div>
+        <div>
+          <h4 class="fl-trust-marker-title">Customer Reviews</h4>
+          <p class="fl-trust-marker-text">Authentic, unedited feedback</p>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <section class="fl-home-section" aria-labelledby="fl-featured-title">
-    <div class="fl-section-row">
-      <h2 id="fl-featured-title" class="fl-section-title">Featured providers</h2>
-      <a class="fl-link" routerLink="/marketplace">View all →</a>
-    </div>
-    @if (featuredStatus() === 'loading') {
-      <p class="fl-state-text" role="status">Loading providers…</p>
-    } @else if (featuredStatus() === 'error') {
-      <p class="fl-state-text" role="alert">
-        Could not load providers right now. <a class="fl-link" routerLink="/marketplace">Open the marketplace</a>
-        to try again.
-      </p>
-    } @else if (featuredStatus() === 'empty') {
-      <p class="fl-state-text" role="status">No providers are listed yet — check back soon.</p>
-    } @else {
-      <div class="fl-provider-grid">
-        @for (provider of featured(); track provider.id) {
-          <app-provider-card [provider]="provider" />
+  <!-- POPULAR SERVICES GRID -->
+  <section class="fl-section" id="services">
+    <div class="fl-section-container">
+      <div class="fl-section-header">
+        <div>
+          <span class="fl-section-eyebrow">Browse by Category</span>
+          <h2 class="fl-section-title">Popular Services</h2>
+          <p class="fl-section-subtitle">Find the right verified professional for the job.</p>
+        </div>
+        <a class="fl-section-link" routerLink="/marketplace">
+          <span>View all 48 services</span>
+          <span class="material-symbols-outlined">arrow_forward</span>
+        </a>
+      </div>
+      <div class="fl-services-grid">
+        @for (service of services(); track service.name) {
+          <a class="fl-service-card" href="#">
+            <div class="fl-service-icon" [class]="service.iconClass">
+              <span class="material-symbols-outlined">{{ service.icon }}</span>
+            </div>
+            <div>
+              <h3 class="fl-service-name">{{ service.name }}</h3>
+              <p class="fl-service-description">{{ service.description }}</p>
+            </div>
+            <div class="fl-service-footer">
+              <span>From {{ service.price }}</span>
+              <span class="material-symbols-outlined">chevron_right</span>
+            </div>
+          </a>
         }
       </div>
-    }
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="fl-section fl-how-it-works" id="how-it-works">
+    <div class="fl-section-container">
+      <div class="fl-how-header">
+        <span class="fl-section-eyebrow secondary">Frictionless Process</span>
+        <h2 class="fl-section-title">Getting help is simple.</h2>
+        <p class="fl-section-subtitle">Book reliable local handymen in four transparent steps with zero surprises.</p>
+      </div>
+      <div class="fl-steps-grid">
+        @for (step of steps(); track step.number) {
+          <div class="fl-step-card">
+            <div class="fl-step-number" aria-hidden="true">{{ step.number }}</div>
+            <div class="fl-step-content">
+              <div class="fl-step-icon" [class]="step.iconClass">
+                <span class="material-symbols-outlined">{{ step.icon }}</span>
+              </div>
+              <h3 class="fl-step-title">{{ step.title }}</h3>
+              <p class="fl-step-text">{{ step.text }}</p>
+            </div>
+            <div class="fl-step-footer">
+              <span>{{ step.footer }}</span>
+              <span class="material-symbols-outlined">check</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUSTED PROFESSIONALS NEAR YOU -->
+  <section class="fl-section" id="featured">
+    <div class="fl-section-container">
+      <div class="fl-section-header">
+        <div>
+          <span class="fl-section-eyebrow">Handpicked Artisans</span>
+          <h2 class="fl-section-title">Trusted Professionals Near You</h2>
+          <p class="fl-section-subtitle">Top-rated handymen currently available in Fourways, Sandton &amp; Bryanston.</p>
+        </div>
+        <div class="fl-filter-bar">
+          <span class="fl-filter-label">Filter:</span>
+          <span class="fl-filter-pill active">Available Today</span>
+          <span class="fl-filter-pill inactive">Top Rated</span>
+        </div>
+      </div>
+      <div class="fl-professionals-grid">
+        @for (pro of professionals(); track pro.name) {
+          <div class="fl-professional-card">
+            <div class="fl-professional-card-body">
+              <div class="fl-professional-header">
+                <div class="fl-professional-info">
+                  <img class="fl-professional-avatar" [src]="pro.avatar" [alt]="pro.name">
+                  <div>
+                    <h3 class="fl-professional-name">{{ pro.name }}</h3>
+                    <div class="fl-professional-location">
+                      <span class="material-symbols-outlined">location_on</span>
+                      <span>{{ pro.location }}</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="fl-verified-badge">
+                  <span class="material-symbols-outlined fill-icon">verified</span>
+                  <span>Verified</span>
+                </span>
+              </div>
+              <div class="fl-professional-skills">
+                @for (skill of pro.skills; track skill) {
+                  <span class="fl-skill-tag">{{ skill }}</span>
+                }
+              </div>
+              <div class="fl-professional-metrics">
+                <div class="fl-professional-rating">
+                  <span class="star">&#9733; {{ pro.rating }}</span>
+                  <span class="review-count">({{ pro.reviews }} reviews)</span>
+                </div>
+                <div class="fl-professional-exp">
+                  <span class="material-symbols-outlined">work_history</span>
+                  <span>{{ pro.experience }}</span>
+                </div>
+              </div>
+              <div class="fl-portfolio-section">
+                <span class="fl-portfolio-label">Recent Verified Work</span>
+                <div class="fl-portfolio-grid">
+                  @for (img of pro.portfolio; track img) {
+                    <img class="fl-portfolio-item" [src]="img" alt="Completed work by {{ pro.name }}">
+                  }
+                </div>
+              </div>
+            </div>
+            <div class="fl-professional-card-footer">
+              <div>
+                <span class="fl-professional-price-label">Starting from</span>
+                <span class="fl-professional-price">{{ pro.price }}</span>
+              </div>
+              <div class="fl-professional-actions">
+                <button class="fl-btn-view-profile" type="button">View Profile</button>
+                <button class="fl-btn-request-job" type="button">Request Job</button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST & PROOF SPLIT SECTION -->
+  <section class="fl-section fl-split-section">
+    <div class="fl-section-container">
+      <div class="fl-split-grid">
+        <div class="fl-collage">
+          <div class="fl-collage-col">
+            <div class="fl-collage-item tall">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgAPdBwUtWpjOF-d1nmxDmIEIXSnZiiaBXb6yMBU3uoK2wPHT7MlHpcHK5uQEWA_okE3YoScPgFcwUNBvgIDZDYxOLQ_Xp2Ymrt514leuQfJShIRwSD3Qu4Qk-Svr2kD8wjSNxLuf8j1r7KzA_7fse1rP7gkqfD_wMGujtx9yVKHKftmuWJczEB8-7OOcqfWM3izi7Cb7dyXUeYX7HnJDRniPyeISUEvmmMg79bjJadVuQfbQNaT0ttg" alt="A modern, high-end bathroom renovation showcase in Johannesburg">
+              <span class="fl-collage-label">Bathroom Revamp &bull; Fourways</span>
+            </div>
+            <div class="fl-collage-item short">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDotrApdD08UpdaK_ONtK31Cl-EoLP63oejYQjsk3qvLNebUVzYKhuyVFBfCHferiuhb5NwbisuERkWt9-VCbZa-cFrlQdhvFtAr7gswjsPj_s_MDucuwqd-6Q5CJ39hDeXZeGLuS-tCyttIpHKrRR8kxx8oJGpq133C4njhXelc-SZZtxHq8hfWoQQRYxMoA6sSjmCXu8NyesgIFqZOEji3BTywzrv3iPXl05OcSgO_nVJ1lGDH8-C3Q" alt="A clean copper pipe water manifold repair under a modern kitchen sink">
+              <span class="fl-collage-label">Plumbing Fix &bull; Bryanston</span>
+            </div>
+          </div>
+          <div class="fl-collage-col offset">
+            <div class="fl-collage-item short">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAaIZxwm8Hj1mDIAbgb_AoJqTIIQDicZ9IQ5879_JLjAsZpxsukvC6EIVJP5ugipJNDDtGocCzQrBvk1YmhCgmFy8rWl0lWk-dU3uDpSphixTawYZHwEJOw_ucU6qjBMIg1PREX3MOAn34qDtu8j_yOAd1guEm6LNajsdEpclW4GrtCumoQtG3MCAOqoyvZia2Ta25g6WDlynz_ZcnArfdhkVrtKbIltf44C7CUtsOpnTKLlwRTUXWshg" alt="A sunlit outdoor covered patio featuring newly laid textured sandstone paving tiles">
+              <span class="fl-collage-label">Patio Tiling &bull; Sandton</span>
+            </div>
+            <div class="fl-collage-item tall">
+              <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuA23PBenPEoyEg9908J1wKeQD3N94CtFYzrUyBt0wOiIMJ5zyAGVPqPhngY3zhxnwhuIM9OmvijHFfHOXROrsQZ3DgtJC7n1yqnCrMTdkaARM3QKzl2Ao00MGgyIxDcfFsiV0NHJNmGFCCOn5jfYa2eDjduCWlKrawjvcnexG5lC5TcIAjJsHYvq3wglHVVbDqxvsVgPa6z_vftTbnq4KYwAQG1tGuEeJcYmUcdme3SeFzJA-Kt0VrUqw" alt="A freshly painted architectural feature wall painted in calm sage green">
+              <span class="fl-collage-label">Carpentry &amp; Paint &bull; Rosebank</span>
+            </div>
+          </div>
+        </div>
+        <div class="fl-split-content">
+          <div class="fl-proof-badge">
+            <span class="material-symbols-outlined">policy</span>
+            <span>Proof-First Marketplace</span>
+          </div>
+          <h2 class="fl-split-title">See their work before you hire.</h2>
+          <p class="fl-split-description">
+            Every professional can showcase their previous work, experience, qualifications and customer reviews — so you can make a confident decision without taking chances.
+          </p>
+          <ul class="fl-checklist">
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <div class="flex-1">
+                <span class="fl-checklist-title">Previous work</span>
+                <span class="fl-checklist-text"> — High resolution photos of completed local projects.</span>
+              </div>
+            </li>
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <div class="flex-1">
+                <span class="fl-checklist-title">Certificates &amp; Trade Tests</span>
+                <span class="fl-checklist-text"> — Verified trade diplomas and South African COC accreditations.</span>
+              </div>
+            </li>
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <div class="flex-1">
+                <span class="fl-checklist-title">Customer reviews</span>
+                <span class="fl-checklist-text"> — Rated exclusively by confirmed clients who paid through the platform.</span>
+              </div>
+            </li>
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <div class="flex-1">
+                <span class="fl-checklist-title">Verified experience</span>
+                <span class="fl-checklist-text"> — Track record of documented on-site home service years.</span>
+              </div>
+            </li>
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <div class="flex-1">
+                <span class="fl-checklist-title">Local service area</span>
+                <span class="fl-checklist-text"> — Precise radius coverage for Fourways, Sandton, Bryanston &amp; Randburg.</span>
+              </div>
+            </li>
+          </ul>
+          <a class="fl-explore-btn" href="#featured">
+            <span>Explore Professionals</span>
+            <span class="material-symbols-outlined">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA BANNER -->
+  <section class="fl-bottom-cta">
+    <div class="fl-bottom-cta-glow"></div>
+    <div class="fl-bottom-cta-content">
+      <h2 class="fl-bottom-cta-title">Need something fixed? Find a trusted professional near you.</h2>
+      <p class="fl-bottom-cta-text">
+        Join thousands of South African homeowners in Sandton and Fourways getting repairs done right, on time, and on budget.
+      </p>
+      <div class="fl-bottom-cta-actions">
+        <a class="fl-cta-btn primary" href="#search-anchor">
+          <span class="material-symbols-outlined">search</span>
+          <span>Find a Handyman</span>
+        </a>
+        <a class="fl-cta-btn secondary" routerLink="/register" [queryParams]="{ role: 'PROFESSIONAL' }">
+          <span class="material-symbols-outlined">handyman</span>
+          <span>Join as a Handyman</span>
+        </a>
+      </div>
+    </div>
   </section>
 </div>

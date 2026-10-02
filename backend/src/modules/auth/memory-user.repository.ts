@@ -1,6 +1,8 @@
 import {
   toSafeUser,
+  type CreateAccountInput,
   type CreateUserInput,
+  type ProfileProvision,
   type UserRecord,
   type UserRepository,
 } from '../users/user.repository';
@@ -19,6 +21,7 @@ export class MemoryUserRepository implements UserRepository {
   private readonly byId = new Map<string, UserRecord>();
   private readonly idByEmail = new Map<string, string>();
   private readonly roles = new Map<string, Set<string>>();
+  private readonly profiles = new Map<string, ProfileProvision>();
 
   async findByEmail(email: string): Promise<UserRecord | null> {
     const id = this.idByEmail.get(email);
@@ -30,6 +33,19 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async create(input: CreateUserInput): Promise<UserRecord> {
+    const user = this.insert(input);
+    return user;
+  }
+
+  /** Mirrors the MySQL transaction: nothing is retained if any part fails. */
+  async createAccount(input: CreateAccountInput): Promise<UserRecord> {
+    const user = this.insert(input);
+    this.roles.set(user.id, new Set([input.role]));
+    if (input.profile !== null) this.profiles.set(user.id, input.profile);
+    return { ...user };
+  }
+
+  private insert(input: CreateUserInput): UserRecord {
     if (this.idByEmail.has(input.email)) {
       const err = new Error('Duplicate email');
       (err as NodeJS.ErrnoException).code = 'ER_DUP_ENTRY';
@@ -41,7 +57,7 @@ export class MemoryUserRepository implements UserRepository {
       email: input.email,
       phone: input.phone,
       passwordHash: input.passwordHash,
-      status: 'PENDING',
+      status: 'ACTIVE',
       emailVerifiedAt: null,
       lastLoginAt: null,
       createdAt: nowIso(),
@@ -101,5 +117,11 @@ export class MemoryUserRepository implements UserRepository {
   /** Test helper — exposes the stored hash to prove it is not plaintext. */
   async debugHashFor(email: string): Promise<string | null> {
     return (await this.findByEmail(email))?.passwordHash ?? null;
+  }
+
+  /** Test helper — the role profile provisioned at registration, if any. */
+  async debugProfileFor(email: string): Promise<ProfileProvision | null> {
+    const user = await this.findByEmail(email);
+    return user ? (this.profiles.get(user.id) ?? null) : null;
   }
 }

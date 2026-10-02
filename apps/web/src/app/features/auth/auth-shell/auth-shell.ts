@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 /**
  * Shared Oceanic layout for authentication screens.
  *
- * Centered Tier-1 card on the canvas background with the FixLink logo,
+ * Centered Tier-1 card on the canvas background with the Fixlynk logo,
  * headline, projected form content and a footer navigation link.
  * Keeps login and register visually consistent without duplicating markup.
  */

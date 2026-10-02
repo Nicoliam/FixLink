@@ -1,9 +1,9 @@
-# FixLink Stage 11 — Full System Test Report
+# Fixlynk Stage 11 — Full System Test Report
 
 ## 1. Test Environment
 
 - Date: 2026-09-25
-- Repository: FixLink repository (repository root)
+- Repository: Fixlynk repository (repository root)
 - Repository commit under test: `f17b0b9 fix(security): harden authentication and platform boundaries`
 - Platform: macOS on Darwin
 - Node.js: `v24.16.0`
@@ -11,7 +11,7 @@
 - Backend: Node.js/TypeScript modular monolith
 - Frontend: Angular 21 standalone application
 - Database: MySQL 8 in Docker, exposed on port `3307`
-- Database name: `fixlink`
+- Database name: `fixlynk`
 - Backend automated tests use isolated in-memory stores, as documented in `docs/TEST-PLAN.md`.
 - Database and MySQL-backed smoke tests used the local Docker database.
 
@@ -41,7 +41,7 @@ No commit, staging, push, product-scope change, payment change, role change, or 
 
 Docker status:
 
-- Container: `fixlink-mysql`
+- Container: `fixlynk-mysql`
 - Image: `mysql:8.0`
 - Status: running
 - Port mapping: `3307:3306`

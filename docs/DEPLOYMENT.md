@@ -1,8 +1,8 @@
-# FixLink Deployment Guide
+# Fixlynk Deployment Guide
 
 ## 1. Scope and architecture
 
-FixLink has three runtime components:
+Fixlynk has three runtime components:
 
 ```text
 Browser / Angular web application
@@ -116,10 +116,26 @@ The current implementation reads the variables below. Names are exact; do not su
 | `BCRYPT_COST` | No | Password hashing cost; default `12` |
 | `CORS_ORIGIN` | Yes | Comma-separated allowlist of exact allowed web origins, without trailing slashes |
 | `FILE_STORAGE_DIR` | Yes for file workflows | Durable directory for the local MVP file adapter |
+| `WEB_BASE_URL` | Yes when email is enabled | Public base URL of the deployed web app, used to build notification email deep links; default `http://localhost:4200` |
+| `MAIL_ENABLED` | No | `true` sends provider notification email; `false` (default) renders to the log only |
+| `MAIL_HOST` | Yes when `MAIL_ENABLED=true` | SMTP host; startup fails if enabled without a host |
+| `MAIL_PORT` | No | SMTP port; default `587` |
+| `MAIL_SECURE` | No | `true` for implicit TLS (typically port 465); default `false` for STARTTLS |
+| `MAIL_USER` | No | SMTP username; some relays require none |
+| `MAIL_PASSWORD` | No | Secret; SMTP password. Never commit or log it |
+| `MAIL_FROM` | No | Envelope/header sender address; default `no-reply@fixlynk.local` |
+| `MAIL_FROM_NAME` | No | Header sender name; default `Fixlynk` |
 
 `JWT_SECRET` is a legacy fallback read by the current configuration when `JWT_ACCESS_SECRET` is not set. New deployments should set `JWT_ACCESS_SECRET` explicitly and should not rely on the fallback.
 
 The development templates contain placeholder values only. `dev-only-change-me` is explicitly rejected when `NODE_ENV` is `production` or `prod`.
+
+### Email delivery (Stage 13)
+
+With `MAIL_ENABLED` unset or `false`, provider notifications are in-app only and the rendered message is written to the application log — a deployment that never configures mail behaves exactly as it did before Stage 13.
+
+Set `MAIL_ENABLED=true` plus `MAIL_HOST` (and credentials, where the relay requires them) to deliver provider notification email, and set `WEB_BASE_URL` to the deployed web origin so the "view and reply" link in each email points at the right host. Configure a real sender domain in `MAIL_FROM`/`MAIL_FROM_NAME`; a relay will reject or spam-folder an unverified sender. Email delivery is best-effort and never blocks or fails a job, quote or assignment operation — see `docs/NOTIFICATIONS.md` for the channel design and the `notifications.email_status` tracking columns.
+
 
 ## 7. Production secrets
 

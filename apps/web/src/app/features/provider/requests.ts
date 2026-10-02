@@ -9,7 +9,7 @@ import type { ProviderRequest } from '../../core/models/job.model';
 type RequestsStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 /**
- * FixLink provider requests — Stage 6C (`/requests`, authenticated
+ * Fixlynk provider requests — Stage 6C (`/requests`, authenticated
  * PROFESSIONAL / BUSINESS_OWNER / BUSINESS_MANAGER) + Stage 6E
  * (ACCEPTED / SCHEDULED / IN_PROGRESS badges with the scheduled slot).
  *

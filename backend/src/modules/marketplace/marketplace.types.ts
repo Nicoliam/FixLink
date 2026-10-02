@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — marketplace public DTOs.
+ * Fixlynk Stage 6A — marketplace public DTOs.
  *
  * These are the ONLY shapes the marketplace API returns. They deliberately
  * exclude private data: no passwords/hashes, no tokens, no ID documents,

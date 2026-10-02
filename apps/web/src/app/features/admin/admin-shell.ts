@@ -10,7 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
   template: `
     <div class="admin-shell">
       <aside class="admin-sidebar" aria-label="Admin navigation">
-        <div class="admin-brand"><img class="admin-brand-logo" ngSrc="brand/fixlink-logo.png" width="132" height="44" alt="FixLink operations"><small>Operations</small></div>
+        <div class="admin-brand"><img class="admin-brand-logo" ngSrc="brand/fixlynk-logo.svg" width="132" height="66" alt="Fixlynk operations"><small>Operations</small></div>
         <nav class="admin-nav">
           @for (item of navigation; track item.path) {
              <a [routerLink]="item.path" routerLinkActive="admin-nav-active" [routerLinkActiveOptions]="{ exact: item.path === '/admin' }" ariaCurrentWhenActive="page">{{ item.label }}</a>

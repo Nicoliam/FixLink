@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — execution input validation.
+ * Fixlynk Stage 6F — execution input validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * The frontend never controls job status, ownership or timestamps — only

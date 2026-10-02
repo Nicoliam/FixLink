@@ -1,4 +1,4 @@
--- FixLink migration 007 — Portfolio, certificates, verification
+-- Fixlynk migration 007 — Portfolio, certificates, verification
 -- Verification documents are PRIVATE: only storage references are kept here;
 -- public profiles expose badges derived from verification_status, never files.
 

@@ -1,8 +1,8 @@
-# FixLink — Security
+# Fixlynk — Security
 
 ## 1. Purpose
 
-This document records the security controls enforced by the FixLink
+This document records the security controls enforced by the Fixlynk
 backend. Frontend checks are user experience only — every control below
 is enforced server-side.
 

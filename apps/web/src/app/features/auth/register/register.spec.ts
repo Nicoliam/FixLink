@@ -1,12 +1,17 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
+import { Component } from '@angular/core';
+import { vi } from 'vitest';
 import { RegisterComponent } from './register';
 import { API_BASE_URL } from '../../../core/config/api-config';
 import type { AuthUser, SelfRegisterRole } from '../../../core/models/auth.model';
 
 const API = 'http://test.local/api/v1';
+
+@Component({ template: '' })
+class DummyComponent {}
 
 const mockUser: AuthUser = {
   id: 'user-1',
@@ -23,12 +28,22 @@ const validDetails = {
   phone: '',
   password: 'password123',
   confirmPassword: 'password123',
+  displayName: 'Sipho Ndlovu',
+  businessName: 'Mokoena Plumbing',
+};
+
+/** Landing route each self-registerable role is sent to. */
+const LANDING: Record<SelfRegisterRole, string> = {
+  CUSTOMER: '/my-jobs',
+  PROFESSIONAL: '/requests',
+  BUSINESS_OWNER: '/business',
 };
 
 describe('RegisterComponent (two-step registration)', () => {
   let fixture: ComponentFixture<RegisterComponent>;
   let component: RegisterComponent;
   let httpMock: HttpTestingController;
+  let router: Router;
 
   const el = (testid: string): HTMLElement | null =>
     fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
@@ -58,7 +73,9 @@ describe('RegisterComponent (two-step registration)', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter([]),
+        // The landing routes are real, so a successful registration navigates
+        // without the router rejecting an unknown URL segment.
+        provideRouter(Object.values(LANDING).map((path) => ({ path: path.slice(1), component: DummyComponent }))),
         { provide: API_BASE_URL, useValue: API },
         {
           provide: ActivatedRoute,
@@ -69,13 +86,29 @@ describe('RegisterComponent (two-step registration)', () => {
     fixture = TestBed.createComponent(RegisterComponent);
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
+    router = TestBed.inject(Router);
     fixture.detectChanges();
   });
 
   afterEach(() => {
     httpMock.verify();
+    TestBed.resetTestingModule();
     localStorage.clear();
   });
+
+  /**
+   * Builds a second, independent component whose ActivatedRoute carries the
+   * given query params, so the ?role= preselection can be exercised without
+   * disturbing the shared fixture (which must stay unselected).
+   */
+  const createWithQueryParams = (queryParams: Record<string, string>): { component: RegisterComponent } => {
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { snapshot: { queryParamMap: convertToParamMap(queryParams) } },
+    });
+    const extraFixture = TestBed.createComponent(RegisterComponent);
+    extraFixture.detectChanges();
+    return { component: extraFixture.componentInstance };
+  };
 
   describe('step 1 — account type', () => {
     it('only offers self-registrable roles (ADMIN, TECHNICIAN, BUSINESS_MANAGER excluded)', () => {
@@ -106,6 +139,26 @@ describe('RegisterComponent (two-step registration)', () => {
       expect(component.role.value).toBeNull();
       expect(component.canContinue).toBe(false);
     });
+
+    it.each(['CUSTOMER', 'PROFESSIONAL', 'BUSINESS_OWNER'] as const)(
+      'preselects %s from the ?role= hint used by "Join as an Artisan"',
+      (role) => {
+        const withHint = createWithQueryParams({ role });
+        expect(withHint.component.role.value).toBe(role);
+        expect(withHint.component.canContinue).toBe(true);
+        // Still on step 1: the user confirms the type rather than skipping it.
+        expect(withHint.component.step()).toBe(1);
+      },
+    );
+
+    it.each(['ADMIN', 'TECHNICIAN', 'BUSINESS_MANAGER', 'nonsense', ''])(
+      'ignores an invalid ?role=%s hint and stays unselected',
+      (role) => {
+        const withHint = createWithQueryParams({ role });
+        expect(withHint.component.role.value).toBeNull();
+        expect(withHint.component.canContinue).toBe(false);
+      },
+    );
 
     it('hides the email and password fields until an account type is chosen', () => {
       expect(el('register-email')).toBeNull();
@@ -196,7 +249,7 @@ describe('RegisterComponent (two-step registration)', () => {
       httpMock.expectNone(`${API}/auth/register`);
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('Enter a valid email address.');
-      expect(text).toContain('Enter a valid phone number.');
+      expect(text).toContain('Enter a valid South African cell number (10 digits starting with 0).');
       expect(text).toContain('Password must be between 8 and 128 characters.');
       expect(text).toContain('Passwords do not match.');
     });
@@ -207,7 +260,8 @@ describe('RegisterComponent (two-step registration)', () => {
       ['CUSTOMER' as SelfRegisterRole],
       ['PROFESSIONAL' as SelfRegisterRole],
       ['BUSINESS_OWNER' as SelfRegisterRole],
-    ])('submits the %s role and shows the success state', (role) => {
+    ])('logs the new %s account straight in and lands on its dashboard', (role) => {
+      const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
       goToStepTwo(role);
       fillDetails();
       component.submit();
@@ -221,29 +275,69 @@ describe('RegisterComponent (two-step registration)', () => {
         email: 'new@example.co.za',
         password: 'password123',
         role,
+        // The provider profile is created with the account, so the name is sent.
+        ...(role === 'PROFESSIONAL' ? { displayName: 'Sipho Ndlovu' } : {}),
+        ...(role === 'BUSINESS_OWNER' ? { businessName: 'Mokoena Plumbing' } : {}),
       });
-      req.flush({ success: true, data: { user: { ...mockUser, roles: [role] } } });
+      // The response carries a session, so no second login step is needed.
+      req.flush({
+        success: true,
+        data: { user: { ...mockUser, roles: [role] }, accessToken: 'access-1', refreshToken: 'refresh-1' },
+      });
       fixture.detectChanges();
 
-      const success = el('register-success') as HTMLElement;
-      expect(success.textContent).toContain('Account created');
-      expect(success.textContent).toContain('new@example.co.za');
-      expect(fixture.nativeElement.querySelector('form')).toBeNull();
+      expect(navigateSpy).toHaveBeenCalledWith(LANDING[role]);
+      // There is no "account created, now log in" interstitial any more.
+      expect(el('register-success')).toBeNull();
+      expect(el('register-continue-login')).toBeNull();
+      expect(localStorage.getItem('fixlynk.access_token')).toBe('access-1');
     });
 
-    it('includes the phone number when supplied', () => {
-      goToStepTwo();
-      fillDetails({ phone: '+27 82 555 0101' });
+    it('only asks a professional for a display name', () => {
+      goToStepTwo('PROFESSIONAL');
+      expect(el('register-display-name')).not.toBeNull();
+      expect(el('register-business-name')).toBeNull();
+    });
+
+    it('only asks a business owner for a business name', () => {
+      goToStepTwo('BUSINESS_OWNER');
+      expect(el('register-business-name')).not.toBeNull();
+      expect(el('register-display-name')).toBeNull();
+    });
+
+    it('asks a customer for neither name', () => {
+      goToStepTwo('CUSTOMER');
+      expect(el('register-display-name')).toBeNull();
+      expect(el('register-business-name')).toBeNull();
+    });
+
+    it('does not send a provider name the role does not use', () => {
+      goToStepTwo('CUSTOMER');
+      fillDetails();
       component.submit();
 
       const req = httpMock.expectOne(`${API}/auth/register`);
       expect(req.request.body).toEqual({
         email: 'new@example.co.za',
-        phone: '+27 82 555 0101',
         password: 'password123',
         role: 'CUSTOMER',
       });
-      req.flush({ success: true, data: { user: mockUser } });
+      req.flush({ success: true, data: { user: mockUser, accessToken: 'a', refreshToken: 'r' } });
+    });
+
+    it('includes the phone number when supplied', () => {
+      goToStepTwo();
+      fillDetails({ phone: '0825550101' });
+      component.submit();
+
+      const req = httpMock.expectOne(`${API}/auth/register`);
+      expect(req.request.body).toEqual({
+        email: 'new@example.co.za',
+        phone: '0825550101',
+        password: 'password123',
+        role: 'CUSTOMER',
+      });
+      req.flush({ success: true, data: { user: mockUser, accessToken: 'a', refreshToken: 'r' } });
     });
 
     it('shows an API error when the email already exists', () => {
@@ -264,7 +358,7 @@ describe('RegisterComponent (two-step registration)', () => {
 
     it('shows the accurate message when the phone number is already registered', () => {
       goToStepTwo();
-      fillDetails({ phone: '+27825550101' });
+      fillDetails({ phone: '0825550101' });
       component.submit();
 
       httpMock.expectOne(`${API}/auth/register`).flush(
@@ -279,6 +373,36 @@ describe('RegisterComponent (two-step registration)', () => {
       const error = el('register-error') as HTMLElement;
       expect(error.textContent).toContain('This phone number is already registered to another account.');
       expect(error.textContent).not.toContain('email already exists');
+    });
+
+    it('distinguishes an unreachable API from a server error', () => {
+      goToStepTwo();
+      fillDetails();
+      component.submit();
+
+      httpMock
+        .expectOne(`${API}/auth/register`)
+        .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+      fixture.detectChanges();
+
+      const error = el('register-error') as HTMLElement;
+      expect(error.textContent).toContain('Cannot reach the Fixlynk service');
+      expect(error.textContent).not.toContain('Registration failed');
+    });
+
+    it('stays on the form and reports the reason when the provider name is rejected', () => {
+      goToStepTwo('PROFESSIONAL');
+      fillDetails();
+      component.submit();
+
+      httpMock.expectOne(`${API}/auth/register`).flush(
+        { success: false, error: { code: 'VALIDATION_ERROR', message: 'Display name is required.' } },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+      fixture.detectChanges();
+
+      expect(el('register-error')?.textContent).toContain('Display name is required.');
+      expect(el('register-submit')).not.toBeNull();
     });
   });
 });

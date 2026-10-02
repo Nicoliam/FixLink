@@ -1,8 +1,8 @@
-# FixLink
+# Fixlynk
 
 **Connect. Quote. Fix.**
 
-FixLink is a South African home-services marketplace and job-management platform. Customers can discover and hire service professionals or businesses, while businesses can manage private customers, internal jobs, technicians, work updates, parts requests and history.
+Fixlynk is a South African home-services marketplace and job-management platform. Customers can discover and hire service professionals or businesses, while businesses can manage private customers, internal jobs, technicians, work updates, parts requests and history.
 
 The MVP does not process customer payments. It records the agreed quote, and payment is arranged directly between the customer and the professional or business.
 

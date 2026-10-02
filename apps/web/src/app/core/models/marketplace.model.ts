@@ -1,5 +1,5 @@
 /**
- * FixLink marketplace models — Stage 6A.
+ * Fixlynk marketplace models — Stage 6A.
  *
  * Client-side projections of the public marketplace API
  * (GET /api/v1/services, /categories, /providers …).

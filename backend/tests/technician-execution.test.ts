@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7D — technician execution + voice-note tests.
+ * Fixlynk Stage 7D — technician execution + voice-note tests.
  *
  * Run: npm test (no MySQL required — in-memory business store with the
  * same rules as the MySQL implementation, plus an isolated local-storage
@@ -41,7 +41,7 @@ interface TestContext {
 function buildApp(): TestContext {
   const users = new MemoryUserRepository();
   const business = new MemoryBusinessStore();
-  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlink-7d-')));
+  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlynk-7d-')));
   const app = createApp({
     users,
     refreshStore: new MemoryRefreshStore(),
@@ -613,7 +613,7 @@ describe('Stage 7D — voice notes', () => {
   });
 
   it('24. malformed and unsafe storage keys are rejected by the storage adapter', async () => {
-    const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlink-7d-keys-')));
+    const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlynk-7d-keys-')));
     assert.equal(await storage.read('../evil'), null);
     assert.equal(await storage.read('job-images/1/../../etc/passwd'), null);
     assert.equal(await storage.read('job-images/0/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png'), null);

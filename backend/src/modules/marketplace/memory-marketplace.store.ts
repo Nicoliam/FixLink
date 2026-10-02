@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — in-memory marketplace store for automated tests.
+ * Fixlynk Stage 6A — in-memory marketplace store for automated tests.
  *
  * Mirrors the development seeders (fictional data) so the search, profile,
  * portfolio, certificate and review logic is verified without MySQL.

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 8 — in-app notifications tests.
+ * Fixlynk Stage 8 — in-app notifications tests.
  *
  * Run: npm test (no MySQL required — in-memory notifications store with
  * the same recipient-isolation rules as the MySQL implementation).
@@ -53,7 +53,7 @@ function buildApp(notifications?: NotificationStore): TestContext {
   const jobs = new MemoryJobsStore();
   const quotes = new MemoryQuotesStore(jobs);
   const business = new MemoryBusinessStore();
-  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlink-8-')));
+  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlynk-8-')));
   const events = new PartsRequestEventBus();
   const store = notifications ?? new MemoryNotificationsStore();
   const app = createApp({
@@ -827,6 +827,7 @@ describe('Stage 8 — business workflow notification events', () => {
       getById: async () => null,
       markRead: async () => null,
       markAllRead: async () => 0,
+      markEmailDelivery: async () => undefined,
     };
     const failing = buildApp(throwing);
     const customer = await provisionUser(failing, uniqueEmail('resilient.notif'), ['CUSTOMER']);

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
 import { NotificationService } from './core/services/notification.service';
 import { getApiErrorMessage } from './core/models/api.model';
@@ -13,9 +13,9 @@ const PROVIDER_ROLES = ['PROFESSIONAL', 'BUSINESS_OWNER', 'BUSINESS_MANAGER'];
 const BUSINESS_ROLES = ['BUSINESS_OWNER', 'BUSINESS_MANAGER'];
 
 /**
- * FixLink application shell — Stage 5B + 6C + 7A + 7B + 7C + 8.
+ * Fixlynk application shell — Stage 5B + 6C + 7A + 7B + 7C + 8.
  *
- * Oceanic header with the FixLink logo and session-aware navigation,
+ * Oceanic header with the Fixlynk logo and session-aware navigation,
  * plus the routed content. Navigation is UX-only: customers see My Jobs,
  * provider roles see Requests, business roles see the business section
  * (Dashboard, Jobs, Customers, Technicians, Profile, Settings),
@@ -29,7 +29,7 @@ const BUSINESS_ROLES = ['BUSINESS_OWNER', 'BUSINESS_MANAGER'];
  */
 @Component({
   selector: 'app-root',
-  imports: [NgOptimizedImage, RouterLink, RouterOutlet],
+  imports: [NgOptimizedImage, RouterLink, RouterLinkActive, RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
 })

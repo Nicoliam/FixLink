@@ -16,7 +16,7 @@ import type {
 } from '../models/marketplace.model';
 
 /**
- * FixLink marketplace API client — Stage 6A.
+ * Fixlynk marketplace API client — Stage 6A.
  *
  * Single owner of marketplace discovery calls. All endpoints are public
  * (no authentication required); requesting a job is gated by the route

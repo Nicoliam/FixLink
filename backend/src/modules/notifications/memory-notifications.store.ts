@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 8 — in-memory notifications store for automated tests.
+ * Fixlynk Stage 8 — in-memory notifications store for automated tests.
  *
  * Mirrors the MySQL implementation's rules (recipient isolation,
  * unread filtering, newest-first paging, read/read-all scoped to the
@@ -8,7 +8,12 @@
  * upstream), never as a forbidden signal, so notification ids cannot
  * be probed across accounts.
  */
-import type { CreateNotificationInput, NotificationDto } from './notifications.types';
+import type {
+  CreateNotificationInput,
+  EmailDeliveryResult,
+  EmailDeliveryStatus,
+  NotificationDto,
+} from './notifications.types';
 import type { NotificationListFilter, NotificationStore } from './notifications.store';
 
 function nowIso(): string {
@@ -17,6 +22,10 @@ function nowIso(): string {
 
 interface NotificationRow extends NotificationDto {
   userId: string;
+  /** Stage 13 email delivery metadata (never part of the DTO). */
+  emailStatus: EmailDeliveryStatus | null;
+  emailedAt: string | null;
+  emailError: string | null;
 }
 
 export class MemoryNotificationsStore implements NotificationStore {
@@ -52,6 +61,9 @@ export class MemoryNotificationsStore implements NotificationStore {
       read: false,
       createdAt: now,
       readAt: null,
+      emailStatus: null,
+      emailedAt: null,
+      emailError: null,
     };
     this.rows.set(row.id, row);
     return toDto(row);
@@ -96,6 +108,33 @@ export class MemoryNotificationsStore implements NotificationStore {
       }
     }
     return marked;
+  }
+
+  /**
+   * Stage 13 — email delivery metadata, mirroring the MySQL store: only a
+   * SENT row carries a delivery time, and the error is truncated to the
+   * column width. Never changes read state, content or recipient.
+   */
+  async markEmailDelivery(notificationId: string, result: EmailDeliveryResult): Promise<void> {
+    const row = this.rows.get(notificationId);
+    if (!row) return;
+    row.emailStatus = result.status;
+    row.emailedAt = result.status === 'SENT' ? nowIso() : null;
+    row.emailError = result.error ? result.error.slice(0, 255) : null;
+  }
+
+  /** Test helper: the recorded email outcome for one notification. */
+  debugEmailDelivery(notificationId: string): {
+    status: EmailDeliveryStatus | null;
+    emailedAt: string | null;
+    error: string | null;
+  } {
+    const row = this.rows.get(notificationId);
+    return {
+      status: row?.emailStatus ?? null,
+      emailedAt: row?.emailedAt ?? null,
+      error: row?.emailError ?? null,
+    };
   }
 }
 

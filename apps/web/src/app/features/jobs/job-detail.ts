@@ -28,7 +28,7 @@ type JobDetailStatus = 'loading' | 'ready' | 'error' | 'not-found';
 type WorkStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 /**
- * FixLink job detail — Stage 6B (`/my-jobs/:id`, authenticated CUSTOMER)
+ * Fixlynk job detail — Stage 6B (`/my-jobs/:id`, authenticated CUSTOMER)
  * + Stage 6C (read-only received quotes) + Stage 6D (customer quote
  * acceptance: QUOTED → ACCEPTED) + Stage 6E (read-only schedule and
  * in-progress states: ACCEPTED → SCHEDULED → IN_PROGRESS) + Stage 6F
@@ -45,7 +45,7 @@ type WorkStatus = 'idle' | 'loading' | 'ready' | 'error';
  * CLOSED jobs are read-only history. The backend performs every
  * transition and validates ownership server-side; acceptance only
  * records the agreed price (MVP: payment is arranged directly with the
- * professional, never processed by FixLink).
+ * professional, never processed by Fixlynk).
  */
 @Component({
   selector: 'app-job-detail',

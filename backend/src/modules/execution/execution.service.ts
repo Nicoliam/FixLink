@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — job execution & work-documentation service.
+ * Fixlynk Stage 6F — job execution & work-documentation service.
  *
  * Owns the marketplace execution segment: BEFORE/DURING/AFTER photos and
  * notes while IN_PROGRESS, provider completion (IN_PROGRESS → COMPLETED)

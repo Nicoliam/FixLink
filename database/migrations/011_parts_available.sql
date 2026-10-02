@@ -1,4 +1,4 @@
--- FixLink migration 011 — Stage 7F manager approvals + awaiting parts
+-- Fixlynk migration 011 — Stage 7F manager approvals + awaiting parts
 --
 -- Reuses the existing `parts_requests` / `parts_request_items` /
 -- `job_approvals` / `jobs` / `job_status_history` tables (migrations 004

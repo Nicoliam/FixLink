@@ -1,4 +1,4 @@
-# FixLink Production Deployment Checklist
+# Fixlynk Production Deployment Checklist
 
 Use this checklist for every production environment. Record the release version, operator, date and evidence location. Do not mark an item complete from assumption.
 

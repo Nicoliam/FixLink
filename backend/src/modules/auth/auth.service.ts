@@ -1,8 +1,13 @@
 import { env } from '../../config/env';
-import type { SafeUser, UserRepository } from '../users/user.repository';
+import type { ProfileProvision, SafeUser, UserRepository } from '../users/user.repository';
 import { hashPassword, verifyPassword } from '../../utils/password';
 import { generateRefreshToken, hashRefreshToken, signAccessToken } from '../../utils/tokens';
-import { validateLogin, validateRefresh, validateRegister } from './auth.validation';
+import {
+  validateLogin,
+  validateRefresh,
+  validateRegister,
+  type RegisterInput,
+} from './auth.validation';
 import type { RefreshStore } from './refresh.store';
 
 export const GENERIC_AUTH_ERROR = 'Invalid email or password.';
@@ -39,7 +44,29 @@ export function duplicateKeyKind(err: unknown): DuplicateKeyKind {
 
 /** True for any duplicate-entry violation, whether or not the key is known. */
 function isDuplicateEntry(err: unknown): boolean {
-  return (err as { code?: unknown } | null)?.code === 'ER_DUP_ENTRY';
+  return (err as { code?: string } | null)?.code === 'ER_DUP_ENTRY';
+}
+
+const SLUG_MAX = 240;
+
+/**
+ * URL slug for a newly registered business.
+ *
+ * `uq_business_profiles_slug` is UNIQUE, and the new user id is not known
+ * before the insert, so uniqueness comes from the (unique) account email local
+ * part. Deterministic for a given name + email, which keeps a retried
+ * registration on the same slug.
+ */
+export function businessSlug(businessName: string, email: string): string {
+  const slugify = (value: string): string =>
+    value
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  const local = slugify(email.split('@')[0] ?? '');
+  const name = slugify(businessName).slice(0, 120) || 'business';
+  return `${name}-${local || 'fixlynk'}`.slice(0, SLUG_MAX);
 }
 
 export class AuthService {
@@ -48,7 +75,18 @@ export class AuthService {
     private readonly refreshStore: RefreshStore,
   ) {}
 
-  async register(body: unknown): Promise<ServiceResult<{ user: SafeUser }>> {
+  /**
+   * Self-registration.
+   *
+   * Verification is NOT a prerequisite: the account is created ACTIVE and a
+   * session is issued in the same response, so the new customer or provider
+   * lands straight on their dashboard. Any provider profile is created in the
+   * same transaction (see `createAccount`), so nothing has to be verified or
+   * completed before the account can be used.
+   */
+  async register(
+    body: unknown,
+  ): Promise<ServiceResult<{ user: SafeUser; accessToken: string; refreshToken: string }>> {
     const { input, error } = validateRegister(body);
     if (!input || error) {
       const forbidden = error?.includes('cannot be self-registered') === true;
@@ -66,15 +104,19 @@ export class AuthService {
 
     const passwordHash = await hashPassword(input.password);
     try {
-      const created = await this.users.create({
+      const created = await this.users.createAccount({
         email: input.email,
         phone: input.phone,
         passwordHash,
+        role: input.role,
+        profile: this.profileFor(input),
       });
-      await this.users.setRoles(created.id, [input.role]);
       const roles = await this.users.getRoles(created.id);
-      return { status: 201, data: { user: this.users.toSafeUser(created, roles) } };
+      await this.users.touchLogin(created.id);
+      const tokens = await this.issueSession(created.id, created.email, roles);
+      return { status: 201, data: { user: this.users.toSafeUser(created, roles), ...tokens } };
     } catch (err) {
+
       // Race-safe: a unique constraint won the check-then-insert race.
       // Report the constraint that actually fired so the user is not told
       // their email is taken when it is their phone number.
@@ -100,6 +142,26 @@ export class AuthService {
       }
       throw err;
     }
+  }
+
+  /**
+   * The role profile to create alongside the account. A CUSTOMER has none
+   * here — `customer_profiles` is provisioned on their first job request.
+   */
+  private profileFor(input: RegisterInput): ProfileProvision | null {
+    if (input.role === 'PROFESSIONAL' && input.displayName !== null) {
+      return { kind: 'PROFESSIONAL', displayName: input.displayName };
+    }
+    if (input.role === 'BUSINESS_OWNER' && input.businessName !== null) {
+      return {
+        kind: 'BUSINESS_OWNER',
+        businessName: input.businessName,
+        slug: businessSlug(input.businessName, input.email),
+        email: input.email,
+        phone: input.phone,
+      };
+    }
+    return null;
   }
 
   async login(body: unknown): Promise<ServiceResult<{ user: SafeUser; accessToken: string; refreshToken: string }>> {

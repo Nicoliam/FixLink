@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 8 — notifications data-access contract.
+ * Fixlynk Stage 8 — notifications data-access contract.
  *
  * The MySQL implementation serves production (the `notifications`
  * table from migration 008); the memory implementation serves
@@ -8,7 +8,11 @@
  * business → owner/manager ids) lives in the calling services —
  * this store only persists rows for explicit user ids.
  */
-import type { CreateNotificationInput, NotificationDto } from './notifications.types';
+import type {
+  CreateNotificationInput,
+  EmailDeliveryResult,
+  NotificationDto,
+} from './notifications.types';
 
 export interface NotificationListFilter {
   userId: string;
@@ -27,4 +31,13 @@ export interface NotificationStore {
   markRead(userId: string, notificationId: string): Promise<NotificationDto | null>;
   /** Mark every unread owned notification read; resolves with the count marked. */
   markAllRead(userId: string): Promise<number>;
+  /**
+   * Stage 13 — record the email channel outcome for one notification row.
+   *
+   * Delivery metadata only: it never changes the notification's read state,
+   * content or recipient, and it is not part of the API projection. A
+   * failure here must not affect the notification itself, so callers treat
+   * it as best-effort.
+   */
+  markEmailDelivery(notificationId: string, result: EmailDeliveryResult): Promise<void>;
 }

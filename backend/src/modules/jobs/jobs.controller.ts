@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — authenticated customer job controllers.
+ * Fixlynk Stage 6B — authenticated customer job controllers.
  * Authentication is enforced by `requireAuth`; customer ownership is
  * derived from the session user id inside the service — never from the
  * request body.

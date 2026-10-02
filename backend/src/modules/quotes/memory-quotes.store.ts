@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — in-memory quotes store for automated tests.
+ * Fixlynk Stage 6C — in-memory quotes store for automated tests.
  *
  * Mirrors the MySQL implementation's rules (provider-scoped inbox,
  * MARKETPLACE + REQUESTED gating, SUBMITTED quotes, REQUESTED → QUOTED

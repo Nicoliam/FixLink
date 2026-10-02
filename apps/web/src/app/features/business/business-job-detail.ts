@@ -29,7 +29,7 @@ type DetailStatus = 'loading' | 'ready' | 'error';
 type ExecStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 /**
- * FixLink internal job detail — Stage 7B (`/business/jobs/:id`,
+ * Fixlynk internal job detail — Stage 7B (`/business/jobs/:id`,
  * authenticated BUSINESS_OWNER / BUSINESS_MANAGER) + Stage 7C
  * (technician assignment).
  *

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 5A — authentication foundation tests.
+ * Fixlynk Stage 5A — authentication foundation tests.
  *
  * Run: npm test  (sets JWT_ACCESS_SECRET + AUTH_STORE=memory + fast bcrypt cost)
  *
@@ -14,7 +14,8 @@ import type { Express } from 'express';
 import { createApp } from '../src/app';
 import { MemoryUserRepository } from '../src/modules/auth/memory-user.repository';
 import { MemoryRefreshStore } from '../src/modules/auth/refresh.store';
-import { duplicateKeyKind } from '../src/modules/auth/auth.service';
+import { duplicateKeyKind, businessSlug } from '../src/modules/auth/auth.service';
+import { PROFILE_NAME_MAX } from '../src/modules/auth/auth.validation';
 import { toSafeUser, type UserRepository } from '../src/modules/users/user.repository';
 import { signAccessToken } from '../src/utils/tokens';
 import { verifyPassword } from '../src/utils/password';
@@ -72,11 +73,127 @@ describe('POST /api/v1/auth/register', () => {
     assert.equal(res.body.success, true);
     assert.equal(res.body.data.user.email, 'thandi.mokoena@example.co.za');
     assert.deepEqual(res.body.data.user.roles, ['CUSTOMER']);
-    assert.equal(res.body.data.user.status, 'PENDING');
-    // Newly self-registered users start as PENDING (registered but unverified).
+    // Verification is not a prerequisite: a self-registered account is usable
+    // immediately, so it lands ACTIVE rather than PENDING.
+    assert.equal(res.body.data.user.status, 'ACTIVE');
     const stored = await users.findByEmail('thandi.mokoena@example.co.za');
     assert.ok(stored);
-    assert.equal(stored.status, 'PENDING');
+    assert.equal(stored.status, 'ACTIVE');
+  });
+
+  it('logs the new account straight in — registration returns a working session', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'autologin@example.co.za',
+      password: 'Str0ngPassw0rd!',
+    });
+    assert.equal(res.status, 201);
+    assert.equal(typeof res.body.data.accessToken, 'string');
+    assert.equal(typeof res.body.data.refreshToken, 'string');
+    // No verification step: the returned token already opens a protected route.
+    const me = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${res.body.data.accessToken as string}`);
+    assert.equal(me.status, 200);
+    assert.deepEqual(me.body.data.user.roles, ['CUSTOMER']);
+    // The refresh token is a real session, not a stub.
+    const refreshed = await request(app)
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken: res.body.data.refreshToken });
+    assert.equal(refreshed.status, 200);
+  });
+
+  it('provisions a professional profile from the supplied display name', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'sipho.ndlovu@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'PROFESSIONAL',
+      displayName: 'Sipho Ndlovu',
+    });
+    assert.equal(res.status, 201);
+    assert.deepEqual(res.body.data.user.roles, ['PROFESSIONAL']);
+    const profile = await users.debugProfileFor('sipho.ndlovu@example.co.za');
+    assert.deepEqual(profile, { kind: 'PROFESSIONAL', displayName: 'Sipho Ndlovu' });
+  });
+
+  it('provisions a business profile with a unique slug for a business owner', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'owner@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      phone: '+27825550199',
+      role: 'BUSINESS_OWNER',
+      businessName: 'Mokoena Plumbing',
+    });
+    assert.equal(res.status, 201);
+    assert.deepEqual(res.body.data.user.roles, ['BUSINESS_OWNER']);
+    const profile = await users.debugProfileFor('owner@example.co.za');
+    assert.deepEqual(profile, {
+      kind: 'BUSINESS_OWNER',
+      businessName: 'Mokoena Plumbing',
+      slug: 'mokoena-plumbing-owner',
+      email: 'owner@example.co.za',
+      phone: '+27825550199',
+    });
+  });
+
+  it('builds a URL-safe, deterministic business slug', () => {
+    assert.equal(businessSlug('Mokoena Plumbing', 'owner@example.co.za'), 'mokoena-plumbing-owner');
+    assert.equal(businessSlug('  A & B Kitchens  ', 'chef@example.co.za'), 'a-b-kitchens-chef');
+    assert.equal(businessSlug('***', 'fixlynk@example.co.za'), 'business-fixlynk');
+    // Same name + email always produces the same slug, so a retried
+    // registration cannot collide with uq_business_profiles_slug.
+    assert.equal(businessSlug('Mokoena Plumbing', 'owner@example.co.za'), businessSlug('mokoena  plumbing', 'OWNER@example.co.za'));
+  });
+
+  it('does not create a profile for a CUSTOMER (provisioned on first job request)', async () => {
+    await request(app)
+      .post('/api/v1/auth/register')
+      .send({ email: 'plain.customer@example.co.za', password: 'Str0ngPassw0rd!' });
+    assert.equal(await users.debugProfileFor('plain.customer@example.co.za'), null);
+  });
+
+  it('requires the display name a PROFESSIONAL profile is created with (422)', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'nameless.pro@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'PROFESSIONAL',
+    });
+    assert.equal(res.status, 422);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+    assert.equal(await users.findByEmail('nameless.pro@example.co.za'), null);
+  });
+
+  it('requires the business name a BUSINESS_OWNER profile is created with (422)', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'nameless.owner@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'BUSINESS_OWNER',
+    });
+    assert.equal(res.status, 422);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+    assert.equal(await users.findByEmail('nameless.owner@example.co.za'), null);
+  });
+
+  it('ignores a provider name sent for a role that has no profile (CUSTOMER)', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'customer.with.name@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'CUSTOMER',
+      displayName: 'Should Not Provision',
+      businessName: 'Should Not Provision Either',
+    });
+    assert.equal(res.status, 201);
+    assert.equal(await users.debugProfileFor('customer.with.name@example.co.za'), null);
+  });
+
+  it('rejects a provider name longer than the profile column allows (422)', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'long.name@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'PROFESSIONAL',
+      displayName: 'x'.repeat(PROFILE_NAME_MAX + 1),
+    });
+    assert.equal(res.status, 422);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
   });
 
   it('normalises email (trim + lowercase) and accepts a valid self-register role', async () => {
@@ -84,6 +201,7 @@ describe('POST /api/v1/auth/register', () => {
       email: '  SIPHO.Ndhlovu@Example.CO.ZA ',
       password: 'Str0ngPassw0rd!',
       role: 'professional',
+      displayName: 'Sipho Ndlovu',
     });
     assert.equal(res.status, 201);
     assert.equal(res.body.data.user.email, 'sipho.ndhlovu@example.co.za');
@@ -162,12 +280,15 @@ describe('POST /api/v1/auth/register — unique constraint classification', () =
     return err;
   }
 
-  /** Repository whose create() always fails with the given driver error. */
+  /** Repository whose account creation always fails with the given driver error. */
   function repoFailingWith(err: Error): UserRepository {
     return {
       findByEmail: async () => null,
       findById: async () => null,
       create: async () => {
+        throw err;
+      },
+      createAccount: async () => {
         throw err;
       },
       setRoles: async () => undefined,
@@ -390,7 +511,7 @@ describe('production secret validation', () => {
   it('rejects short and known example secrets', () => {
     assert.equal(isStrongProductionSecret('short'), false);
     assert.equal(isStrongProductionSecret('dev-only-change-me'), false);
-    assert.equal(isStrongProductionSecret('fixlink-test-secret'), false);
+    assert.equal(isStrongProductionSecret('fixlynk-test-secret'), false);
     assert.equal(isStrongProductionSecret('a'.repeat(32)), true);
   });
 });

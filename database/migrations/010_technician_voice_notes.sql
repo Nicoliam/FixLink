@@ -1,4 +1,4 @@
--- FixLink migration 010 — Stage 7D technician voice-note support
+-- Fixlynk migration 010 — Stage 7D technician voice-note support
 -- Reuses the existing `job_voice_notes` table from migration 005 (no new
 -- tables). The single NULLABLE column preserves the upload name while
 -- `file_reference` stays the opaque server-side storage key, mirroring

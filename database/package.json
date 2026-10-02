@@ -1,8 +1,8 @@
 {
-  "name": "fixlink-database",
+  "name": "fixlynk-database",
   "version": "1.0.0",
   "private": true,
-  "description": "FixLink Stage 4 — MySQL migrations, seeders and database foundation tests",
+  "description": "Fixlynk Stage 4 — MySQL migrations, seeders and database foundation tests",
   "type": "commonjs",
   "scripts": {
     "db:migrate": "node migrate.js up",

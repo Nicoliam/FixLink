@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — MySQL execution store (production implementation).
+ * Fixlynk Stage 6F — MySQL execution store (production implementation).
  *
  * Reuses the existing `job_images`, `job_updates` and `job_status_history`
  * tables plus migration 009's nullable `job_updates.phase` /

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — provider request + quote service.
+ * Fixlynk Stage 6C — provider request + quote service.
  * Stage 6D adds customer quote acceptance.
  *
  * Owns the provider side of the marketplace flow: inbox, request detail

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7C — technician assignment validation.
+ * Fixlynk Stage 7C — technician assignment validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Only the technician id is accepted — the business, job ownership and

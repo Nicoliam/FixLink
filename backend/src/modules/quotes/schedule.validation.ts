@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6E — provider job scheduling validation.
+ * Fixlynk Stage 6E — provider job scheduling validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * The frontend must never control the job status — only the requested

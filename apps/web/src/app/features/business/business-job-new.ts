@@ -12,7 +12,7 @@ import type { ServiceListing as MarketplaceServiceListing } from '../../core/mod
 type CreateStatus = 'loading' | 'ready' | 'saving' | 'created' | 'error';
 
 /**
- * FixLink create internal job — Stage 7B (`/business/jobs/new`,
+ * Fixlynk create internal job — Stage 7B (`/business/jobs/new`,
  * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
  *
  * Creates an INTERNAL job for an existing business-managed customer

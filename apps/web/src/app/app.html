@@ -1,119 +1,27 @@
-<header class="fl-header">
-  <div class="fl-header-inner">
-    <a class="fl-brand" routerLink="/" aria-label="FixLink home">
+<header class="fl-stitch-header">
+  <div class="fl-stitch-header-inner">
+    <a class="fl-stitch-brand" routerLink="/" aria-label="Fixlynk home">
       <img
-        ngSrc="brand/fixlink-logo.png"
-        width="132"
-        height="44"
+        class="fl-stitch-brand-logo"
+        ngSrc="brand/fixlynk-logo.svg"
+        width="120"
+        height="60"
         priority
-        alt="FixLink"
-        class="fl-brand-logo"
+        alt="Fixlynk"
       />
     </a>
-    <nav class="fl-nav" aria-label="Primary">
-      <a class="fl-link fl-nav-link" routerLink="/marketplace">Marketplace</a>
-      @if (auth.isRestoring()) {
-        <span class="fl-nav-status" role="status">Checking session…</span>
-      } @else if (auth.isAuthenticated() && auth.currentUser()) {
-        @if (showAdmin()) {
-          <a class="fl-link fl-nav-link" routerLink="/admin">Admin</a>
-        }
-        @if (showMyJobs()) {
-          <a class="fl-link fl-nav-link" routerLink="/my-jobs">My jobs</a>
-        }
-        @if (showRequests()) {
-          <a class="fl-link fl-nav-link" routerLink="/requests">Requests</a>
-        }
-        @if (showBusiness()) {
-          <a class="fl-link fl-nav-link" routerLink="/business">Dashboard</a>
-          <a class="fl-link fl-nav-link" routerLink="/business/jobs">Jobs</a>
-          <a class="fl-link fl-nav-link" routerLink="/business/customers">Customers</a>
-          <a class="fl-link fl-nav-link" routerLink="/business/technicians">Technicians</a>
-          <a class="fl-link fl-nav-link" routerLink="/business/profile">Profile</a>
-          <a class="fl-link fl-nav-link" routerLink="/account">Settings</a>
-        }
-        @if (showTechnicianJobs()) {
-          <a class="fl-link fl-nav-link" routerLink="/technician/jobs">My jobs</a>
-        }
-        @if (showNotifications()) {
-          <div class="fl-bell-wrap">
-            <button
-              type="button"
-              class="fl-bell"
-              (click)="togglePanel()"
-              [attr.aria-expanded]="panelOpen()"
-              [attr.aria-label]="
-                notifications.unreadCount() > 0
-                  ? 'Notifications, ' + notifications.unreadCount() + ' unread'
-                  : 'Notifications'
-              "
-            >
-              <span aria-hidden="true">🔔</span>
-              @if (notifications.unreadCount() > 0) {
-                <span class="fl-bell-badge" role="status">{{ notifications.unreadCount() }}</span>
-              }
-            </button>
-            @if (panelOpen()) {
-              <div class="fl-bell-panel" role="dialog" aria-label="Recent notifications">
-                <div class="fl-bell-panel-head">
-                  <p class="fl-bell-panel-title">Notifications</p>
-                  <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="closePanel()">
-                    Close
-                  </button>
-                </div>
-                @if (panelLoading()) {
-                  <p class="fl-state-text" role="status">Loading notifications…</p>
-                } @else if (panelError()) {
-                  <div class="fl-state fl-state-error" role="alert">
-                    <p class="fl-state-text">{{ panelError() }}</p>
-                    <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="refreshPanel()">
-                      Try again
-                    </button>
-                  </div>
-                } @else if (panelItems().length === 0) {
-                  <p class="fl-state-text" role="status">No notifications yet.</p>
-                } @else {
-                  <ul class="fl-notification-list">
-                    @for (item of panelItems(); track item.id) {
-                      <li>
-                        <article class="fl-notification" [class.fl-notification-unread]="!item.read">
-                          <button
-                            type="button"
-                            class="fl-notification-open"
-                            (click)="openPanelItem(item)"
-                            [attr.aria-label]="(item.read ? 'Open ' : 'Mark as read and open ') + item.title"
-                          >
-                            <span class="fl-notification-top">
-                              <span class="fl-pill fl-pill-info">{{ typeLabel(item.type) }}</span>
-                              @if (!item.read) {
-                                <span class="fl-notification-dot" aria-label="Unread"></span>
-                              }
-                              <span class="fl-notification-time">{{ formatTime(item.createdAt) }}</span>
-                            </span>
-                            <span class="fl-notification-title">{{ item.title }}</span>
-                          </button>
-                        </article>
-                      </li>
-                    }
-                  </ul>
-                  <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="markAllRead()">
-                    Mark all as read
-                  </button>
-                }
-                <a class="fl-btn fl-btn-primary fl-btn-sm" routerLink="/notifications" (click)="closePanel()">
-                  View all notifications
-                </a>
-              </div>
-            }
-          </div>
-        }
-        <span class="fl-nav-status">{{ auth.currentUser()?.email }}</span>
-        <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/account">My account</a>
-      } @else {
-        <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/login">Log in</a>
-        <a class="fl-btn fl-btn-primary fl-btn-sm" routerLink="/register">Sign up</a>
-      }
-    </nav>
+    <nav class="fl-stitch-nav" aria-label="Primary">
+      <a class="fl-stitch-nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
+      <a class="fl-stitch-nav-link" routerLink="/marketplace" routerLinkActive="active">Find a Handyman</a>
+      </nav>
+    <div class="fl-stitch-actions">
+      <a class="fl-stitch-login" routerLink="/login" routerLinkActive="active">Login</a>
+      <a class="fl-stitch-join" routerLink="/register" [queryParams]="{ role: 'PROFESSIONAL' }" routerLinkActive="active">Join as an Artisan</a>
+      <a class="fl-stitch-cta" routerLink="/marketplace">
+        <span class="material-symbols-outlined">search</span>
+        <span>Find a Handyman</span>
+      </a>
+    </div>
   </div>
 </header>
 
@@ -121,6 +29,63 @@
   <router-outlet />
 </main>
 
-<footer class="fl-footer">
-  <p>FixLink — Connect. Quote. Fix. · Payment is arranged directly with your professional.</p>
+<footer class="fl-stitch-footer">
+  <div class="fl-stitch-footer-inner">
+    <div class="fl-stitch-footer-grid">
+      <div class="fl-stitch-footer-brand">
+        <div class="fl-stitch-footer-brand-row">
+          <img
+            class="fl-stitch-footer-brand-logo"
+            ngSrc="brand/fixlynk-logo.svg"
+            width="96"
+            height="48"
+            alt="Fixlynk"
+          />
+        </div>
+        <p class="fl-stitch-footer-blurb">
+          South Africa's modern marketplace connecting verified local artisans with homeowners. Built for speed, trust, and quality craft.
+        </p>
+        </div>
+      <div class="fl-stitch-footer-col">
+        <h4 class="fl-stitch-footer-col-title">Services</h4>
+        <ul class="fl-stitch-footer-list">
+          <li><a routerLink="/marketplace">Plumbing</a></li>
+          <li><a routerLink="/marketplace">Electrical</a></li>
+          <li><a routerLink="/marketplace">Handyman</a></li>
+          <li><a routerLink="/marketplace">Carpentry</a></li>
+          <li><a routerLink="/marketplace">Painting</a></li>
+        </ul>
+      </div>
+      <div class="fl-stitch-footer-col">
+        <h4 class="fl-stitch-footer-col-title">Areas Covered</h4>
+        <ul class="fl-stitch-footer-list">
+          <li><a routerLink="/marketplace">Fourways</a></li>
+          <li><a routerLink="/marketplace">Sandton</a></li>
+          <li><a routerLink="/marketplace">Bryanston</a></li>
+          <li><a routerLink="/marketplace">Randburg</a></li>
+          <li><a routerLink="/marketplace">Rosebank</a></li>
+        </ul>
+      </div>
+      <div class="fl-stitch-footer-col">
+        <h4 class="fl-stitch-footer-col-title">Trust &amp; Safety</h4>
+        <ul class="fl-stitch-footer-list">
+          <li><a href="#">Trust &amp; Safety</a></li>
+          <li><a routerLink="/register" [queryParams]="{ role: 'PROFESSIONAL' }">Join as an Artisan</a></li>
+          <li><a href="#">Background Checks</a></li>
+          <li><a href="#">Privacy Policy</a></li>
+          <li><a href="#">Terms of Service</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fl-stitch-footer-bottom">
+      <p>&copy; 2025 Fixlynk (Pty) Ltd. South Africa. All rights reserved.</p>
+      <div class="fl-stitch-footer-cities">
+        <span>Johannesburg</span>
+        <span aria-hidden="true">&bull;</span>
+        <span>Pretoria</span>
+        <span aria-hidden="true">&bull;</span>
+        <span>Cape Town</span>
+      </div>
+    </div>
+  </div>
 </footer>

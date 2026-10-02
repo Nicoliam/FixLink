@@ -1,0 +1,143 @@
+<div class="fl-page">
+  <!-- PAGE HERO -->
+  <section class="fl-page-hero">
+    <div class="fl-page-hero-container">
+      <span class="fl-page-eyebrow">Frictionless Process</span>
+      <h1 class="fl-page-title">Getting help is simple.</h1>
+      <p class="fl-page-subtitle">
+        Book reliable local handymen in four transparent steps with zero surprises. No hidden fees,
+        no middlemen — just verified local professionals and clear pricing in ZAR.
+      </p>
+      <div class="fl-page-hero-actions">
+        <a class="fl-cta-btn primary" routerLink="/marketplace">
+          <span class="material-symbols-outlined">search</span>
+          <span>Find a Handyman</span>
+        </a>
+        <a class="fl-cta-btn secondary" routerLink="/services">
+          <span class="material-symbols-outlined">handyman</span>
+          <span>Popular Services</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEPS -->
+  <section class="fl-section fl-steps-section">
+    <div class="fl-section-container">
+      <div class="fl-steps-grid">
+        @for (step of steps(); track step.number) {
+          <article class="fl-step-card">
+            <div class="fl-step-number" aria-hidden="true">{{ step.number }}</div>
+            <div class="fl-step-content">
+              <div class="fl-step-icon" [class]="step.iconClass">
+                <span class="material-symbols-outlined">{{ step.icon }}</span>
+              </div>
+              <h2 class="fl-step-title">{{ step.title }}</h2>
+              <p class="fl-step-text">{{ step.text }}</p>
+              <ul class="fl-step-detail">
+                @for (item of step.detail; track item) {
+                  <li class="fl-step-detail-item">
+                    <span class="material-symbols-outlined">check</span>
+                    <span>{{ item }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+            <div class="fl-step-footer">
+              <span>{{ step.footer }}</span>
+              <span class="material-symbols-outlined">check</span>
+            </div>
+          </article>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- AUDIENCES -->
+  <section class="fl-section fl-audience-section">
+    <div class="fl-section-container">
+      <div class="fl-section-header">
+        <div>
+          <span class="fl-section-eyebrow secondary">Who it's for</span>
+          <h2 class="fl-section-title">Built for you</h2>
+        </div>
+      </div>
+      <div class="fl-audience-grid">
+        @for (audience of audiences(); track audience.title) {
+          <div class="fl-audience-card">
+            <div class="fl-audience-icon">
+              <span class="material-symbols-outlined">{{ audience.icon }}</span>
+            </div>
+            <h3 class="fl-audience-title">{{ audience.title }}</h3>
+            <p class="fl-audience-text">{{ audience.text }}</p>
+            <ul class="fl-audience-points">
+              @for (point of audience.points; track point) {
+                <li class="fl-audience-point">
+                  <span class="material-symbols-outlined">check</span>
+                  <span>{{ point }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST SPLIT -->
+  <section class="fl-section fl-trust-section">
+    <div class="fl-section-container">
+      <div class="fl-trust-grid">
+        <div class="fl-trust-content">
+          <div class="fl-proof-badge">
+            <span class="material-symbols-outlined">policy</span>
+            <span>Proof-First Marketplace</span>
+          </div>
+          <h2 class="fl-trust-title">See their work before you hire.</h2>
+          <p class="fl-trust-text">
+            Every professional can showcase their previous work, experience, qualifications and customer
+            reviews — so you can make a confident decision without taking chances.
+          </p>
+          <ul class="fl-checklist">
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <span class="fl-checklist-text">Real photos of completed local jobs.</span>
+            </li>
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <span class="fl-checklist-text">Verified trade diplomas and COC accreditation.</span>
+            </li>
+            <li class="fl-checklist-item">
+              <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
+              <span class="fl-checklist-text">Reviews only from confirmed clients.</span>
+            </li>
+          </ul>
+          <a class="fl-explore-btn" routerLink="/marketplace">
+            <span>Explore Professionals</span>
+            <span class="material-symbols-outlined">arrow_forward</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA -->
+  <section class="fl-bottom-cta">
+    <div class="fl-bottom-cta-content">
+      <h2 class="fl-bottom-cta-title">Ready to get started?</h2>
+      <p class="fl-bottom-cta-text">
+        Post your job in under two minutes and let verified local professionals come to you.
+      </p>
+      <div class="fl-bottom-cta-actions">
+        <a class="fl-cta-btn primary" routerLink="/marketplace">
+          <span class="material-symbols-outlined">search</span>
+          <span>Find a Handyman</span>
+        </a>
+        <a class="fl-cta-btn secondary" routerLink="/services">
+          <span class="material-symbols-outlined">handyman</span>
+          <span>Popular Services</span>
+        </a>
+      </div>
+    </div>
+  </section>
+</div>

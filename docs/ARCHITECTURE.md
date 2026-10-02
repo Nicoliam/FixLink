@@ -1,17 +1,28 @@
-# FixLink — System Architecture
+# Fixlynk — System Architecture
 
 ## 1. Purpose
 
-This document defines the technical architecture of FixLink.
+This document defines the technical architecture of Fixlynk.
 
 ## Current implementation note
 
 The implemented MVP uses an Angular web application, a Node.js/TypeScript
 REST API, MySQL 8 and a protected local filesystem adapter. The file and
 notification concepts below include the intended platform architecture;
-cloud/object storage, external notification channels and several product
-features remain future scope. For release-specific facts, use
-`docs/HANDOVER.md` and `docs/DEPLOYMENT.md`.
+cloud/object storage, further notification channels and several product
+features remain future scope. Stage 13 added the email delivery channel
+for provider-side notifications (see §22). For release-specific facts,
+use `docs/HANDOVER.md` and `docs/DEPLOYMENT.md`.
+
+Runtime dependencies are kept deliberately few. The Stage 13 email
+channel added `nodemailer` as the single new package: it speaks SMTP to
+any relay (no vendor lock-in, no account requirement), is actively
+maintained, and is only reachable through the `Mailer` adapter
+(`backend/src/services/mailer.ts`), so the transport can be replaced
+without touching feature code. Everything else the platform needs
+(auth, hashing, validation, database, uploads) is already covered by
+the existing packages — no framework, database, authentication or
+storage architecture was changed.
 
 The architecture must support:
 
@@ -35,7 +46,7 @@ for future expansion.
 
 ## 2. High-Level Architecture
 
-FixLink consists of:
+Fixlynk consists of:
 
 1. Angular Web Application
 2. Node.js REST API
@@ -316,7 +327,7 @@ Business A cannot access Business B's:
 
 ## 13. Job Architecture
 
-FixLink uses one job system.
+Fixlynk uses one job system.
 
 Do NOT create separate:
 
@@ -525,9 +536,32 @@ Examples:
 - Customer confirmation
 - Review request
 
-Notification delivery can initially use in-app notifications.
+Notification delivery uses in-app notifications as the base channel.
 
-Additional channels may be added later.
+Stage 13 adds an **email** channel for provider-side recipients
+(`PROFESSIONAL`, `BUSINESS_OWNER`, `BUSINESS_MANAGER`, `TECHNICIAN` on
+`ACTIVE` accounts). It is implemented as a second delivery channel
+inside the central notification service, not as a parallel system:
+
+- Transport is an adapter (`backend/src/services/mailer.ts`) behind a
+  `Mailer` contract — the same seam pattern as file storage — so the
+  SMTP implementation can be replaced without touching feature code.
+- Rendering lives in `backend/src/services/notification-email.ts` and
+  produces a plain-text body plus a table-based HTML body with one
+  role-specific deep link into the app.
+- Configuration is environment driven (`MAIL_*`, `WEB_BASE_URL`). With
+  no mail configuration the adapter renders to the log and sends
+  nothing, so an unconfigured deployment behaves as before.
+- Delivery is best-effort and always secondary to the in-app row: a
+  mail failure never rolls back a committed business operation, and no
+  queue or retry exists yet.
+
+Customer contact details are never included in a notification email —
+providers are given the job details and an in-app link to reply, which
+keeps replies, audit history and customer privacy inside the platform.
+
+Additional channels (SMS/WhatsApp/push) may be added later behind the
+same seam.
 
 
 ## 23. Verification Architecture
@@ -791,7 +825,7 @@ Do not silently change the architecture.
 
 ## 40. Architecture Principle
 
-Build the simplest architecture that satisfies the approved FixLink MVP.
+Build the simplest architecture that satisfies the approved Fixlynk MVP.
 
 Do not build infrastructure for hypothetical requirements.
 

@@ -10,7 +10,7 @@ import type { Business } from '../../core/models/business.model';
 type ProfileStatus = 'loading' | 'ready' | 'error';
 
 /**
- * FixLink business profile — Stage 7B (`/business/profile`,
+ * Fixlynk business profile — Stage 7B (`/business/profile`,
  * authenticated BUSINESS_OWNER / BUSINESS_MANAGER).
  *
  * Shows the server-derived business profile with an owner-only

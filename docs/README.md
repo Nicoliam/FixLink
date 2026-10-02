@@ -1,4 +1,4 @@
-# FixLink Documentation Index
+# Fixlynk Documentation Index
 
 ## Start here
 

@@ -1,17 +1,17 @@
-# FixLink — Master AI Agent Instructions
+# Fixlynk — Master AI Agent Instructions
 
 ## 1. PROJECT IDENTITY
 
-Project name: FixLink
+Project name: Fixlynk
 
 Slogan:
 
 Connect. Quote. Fix.
 
-FixLink is a South African home-services marketplace and job-management
+Fixlynk is a South African home-services marketplace and job-management
 platform.
 
-FixLink connects customers with individual service professionals and
+Fixlynk connects customers with individual service professionals and
 service businesses while also providing businesses with tools to manage
 their existing customers, jobs, technicians, work updates and job history.
 
@@ -29,7 +29,7 @@ The core product has two connected purposes:
 
 ## 2. CORE PRODUCT PRINCIPLES
 
-FixLink is built around:
+Fixlynk is built around:
 
 Find → Trust → Hire → Work → Document → Complete → Review
 
@@ -40,7 +40,7 @@ Create → Assign → Work → Update → Approve → Complete → Close
 
 ## 3. TARGET USERS
 
-FixLink supports the following primary roles:
+Fixlynk supports the following primary roles:
 
 ### CUSTOMER
 
@@ -290,7 +290,7 @@ tests/
 
 ## 7. STITCH DESIGN IS THE VISUAL SOURCE OF TRUTH
 
-The approved Stitch design is the primary visual reference for FixLink.
+The approved Stitch design is the primary visual reference for Fixlynk.
 
 Location:
 
@@ -316,13 +316,13 @@ If a design limitation requires a change:
 3. Update the relevant design documentation.
 4. Implement only after the change is understood and approved.
 
-Do not turn FixLink into a generic admin dashboard or generic Bootstrap
+Do not turn Fixlynk into a generic admin dashboard or generic Bootstrap
 template if the Stitch design specifies a different visual direction.
 
 
 ## 8. PRODUCT DESIGN PRINCIPLES
 
-FixLink should feel:
+Fixlynk should feel:
 
 - Modern
 - Trustworthy
@@ -423,7 +423,7 @@ The frontend must never be trusted to arbitrarily change a job status.
 
 ## 11. BEFORE / DURING / AFTER
 
-Before/During/After documentation is a core FixLink feature.
+Before/During/After documentation is a core Fixlynk feature.
 
 All professional tiers support:
 
@@ -447,7 +447,7 @@ Job media must be associated with the correct job and phase.
 
 ## 12. PAYMENT — MVP
 
-FixLink does NOT process customer payments in the MVP.
+Fixlynk does NOT process customer payments in the MVP.
 
 The MVP payment flow is:
 
@@ -824,7 +824,7 @@ Do not build only the successful state.
 
 ## 24. RESPONSIVE DESIGN
 
-FixLink must work on:
+Fixlynk must work on:
 
 - Desktop
 - Tablet
@@ -1144,7 +1144,7 @@ Do not put large amounts of business logic directly into templates.
 
 The product must be designed with mobile use in mind.
 
-Technicians may use FixLink while physically working at a customer's property.
+Technicians may use Fixlynk while physically working at a customer's property.
 
 Important technician actions should therefore be:
 
@@ -1225,7 +1225,7 @@ Investigate and document the discrepancy.
 
 ## 45. AGENT BEHAVIOUR
 
-AI agents working on FixLink must:
+AI agents working on Fixlynk must:
 
 - Read relevant documentation before making significant changes.
 - Inspect existing code before modifying it.
@@ -1253,7 +1253,7 @@ AI agents must NOT:
 
 ## 46. CURRENT DEVELOPMENT STAGE
 
-FixLink is currently in the project foundation stage.
+Fixlynk is currently in the project foundation stage.
 
 The repository has:
 
@@ -1275,7 +1275,7 @@ architecture and database planning.
 
 ## 47. FINAL PRINCIPLE
 
-Build FixLink deliberately.
+Build Fixlynk deliberately.
 
 Prefer:
 
@@ -1309,6 +1309,6 @@ screens that merely look complete.
 
 Prefer:
 
-The approved FixLink product
+The approved Fixlynk product
 over
 generic generated application patterns.

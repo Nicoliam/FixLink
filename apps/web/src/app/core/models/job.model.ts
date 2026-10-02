@@ -1,5 +1,5 @@
 /**
- * FixLink job models — Stage 6B + 6C + 6D + 6E + 6F.
+ * Fixlynk job models — Stage 6B + 6C + 6D + 6E + 6F.
  *
  * Client-side projections of the customer job-request API
  * (POST /api/v1/jobs, GET /api/v1/jobs, GET /api/v1/jobs/:id), the
@@ -214,7 +214,7 @@ export function jobStatusLabel(status: JobStatus): string {  switch (status) {
 }
 
 /**
- * FixLink schedule display — Stage 6E.
+ * Fixlynk schedule display — Stage 6E.
  *
  * Formats a stored `scheduledAt` instant for South African viewers
  * (Africa/Johannesburg, SAST = UTC+2 year-round, no daylight saving), so

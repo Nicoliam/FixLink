@@ -9,7 +9,7 @@ import type { Job } from '../../core/models/job.model';
 type JobsStatus = 'loading' | 'ready' | 'empty' | 'error';
 
 /**
- * FixLink My Jobs — Stage 6B (`/my-jobs`, authenticated CUSTOMER) +
+ * Fixlynk My Jobs — Stage 6B (`/my-jobs`, authenticated CUSTOMER) +
  * Stage 6E (SCHEDULED / IN_PROGRESS badges with the scheduled slot).
  *
  * Lists the marketplace jobs the authenticated customer requested,

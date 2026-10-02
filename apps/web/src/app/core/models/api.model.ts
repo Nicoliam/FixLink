@@ -1,5 +1,5 @@
 /**
- * FixLink API response envelope (see docs/API.md).
+ * Fixlynk API response envelope (see docs/API.md).
  *
  * Success:
  *   { "success": true, "data": {}, "message": "Success" }

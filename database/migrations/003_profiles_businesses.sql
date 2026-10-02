@@ -1,4 +1,4 @@
--- FixLink migration 003 — Profiles, businesses, technicians, service links
+-- Fixlynk migration 003 — Profiles, businesses, technicians, service links
 -- Tables: customer_profiles, professional_profiles, business_profiles,
 -- business_members, technicians, professional_services, business_services, service_areas
 --

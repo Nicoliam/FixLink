@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — public services catalogue controllers.
+ * Fixlynk Stage 6A — public services catalogue controllers.
  * No authentication required: services and categories are public data.
  */
 import type { Request, Response } from 'express';

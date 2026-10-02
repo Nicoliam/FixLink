@@ -34,7 +34,7 @@ type WorkStatus = 'idle' | 'loading' | 'ready' | 'error';
 type RecordingState = 'idle' | 'requesting' | 'recording';
 
 /**
- * FixLink technician job detail — Stage 7C (`/technician/jobs/:id`,
+ * Fixlynk technician job detail — Stage 7C (`/technician/jobs/:id`,
  * read-only detail) + Stage 7D (execution workspace: start work,
  * BEFORE/DURING/AFTER photos and notes, voice notes, completion).
  *

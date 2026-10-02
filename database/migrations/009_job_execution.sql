@@ -1,4 +1,4 @@
--- FixLink migration 009 — Stage 6F work documentation support
+-- Fixlynk migration 009 — Stage 6F work documentation support
 -- Reuses job_images / job_updates / job_status_history (no new tables).
 -- Both columns are NULLABLE so existing rows and earlier stages are
 -- unaffected: phase distinguishes BEFORE/DURING/AFTER progress notes

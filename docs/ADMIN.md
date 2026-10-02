@@ -1,8 +1,8 @@
-# FixLink — Admin / Platform Operations
+# Fixlynk — Admin / Platform Operations
 
 ## 1. Purpose
 
-Stage 9 provides the implemented FixLink platform-operations surface for
+Stage 9 provides the implemented Fixlynk platform-operations surface for
 active `ADMIN` users. It is a platform-level view, not a second business,
 marketplace or technician workflow.
 
@@ -325,7 +325,7 @@ The implemented admin screens provide:
 
 ## 12. Deployment and operations notes
 
-- Production admin access requires the normal FixLink authentication
+- Production admin access requires the normal Fixlynk authentication
   configuration and an explicitly granted `ADMIN` role in the
   authoritative user data.
 - Suspended or deleted ADMIN accounts must not be left as operational

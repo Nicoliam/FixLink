@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, input, OnInit, output, signal } fro
 import { FormsModule } from '@angular/forms';
 
 /**
- * FixLink marketplace search bar — Oceanic dual-input pattern
+ * Fixlynk marketplace search bar — Oceanic dual-input pattern
  * (Service + Location/Suburb + Search). Emits the entered criteria;
  * the owning page performs the API-backed search.
  */
@@ -11,7 +11,7 @@ import { FormsModule } from '@angular/forms';
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <form class="fl-search" (ngSubmit)="onSubmit()" role="search" aria-label="Search FixLink providers">
+    <form class="fl-search" (ngSubmit)="onSubmit()" role="search" aria-label="Search Fixlynk providers">
       <div class="fl-search-field">
         <label class="fl-label" for="fl-search-service">Service</label>
         <input

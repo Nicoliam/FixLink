@@ -1,0 +1,75 @@
+<div class="fl-page">
+  <!-- PAGE HERO -->
+  <section class="fl-page-hero">
+    <div class="fl-page-hero-container">
+      <span class="fl-page-eyebrow">Browse by Category</span>
+      <h1 class="fl-page-title">Popular Services</h1>
+      <p class="fl-page-subtitle">
+        From urgent plumbing fixes to full home makeovers, find verified local professionals across
+        Johannesburg, Pretoria and Cape Town. Every category below shows indicative starting prices in
+        South African Rand (ZAR).
+      </p>
+      <div class="fl-page-hero-actions">
+        <a class="fl-cta-btn primary" routerLink="/marketplace">
+          <span class="material-symbols-outlined">search</span>
+          <span>Find a Handyman</span>
+        </a>
+        <a class="fl-cta-btn secondary" routerLink="/how-it-works">
+          <span class="material-symbols-outlined">info</span>
+          <span>How it works</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES GRID -->
+  <section class="fl-section">
+    <div class="fl-section-container">
+      <div class="fl-services-grid">
+        @for (service of services(); track service.name) {
+          <div class="fl-service-card">
+            <div class="fl-service-icon" [class]="service.iconClass">
+              <span class="material-symbols-outlined">{{ service.icon }}</span>
+            </div>
+            <div>
+              <h2 class="fl-service-name">{{ service.name }}</h2>
+              <p class="fl-service-description">{{ service.description }}</p>
+            </div>
+            <ul class="fl-service-includes">
+              @for (item of service.includes; track item) {
+                <li class="fl-service-include">
+                  <span class="material-symbols-outlined">check</span>
+                  <span>{{ item }}</span>
+                </li>
+              }
+            </ul>
+            <div class="fl-service-footer">
+              <span>From {{ service.price }}</span>
+              <a class="fl-service-cta" [routerLink]="['/marketplace']" [queryParams]="{ service: service.name }">
+                <span>Find pros</span>
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </a>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- BOTTOM CTA -->
+  <section class="fl-bottom-cta">
+    <div class="fl-bottom-cta-content">
+      <h2 class="fl-bottom-cta-title">Can't see what you need?</h2>
+      <p class="fl-bottom-cta-text">
+        Post your job anyway. Verified professionals covering your area will review it and submit quotes
+        in ZAR.
+      </p>
+      <div class="fl-bottom-cta-actions">
+        <a class="fl-cta-btn primary" routerLink="/marketplace">
+          <span class="material-symbols-outlined">search</span>
+          <span>Find a Handyman</span>
+        </a>
+      </div>
+    </div>
+  </section>
+</div>

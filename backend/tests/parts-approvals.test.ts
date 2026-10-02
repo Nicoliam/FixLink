@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7F — manager approvals + awaiting parts tests.
+ * Fixlynk Stage 7F — manager approvals + awaiting parts tests.
  *
  * Run: npm test (no MySQL required — in-memory business store with the
  * same rules as the MySQL implementation, plus an isolated local-storage
@@ -43,7 +43,7 @@ interface TestContext {
 function buildApp(): TestContext {
   const users = new MemoryUserRepository();
   const business = new MemoryBusinessStore();
-  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlink-7f-')));
+  const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlynk-7f-')));
   // The shared bus is threaded through createApp so tests can drain the
   // Stage 8 notification seam after each HTTP workflow step.
   const events = new PartsRequestEventBus();

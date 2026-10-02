@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — MySQL marketplace store (production implementation).
+ * Fixlynk Stage 6A — MySQL marketplace store (production implementation).
  *
  * Every value is a bound parameter — no string-interpolated SQL. LIKE
  * patterns escape `%`, `_` and `\` so search input cannot widen matches.

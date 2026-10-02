@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — provider request + quote routes.
+ * Fixlynk Stage 6C — provider request + quote routes.
  * Stage 6D adds customer quote acceptance.
  * Stage 6E adds provider scheduling and start.
  *

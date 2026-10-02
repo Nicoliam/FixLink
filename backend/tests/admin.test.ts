@@ -277,7 +277,7 @@ describe('admin authorization and resources', () => {
   });
 
   it('streams admin documents without exposing storage references or paths', async () => {
-    const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlink-admin-docs-')));
+    const storage = new LocalFileStorage(mkdtempSync(join(tmpdir(), 'fixlynk-admin-docs-')));
     const verificationFile = await storage.saveAdminDocument('verification', '1', Buffer.from('%PDF-verification'), 'pdf');
     const certificateFile = await storage.saveAdminDocument('certificate', '1', Buffer.from('%PDF-certificate'), 'pdf');
     const documentStore = new MemoryAdminStore(users, {

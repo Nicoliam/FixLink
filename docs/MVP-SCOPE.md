@@ -1,8 +1,8 @@
-# FixLink — MVP Scope
+# Fixlynk — MVP Scope
 
 ## 1. Purpose
 
-This document defines what is included in the FixLink MVP.
+This document defines what is included in the Fixlynk MVP.
 
 The purpose of this document is to prevent feature creep and give
 development agents a clear boundary.

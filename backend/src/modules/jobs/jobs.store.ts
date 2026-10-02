@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6B — jobs data-access contract.
+ * Fixlynk Stage 6B — jobs data-access contract.
  *
  * The MySQL implementation serves production; the memory implementation
  * serves automated tests (no database required). Provider catalogue reads

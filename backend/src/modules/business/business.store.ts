@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7A — business data-access contract.
+ * Fixlynk Stage 7A — business data-access contract.
  *
  * The MySQL implementation serves production (transactional technician
  * linking + activation); the memory implementation serves automated

@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — execution controllers.
+ * Fixlynk Stage 6F — execution controllers.
  *
  * Authentication is enforced by `requireAuth`; provider identity, customer
  * ownership and job state are derived inside the service — never from the

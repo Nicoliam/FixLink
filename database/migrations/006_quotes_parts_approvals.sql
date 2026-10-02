@@ -1,4 +1,4 @@
--- FixLink migration 006 — Quotes, parts, approvals
+-- Fixlynk migration 006 — Quotes, parts, approvals
 -- MVP records agreed amounts in ZAR only; no payment processing tables.
 
 -- +migrate Up

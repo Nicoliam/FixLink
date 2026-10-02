@@ -23,7 +23,7 @@ import type {
 } from '../models/business.model';
 
 /**
- * FixLink technician API client — Stage 7C (My Jobs) + Stage 7D
+ * Fixlynk technician API client — Stage 7C (My Jobs) + Stage 7D
  * (execution: start, BEFORE/DURING/AFTER photos and notes, voice
  * notes, timeline, completion) + Stage 7E (parts requests: submit,
  * list, read, photo evidence) + Stage 7F (respond to needs-info,

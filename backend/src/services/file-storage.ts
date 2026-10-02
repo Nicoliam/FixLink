@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6F — file-storage abstraction (MVP local adapter) +
+ * Fixlynk Stage 6F — file-storage abstraction (MVP local adapter) +
  * Stage 7D voice-note support.
  *
  * Flow: User → Backend → File Storage → Metadata → MySQL.

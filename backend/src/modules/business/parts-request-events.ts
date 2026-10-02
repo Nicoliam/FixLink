@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7F — parts-request notification event seam (retained
+ * Fixlynk Stage 7F — parts-request notification event seam (retained
  * in Stage 8 as a test-observable seam).
  *
  * The `notifications` table (migration 008) is now written by the

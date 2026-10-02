@@ -13,7 +13,7 @@ import type { NotificationItem, NotificationList } from '../models/notification.
 export const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
 
 /**
- * FixLink notifications API client — Stage 8 (in-app only).
+ * Fixlynk notifications API client — Stage 8 (in-app only).
  *
  * Single owner of notification calls plus the global unread badge
  * state. All endpoints require authentication (the interceptor

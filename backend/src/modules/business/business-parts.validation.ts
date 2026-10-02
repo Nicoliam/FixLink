@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 7E — parts-request validation.
+ * Fixlynk Stage 7E — parts-request validation.
  *
  * Server-side validation is authoritative; Angular validation is UX only.
  * Only the requested part fields are accepted — the job, business,

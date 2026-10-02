@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6A — public marketplace routes.
+ * Fixlynk Stage 6A — public marketplace routes.
  *
  * Catalogue and provider discovery are public (no auth): customers browse
  * the marketplace before registering. Rate-limited like the auth routes.

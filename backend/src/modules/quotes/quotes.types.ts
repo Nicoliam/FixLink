@@ -1,5 +1,5 @@
 /**
- * FixLink Stage 6C — provider quote types.
+ * Fixlynk Stage 6C — provider quote types.
  *
  * Marketplace jobs and internal business jobs share the ONE `jobs` table;
  * quotes live in the existing `quotes` / `quote_items` tables (see

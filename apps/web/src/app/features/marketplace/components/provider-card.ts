@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { ProviderCard } from '../../../core/models/marketplace.model';
 
 /**
- * FixLink provider card — Oceanic Modern Marketplace (Stage 6A).
+ * Fixlynk provider card — Oceanic Modern Marketplace (Stage 6A).
  *
  * Data-driven card for marketplace results and the homepage. The verified
  * badge renders only when the backend confirms `isVerified`; the frontend

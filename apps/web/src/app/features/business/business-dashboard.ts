@@ -10,7 +10,7 @@ import type { Business, BusinessBoardSummary, BusinessJobsSummary } from '../../
 type DashboardStatus = 'loading' | 'ready' | 'error';
 
 /**
- * FixLink business dashboard — Stage 7A + 7B (`/business`, authenticated
+ * Fixlynk business dashboard — Stage 7A + 7B (`/business`, authenticated
  * BUSINESS_OWNER / BUSINESS_MANAGER).
  *
  * Shows the server-derived business profile (name, status, technician

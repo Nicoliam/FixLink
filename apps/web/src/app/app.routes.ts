@@ -24,6 +24,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home').then((m) => m.HomeComponent),
   },
   {
+    path: 'services',
+    loadComponent: () => import('./features/services/services').then((m) => m.ServicesComponent),
+  },
+  {
+    path: 'how-it-works',
+    loadComponent: () =>
+      import('./features/how-it-works/how-it-works').then((m) => m.HowItWorksComponent),
+  },
+  {
     path: 'marketplace',
     loadComponent: () => import('./features/marketplace/marketplace').then((m) => m.MarketplaceComponent),
   },

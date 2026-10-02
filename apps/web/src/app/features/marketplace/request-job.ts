@@ -10,7 +10,7 @@ import type { ProviderProfile, ServiceListing } from '../../core/models/marketpl
 import type { Job } from '../../core/models/job.model';
 
 /**
- * FixLink Request-a-Job — Stage 6B (`/request-job`, authenticated CUSTOMER).
+ * Fixlynk Request-a-Job — Stage 6B (`/request-job`, authenticated CUSTOMER).
  *
  * Submits a marketplace job request to POST /api/v1/jobs. The backend
  * establishes customer ownership from the session and creates the job with

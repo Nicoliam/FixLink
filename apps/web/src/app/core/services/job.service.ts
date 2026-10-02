@@ -22,7 +22,7 @@ import type {
 } from '../models/job.model';
 
 /**
- * FixLink jobs API client — Stage 6B (customer requests) + Stage 6C
+ * Fixlynk jobs API client — Stage 6B (customer requests) + Stage 6C
  * (provider requests and quotes) + Stage 6D (customer quote acceptance)
  * + Stage 6E (provider scheduling and start) + Stage 6F (work
  * documentation, completion, confirmation, timeline).
