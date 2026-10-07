@@ -22,11 +22,11 @@ INSERT INTO `job_images` (`job_id`, `uploader_id`, `phase`, `file_reference`, `m
 
 INSERT INTO `job_updates` (`job_id`, `author_id`, `message`, `created_at`) VALUES
   (5, 11, 'Rodded 12m from upstream manhole, hit solid obstruction at the boundary. Opening up to inspect.', '2026-09-19 09:50:00'),
-  (5, 10, 'Took over from Karin. Trap collar is cracked — needs a 110mm repair section before we jet. Parts requested.', '2026-09-19 11:25:00');
+  (5, 10, 'Took over from Karin. Trap collar is cracked - needs a 110mm repair section before we jet. Parts requested.', '2026-09-19 11:25:00');
 
 -- Parts flow: Bongani requests, Lerato (manager) approves.
 INSERT INTO `parts_requests` (`id`, `job_id`, `requester_id`, `status`, `reason`, `reviewed_by`, `reviewed_at`, `review_notes`) VALUES
-  (1, 5, 10, 'APPROVED', 'Cracked 110mm boundary trap collar; need repair section and couplers to restore line.', 9, '2026-09-19 12:05:00', 'Approved — collect from Builders Express, Northriding.');
+  (1, 5, 10, 'APPROVED', 'Cracked 110mm boundary trap collar; need repair section and couplers to restore line.', 9, '2026-09-19 12:05:00', 'Approved - collect from Builders Express, Northriding.');
 
 INSERT INTO `parts_request_items` (`parts_request_id`, `part_name`, `quantity`, `notes`, `photo_reference`, `photo_mime`, `photo_size`) VALUES
   (1, '110mm PVC repair section (1m)', 1, 'Must be SANS 791 rated', 'parts/1/cracked-trap.jpg', 'image/jpeg', 310200),

@@ -53,7 +53,7 @@ INSERT INTO `job_images` (`job_id`, `uploader_id`, `phase`, `file_reference`, `m
   (3, 6, 'AFTER', 'jobs/3/after-db-board.jpg', 'image/jpeg', 460221, 'Board rewired, labelled and tested');
 
 INSERT INTO `job_updates` (`job_id`, `author_id`, `message`, `created_at`) VALUES
-  (1, 5, 'On site. Isolated water, old cartridge removed — seat is pitted, fitting new cartridge and resealing base.', '2026-09-20 09:40:00'),
+  (1, 5, 'On site. Isolated water, old cartridge removed - seat is pitted, fitting new cartridge and resealing base.', '2026-09-20 09:40:00'),
   (1, 5, 'New cartridge in, no leaks after 15-min pressure test. Drying cupboard, will reseal and photograph.', '2026-09-20 11:15:00'),
   (3, 6, 'Fault traced to damaged neutral on the lights circuit. Breaker replaced, circuit megger-tested OK.', '2026-09-18 15:30:00');
 
@@ -62,7 +62,7 @@ INSERT INTO `job_voice_notes` (`job_id`, `author_id`, `file_reference`, `mime_ty
 
 -- Conversation on job 1 between Naledi (user 2) and Sipho (user 5).
 INSERT INTO `conversations` (`id`, `job_id`, `subject`, `created_by`) VALUES
-  (1, 1, 'Kitchen sink leak — access details', 2);
+  (1, 1, 'Kitchen sink leak - access details', 2);
 INSERT INTO `conversation_participants` (`conversation_id`, `user_id`) VALUES
   (1, 2), (1, 5);
 INSERT INTO `messages` (`id`, `conversation_id`, `sender_id`, `body`, `created_at`) VALUES

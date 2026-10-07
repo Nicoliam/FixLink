@@ -11,18 +11,18 @@
 -- to prove the public API hides them.
 
 INSERT INTO `users` (`id`, `email`, `phone`, `password_hash`, `status`, `email_verified_at`, `created_at`) VALUES
-  (13, 'kabelo.mahlangu@example.co.za', '+27825550113', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-05 08:00:00', '2026-09-05 08:00:00'),
-  (14, 'ayanda.sithole@example.co.za', '+27825550114', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-06 08:00:00', '2026-09-06 08:00:00'),
-  (15, 'pieter.jacobs@example.co.za', '+27825550115', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-18 08:00:00', '2026-09-18 08:00:00'),
-  (16, 'thandi.khumalo@example.co.za', '+27825550116', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-07 08:00:00', '2026-09-07 08:00:00');
+  (13, 'kabelo.mahlangu@example.co.za', '+27825550113', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-05 08:00:00', '2026-09-05 08:00:00'),
+  (14, 'ayanda.sithole@example.co.za', '+27825550114', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-06 08:00:00', '2026-09-06 08:00:00'),
+  (15, 'pieter.jacobs@example.co.za', '+27825550115', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-18 08:00:00', '2026-09-18 08:00:00'),
+  (16, 'thandi.khumalo@example.co.za', '+27825550116', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-07 08:00:00', '2026-09-07 08:00:00');
 
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
   (13, 2), (14, 2), (15, 2),
   (16, 3);
 
 INSERT INTO `professional_profiles` (`id`, `user_id`, `display_name`, `bio`, `experience_years`, `verification_status`, `rating_avg`, `rating_count`) VALUES
-  (4, 13, 'Kabelo Mahlangu — Fix-It Handyman', 'Handyman for doors, locks, flat-packs, wall mounting and small repairs in Fourways and Bryanston.', 7, 'VERIFIED', 4.90, 87),
-  (5, 14, 'Ayanda Sithole — Sparkle Cleans', 'Deep cleans, move-in/move-out cleans and office upkeep in Sandton and Midrand.', 5, 'VERIFIED', 4.90, 52),
+  (4, 13, 'Kabelo Mahlangu - Fix-It Handyman', 'Handyman for doors, locks, flat-packs, wall mounting and small repairs in Fourways and Bryanston.', 7, 'VERIFIED', 4.90, 87),
+  (5, 14, 'Ayanda Sithole - Sparkle Cleans', 'Deep cleans, move-in/move-out cleans and office upkeep in Sandton and Midrand.', 5, 'VERIFIED', 4.90, 52),
   (6, 15, 'Pieter Jacobs Painting', 'Newly listed painter for single rooms and feature walls in Bryanston.', 3, 'UNVERIFIED', 0.00, 0);
 
 INSERT INTO `professional_services` (`professional_id`, `service_id`) VALUES
@@ -86,13 +86,13 @@ INSERT INTO `quote_items` (`quote_id`, `description`, `quantity`, `unit_price`, 
 
 INSERT INTO `reviews` (`id`, `job_id`, `customer_id`, `professional_id`, `business_id`, `rating`, `comment`) VALUES
   (2, 6, 1, 4, NULL, 5, 'Kabelo was quick, tidy and the doors finally close properly. Will book again.'),
-  (3, 7, 2, 5, NULL, 5, 'Flat handed back spotless — the agent even complimented the oven. Worth every rand.');
+  (3, 7, 2, 5, NULL, 5, 'Flat handed back spotless - the agent even complimented the oven. Worth every rand.');
 
 -- Portfolio: Kabelo + Ayanda published; Pieter's draft stays unpublished.
 INSERT INTO `portfolio_projects` (`id`, `professional_id`, `business_id`, `service_id`, `source_job_id`, `title`, `description`, `is_published`) VALUES
   (3, 4, NULL, 9, 6, 'Fourways door and lock refresh', 'Sticking doors planed, new passage lock and rails mounted in one visit.', 1),
   (4, 5, NULL, 13, 7, 'Sandton move-out deep clean', 'Full flat reset: kitchen, bathrooms, oven, windows and balconies.', 1),
-  (5, 6, NULL, 6, NULL, 'Bryanston feature wall (draft)', 'Work in progress — not yet published.', 0);
+  (5, 6, NULL, 6, NULL, 'Bryanston feature wall (draft)', 'Work in progress - not yet published.', 0);
 
 INSERT INTO `portfolio_images` (`project_id`, `file_reference`, `mime_type`, `file_size`, `kind`, `sort_order`, `uploaded_by`) VALUES
   (3, 'portfolio/3/before-doors.jpg', 'image/jpeg', 399100, 'BEFORE', 1, 13),
@@ -102,7 +102,7 @@ INSERT INTO `portfolio_images` (`project_id`, `file_reference`, `mime_type`, `fi
 
 -- Certificates: Kabelo approved (public); Pieter's pending (hidden publicly).
 INSERT INTO `certificates` (`id`, `professional_id`, `business_id`, `title`, `issuing_organisation`, `issue_date`, `expiry_date`, `verification_status`, `document_reference`, `document_mime`, `document_size`) VALUES
-  (3, 4, NULL, 'Certified Handyman — Level 2', 'Gauteng Skills Academy (fictional)', '2024-05-20', '2027-05-19', 'APPROVED', 'certificates/3/kabelo-handyman.pdf', 'application/pdf', 201300),
+  (3, 4, NULL, 'Certified Handyman - Level 2', 'Gauteng Skills Academy (fictional)', '2024-05-20', '2027-05-19', 'APPROVED', 'certificates/3/kabelo-handyman.pdf', 'application/pdf', 201300),
   (4, 6, NULL, 'Paint Techniques Short Course', 'Bryanston Training Centre (fictional)', '2026-07-10', NULL, 'PENDING', 'certificates/4/pieter-paint.pdf', 'application/pdf', 188700);
 
 INSERT INTO `certificate_verifications` (`certificate_id`, `reviewed_by`, `decision`, `notes`, `reviewed_at`) VALUES

@@ -4,18 +4,18 @@
 -- 'Fixlynk-dev-001'.
 
 INSERT INTO `users` (`id`, `email`, `phone`, `password_hash`, `status`, `email_verified_at`, `phone_verified_at`, `created_at`) VALUES
-  (1, 'admin@fixlynk.example.co.za', '+27825550100', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-01 08:00:00', '2026-08-01 08:05:00', '2026-08-01 08:00:00'),
-  (2, 'naledi.dlamini@example.co.za', '+27825550101', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 09:00:00', NULL, '2026-09-01 09:00:00'),
-  (3, 'pieter.vdm@example.co.za', '+27825550102', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-02 10:00:00', NULL, '2026-09-02 10:00:00'),
-  (4, 'aisha.patel@example.co.za', '+27825550103', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-03 11:00:00', NULL, '2026-09-03 11:00:00'),
-  (5, 'sipho.ndlovu@example.co.za', '+27825550104', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 12:00:00', '2026-09-05 12:00:00', '2026-09-01 12:00:00'),
-  (6, 'johan.botha@example.co.za', '+27825550105', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-01 12:30:00', NULL, '2026-09-01 12:30:00'),
-  (7, 'maria.santos@example.co.za', '+27825550106', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-04 08:00:00', NULL, '2026-09-04 08:00:00'),
-  (8, 'thabo.maseko@example.co.za', '+27825550107', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-20 09:00:00', '2026-08-20 09:10:00', '2026-08-20 09:00:00'),
-  (9, 'lerato.khumalo@example.co.za', '+27825550108', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-21 09:00:00', NULL, '2026-08-21 09:00:00'),
-  (10, 'bongani.zulu@example.co.za', '+27825550109', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-22 09:00:00', NULL, '2026-08-22 09:00:00'),
-  (11, 'karin.meyer@example.co.za', '+27825550110', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-08-23 09:00:00', NULL, '2026-08-23 09:00:00'),
-  (12, 'david.naidoo@example.co.za', '+27825550111', '$2a$12$CrmxOltf7.Y5L33eXxHCTO5cNd8pCQDx7Yr7ZlJ3huS1gnZkdtM.S', 'ACTIVE', '2026-09-10 09:00:00', NULL, '2026-09-10 09:00:00');
+  (1, 'admin@fixlynk.example.co.za', '+27825550100', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-08-01 08:00:00', '2026-08-01 08:05:00', '2026-08-01 08:00:00'),
+  (2, 'naledi.dlamini@example.co.za', '+27825550101', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-01 09:00:00', NULL, '2026-09-01 09:00:00'),
+  (3, 'pieter.vdm@example.co.za', '+27825550102', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-02 10:00:00', NULL, '2026-09-02 10:00:00'),
+  (4, 'aisha.patel@example.co.za', '+27825550103', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-03 11:00:00', NULL, '2026-09-03 11:00:00'),
+  (5, 'sipho.ndlovu@example.co.za', '+27825550104', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-01 12:00:00', '2026-09-05 12:00:00', '2026-09-01 12:00:00'),
+  (6, 'johan.botha@example.co.za', '+27825550105', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-01 12:30:00', NULL, '2026-09-01 12:30:00'),
+  (7, 'maria.santos@example.co.za', '+27825550106', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-04 08:00:00', NULL, '2026-09-04 08:00:00'),
+  (8, 'thabo.maseko@example.co.za', '+27825550107', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-08-20 09:00:00', '2026-08-20 09:10:00', '2026-08-20 09:00:00'),
+  (9, 'lerato.khumalo@example.co.za', '+27825550108', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-08-21 09:00:00', NULL, '2026-08-21 09:00:00'),
+  (10, 'bongani.zulu@example.co.za', '+27825550109', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-08-22 09:00:00', NULL, '2026-08-22 09:00:00'),
+  (11, 'karin.meyer@example.co.za', '+27825550110', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-08-23 09:00:00', NULL, '2026-08-23 09:00:00'),
+  (12, 'david.naidoo@example.co.za', '+27825550111', '$2a$12$qMjIW3dbjqz1AbGVcKH5auw0HZYGIgbtwqn1dH61rHs/Sza8wGExu', 'ACTIVE', '2026-09-10 09:00:00', NULL, '2026-09-10 09:00:00');
 
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
   (1, 6),
@@ -48,7 +48,7 @@ INSERT INTO `customer_profiles` (`id`, `user_id`, `business_id`, `first_name`, `
   (4, NULL, 1, 'Jabulani', 'Sithole', NULL, '+27825550190', 'PHONE');
 
 INSERT INTO `professional_profiles` (`id`, `user_id`, `display_name`, `bio`, `experience_years`, `verification_status`, `rating_avg`, `rating_count`) VALUES
-  (1, 5, 'Sipho Ndlovu — ProPlumb', 'PIRB-registered plumber doing leaks, geysers and drains across Joburg North.', 9, 'VERIFIED', 4.80, 64),
+  (1, 5, 'Sipho Ndlovu - ProPlumb', 'PIRB-registered plumber doing leaks, geysers and drains across Joburg North.', 9, 'VERIFIED', 4.80, 64),
   (2, 6, 'Johan Botha Electrical', 'Residential electrician: fault finding, DB boards and lighting in Centurion.', 12, 'VERIFIED', 4.70, 41),
   (3, 7, 'Maria Santos Painting', 'Neat, reliable painter for interiors and exteriors in Durban North.', 6, 'PENDING', 0.00, 0);
 

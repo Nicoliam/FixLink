@@ -21,6 +21,7 @@ const EXPECTED_TABLES = [
   'business_profiles', 'business_members',
   'technicians',
   'service_categories', 'services', 'service_areas', 'business_services',
+  'service_offerings',
   'portfolio_projects', 'portfolio_images',
   'certificates', 'certificate_verifications',
   'verification_requests', 'identity_verifications',
@@ -72,7 +73,7 @@ after(async () => {
 });
 
 describe('schema presence', () => {
-  it('creates all 41 domain tables', async () => {
+  it('creates all 42 domain tables', async () => {
     const found = await tables();
     for (const t of EXPECTED_TABLES) assert.ok(found.has(t), `missing table: ${t}`);
   });
@@ -369,6 +370,236 @@ describe('seeded relationships', () => {
     assert.ok(m[0].n >= 2);
     const [n] = await db.query('SELECT COUNT(*) AS n FROM notifications');
     assert.ok(n[0].n >= 5);
+  });
+});
+
+describe('saved professionals', () => {
+  // Migration 016 hardens the `saved_professionals` table created by migration
+  // 008. It adds no new table, so the domain-table count is unchanged; these
+  // tests cover the constraints it introduced.
+  it('refuses the same professional saved twice by one customer', async () => {
+    await db.query('START TRANSACTION');
+    try {
+      await db.query(
+        'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (1, 1)'
+      );
+      // The duplicate must be refused. MySQL treats NULLs as DISTINCT in a
+      // unique index, so without the COALESCE-generated unique key this insert
+      // would succeed because saved_business_id is NULL on both rows.
+      await assert.rejects(
+        db.query(
+          'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (1, 1)'
+        ),
+        /duplicate/i
+      );
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('refuses the same business saved twice by one customer', async () => {
+    await db.query('START TRANSACTION');
+    try {
+      await db.query(
+        'INSERT INTO `saved_professionals` (`customer_id`,`saved_business_id`) VALUES (1, 1)'
+      );
+      await assert.rejects(
+        db.query(
+          'INSERT INTO `saved_professionals` (`customer_id`,`saved_business_id`) VALUES (1, 1)'
+        ),
+        /duplicate/i
+      );
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('lets different customers save the same professional', async () => {
+    await db.query('START TRANSACTION');
+    try {
+      await db.query(
+        'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (1, 2)'
+      );
+      // Uniqueness is per customer, not global: sharing a shortlist is fine.
+      await db.query(
+        'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (2, 2)'
+      );
+      const [rows] = await db.query(
+        'SELECT COUNT(*) AS n FROM `saved_professionals` WHERE `saved_professional_id` = 2'
+      );
+      assert.equal(rows[0].n, 2);
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('saves a professional or a business, never both or neither', async () => {
+    await db.query('START TRANSACTION');
+    try {
+      // chk_saved_professionals_owner rejects a half-owned row, so a bookmark
+      // can never point at nothing or at two owners at once.
+      await assert.rejects(
+        db.query(
+          'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`,`saved_business_id`) VALUES (3, 1, 1)'
+        ),
+        /check|constraint/i
+      );
+      await assert.rejects(
+        db.query('INSERT INTO `saved_professionals` (`customer_id`) VALUES (3)'),
+        /check|constraint/i
+      );
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('rejects a bookmark for a provider that does not exist', async () => {
+    await db.query('START TRANSACTION');
+    try {
+      await assert.rejects(
+        db.query(
+          'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (1, 999999)'
+        ),
+        /foreign key/i
+      );
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('derives the unique keys with COALESCE over the nullable owner columns', async () => {
+    const [rows] = await db.query(
+      `SELECT COLUMN_NAME, EXTRA, GENERATION_EXPRESSION
+         FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saved_professionals'
+          AND COLUMN_NAME IN ('professional_key','business_key')`
+    );
+    assert.equal(rows.length, 2);
+    for (const row of rows) {
+      // VIRTUAL, not STORED: MySQL refuses a foreign key on a column that is
+      // the base of a STORED generated column, and both owner columns here
+      // carry ON DELETE CASCADE.
+      assert.match(row.EXTRA, /VIRTUAL GENERATED/i, `${row.COLUMN_NAME} must be VIRTUAL`);
+      assert.match(row.GENERATION_EXPRESSION, /COALESCE/i);
+    }
+  });
+
+  it('cascades a deleted provider\'s bookmarks away', async () => {
+    const [rows] = await db.query(
+      `SELECT CONSTRAINT_NAME, DELETE_RULE
+         FROM information_schema.REFERENTIAL_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'saved_professionals'`
+    );
+    const rules = rows.map((r) => r.DELETE_RULE);
+    assert.equal(rules.length, 3);
+    for (const rule of rules) {
+      // customer, professional and business owners all cascade: removing a
+      // profile must not leave dangling bookmarks.
+      assert.equal(rule, 'CASCADE');
+    }
+  });
+});
+
+describe('provider service offerings', () => {
+  it('lets two different providers offer the same service name', async () => {
+    // The invariant that forced offerings into their own table: `services`
+    // enforces UNIQUE(slug) and UNIQUE(category_id, name) globally, so two
+    // providers cannot both author "Leak Repair" as catalogue rows.
+    await db.query('START TRANSACTION');
+    try {
+      await db.query(
+        "INSERT INTO `service_offerings` (`professional_id`,`category_id`,`name`,`price_amount`) VALUES (1,1,'Emergency Leak Repair',850.00)"
+      );
+      await db.query(
+        "INSERT INTO `service_offerings` (`professional_id`,`category_id`,`name`,`price_amount`) VALUES (2,1,'Emergency Leak Repair',950.00)"
+      );
+      // A business owner may hold the same name too: the unset owner column
+      // is NULL and MySQL permits repeated NULLs in a unique index.
+      await db.query(
+        "INSERT INTO `service_offerings` (`business_id`,`category_id`,`name`,`price_amount`) VALUES (1,1,'Emergency Leak Repair',1200.00)"
+      );
+      const [rows] = await db.query(
+        "SELECT COUNT(*) AS n FROM `service_offerings` WHERE `name` = 'Emergency Leak Repair'"
+      );
+      assert.equal(rows[0].n, 3);
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('rejects the same provider listing a name twice', async () => {
+    await db.query('START TRANSACTION');
+    try {
+      await db.query(
+        "INSERT INTO `service_offerings` (`professional_id`,`category_id`,`name`,`price_amount`) VALUES (1,1,'Duplicate Guard',500.00)"
+      );
+      await assert.rejects(
+        db.query(
+          "INSERT INTO `service_offerings` (`professional_id`,`category_id`,`name`,`price_amount`) VALUES (1,1,'Duplicate Guard',600.00)"
+        ),
+        /duplicate/i
+      );
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('keeps the indicative price in ZAR and never negative', async () => {
+    const [rows] = await db.query(
+      `SELECT COLUMN_NAME, COLUMN_DEFAULT, IS_NULLABLE, NUMERIC_SCALE
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'service_offerings'
+         AND COLUMN_NAME IN ('price_amount','currency')`
+    );
+    assert.equal(rows.length, 2);
+    const price = rows.find((r) => r.COLUMN_NAME === 'price_amount');
+    const currency = rows.find((r) => r.COLUMN_NAME === 'currency');
+// DECIMAL(10,2) with a CHECK constraint, matching chk_jobs_agreed_amount.
+      assert.equal(price.IS_NULLABLE, 'NO', 'price_amount must be required');
+      assert.equal(Number(price.NUMERIC_SCALE), 2, 'price must hold cents, not rounded Rand');
+      assert.equal(price.COLUMN_DEFAULT, null, 'price must not be silently defaulted');
+    assert.equal(currency.COLUMN_DEFAULT, 'ZAR');
+    await db.query('START TRANSACTION');
+    try {
+      await assert.rejects(
+        db.query(
+          "INSERT INTO `service_offerings` (`professional_id`,`category_id`,`name`,`price_amount`) VALUES (1,1,'Negative Price',-1.00)"
+        ),
+        /check constraint/i
+      );
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('lets jobs reference an offering without losing the catalogue service link', async () => {
+    const [cols] = await db.query(
+      `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'jobs'
+         AND COLUMN_NAME = 'service_offering_id'`
+    );
+    assert.equal(cols.length, 1);
+    assert.equal(cols[0].IS_NULLABLE, 'YES', 'existing jobs must not require an offering');
+    const [fks] = await db.query(
+      `SELECT REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+       FROM information_schema.KEY_COLUMN_USAGE
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'jobs'
+         AND COLUMN_NAME = 'service_offering_id'`
+    );
+    assert.equal(fks.length, 1, 'jobs.service_offering_id must be a foreign key');
+    assert.equal(fks[0].REFERENCED_TABLE_NAME, 'service_offerings');
+    assert.equal(fks[0].REFERENCED_COLUMN_NAME, 'id');
+  });
+
+  it('preserves offering history via soft deletion', async () => {
+    for (const column of ['created_at', 'updated_at', 'deleted_at', 'is_active']) {
+      const [rows] = await db.query(
+        `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'service_offerings' AND COLUMN_NAME = ?`,
+        [column]
+      );
+      assert.equal(rows[0].n, 1, `service_offerings missing ${column}`);
+    }
   });
 });
 
