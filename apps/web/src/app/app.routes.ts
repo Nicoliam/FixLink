@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/guards/admin.guard';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { providerGuard } from './core/guards/provider.guard';
 
 /**
  * Stage 6A routes — authentication foundation + marketplace discovery.
@@ -68,8 +69,35 @@ export const routes: Routes = [
   },
   {
     path: 'requests/:id',
+    // `source` tells the detail screen which list it came from: the inbox is
+    // ownership-scoped, the board is match-scoped, so they load differently.
+    data: { source: 'inbox' },
     loadComponent: () => import('./features/provider/request-detail').then((m) => m.RequestDetailComponent),
     canActivate: [authGuard],
+  },
+  // Step 14 — unaddressed requests matching this provider's categories and areas.
+  {
+    path: 'open-requests',
+    loadComponent: () => import('./features/provider/open-requests').then((m) => m.OpenRequestsComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'open-requests/:id',
+    data: { source: 'open' },
+    loadComponent: () => import('./features/provider/request-detail').then((m) => m.RequestDetailComponent),
+    canActivate: [authGuard],
+  },
+  // Provider-owned service offerings (professional profile and/or business).
+  // `/services` above is the public marketing page — never reuse it here.
+  {
+    path: 'my-services',
+    loadComponent: () => import('./features/provider/my-services').then((m) => m.MyServicesComponent),
+    canActivate: [providerGuard],
+  },
+  {
+    path: 'my-areas',
+    loadComponent: () => import('./features/provider/my-areas').then((m) => m.MyAreasComponent),
+    canActivate: [providerGuard],
   },
   {
     path: 'business',

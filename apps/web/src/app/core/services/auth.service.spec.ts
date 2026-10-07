@@ -81,7 +81,7 @@ describe('AuthService', () => {
     expect(tokens.getRefreshToken()).toBeNull();
   });
 
-  it('registers and establishes a session — no second login step', () => {
+  it('registers and establishes a session - no second login step', () => {
     let result: AuthUser | null = null;
     service
       .register({ email: 'new@example.co.za', password: 'password123', role: 'CUSTOMER' })

@@ -1,0 +1,236 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/requests">← Back to requests</a>
+  </nav>
+
+  <p class="fl-eyebrow">Services</p>
+  <h1 class="fl-page-title">My services</h1>
+  <p class="fl-page-subtitle">
+    The services you offer. Each service shows an indicative starting price to help customers
+    decide - Fixlynk never charges it, you and your customer agree the final amount directly.
+  </p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading your services…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">{{ errorTitle() }}</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="load()">Try again</button>
+    </div>
+  } @else {
+    @if (status() === 'empty') {
+      <div class="fl-state" role="status">
+        <h2 class="fl-state-title">No services yet</h2>
+        <p class="fl-state-text">
+          Add your first service below so customers can find and request you.
+        </p>
+      </div>
+    } @else {
+      <div class="fl-provider-grid">
+        @for (offering of offerings(); track offering.id) {
+          <article class="fl-card">
+            <p class="fl-card-label">{{ offering.categoryName }}</p>
+            <h2 class="fl-card-title">{{ offering.name }}</h2>
+            <p class="fl-card-text">{{ priceFrom(offering) }}</p>
+            @if (offering.description) {
+              <p class="fl-card-text">{{ offering.description }}</p>
+            }
+            @if (editingId() === offering.id) {
+              <form class="fl-form" [formGroup]="editForm" (ngSubmit)="saveEdit(offering)" novalidate>
+                <div class="fl-field">
+                  <label [for]="'edit-name-' + offering.id">Service name</label>
+                  <input [id]="'edit-name-' + offering.id" class="fl-input" type="text" formControlName="name" />
+                  @if (editForm.controls.name.touched && editForm.controls.name.invalid) {
+                    <p class="fl-field-error" role="alert">Service name is required.</p>
+                  }
+                </div>
+                <div class="fl-field">
+                  <label [for]="'edit-category-' + offering.id">Service category</label>
+                  <select [id]="'edit-category-' + offering.id" class="fl-input" formControlName="categoryId">
+                    <option value="">Select a category</option>
+                    @for (category of categories(); track category.id) {
+                      <option [value]="category.id">{{ category.name }}</option>
+                    }
+                  </select>
+                  @if (editForm.controls.categoryId.touched && editForm.controls.categoryId.invalid) {
+                    <p class="fl-field-error" role="alert">Select a service category.</p>
+                  }
+                </div>
+                <div class="fl-field">
+                  <label [for]="'edit-description-' + offering.id">Description (optional)</label>
+                  <textarea
+                    [id]="'edit-description-' + offering.id"
+                    class="fl-input"
+                    formControlName="description"
+                    rows="3"
+                  ></textarea>
+                </div>
+                <div class="fl-field">
+                  <label [for]="'edit-price-' + offering.id">Indicative starting price (R)</label>
+                  <input
+                    [id]="'edit-price-' + offering.id"
+                    class="fl-input"
+                    type="number"
+                    inputmode="decimal"
+                    min="0"
+                    step="1"
+                    formControlName="priceAmount"
+                  />
+                  @if (editForm.controls.priceAmount.touched && editForm.controls.priceAmount.invalid) {
+                    <p class="fl-field-error" role="alert">Enter a rand amount of R0 or more, with up to 2 decimal places.</p>
+                  }
+                  <p class="fl-form-note">
+                    Shown as “from {{ formatAmount(offering.priceAmount) }}”. Customers pay you
+                    directly - Fixlynk does not charge this amount.
+                  </p>
+                </div>
+                @if (saveError()) {
+                  <p class="fl-field-error" role="alert">{{ saveError() }}</p>
+                }
+                <button type="submit" class="fl-btn fl-btn-primary fl-btn-sm" [disabled]="saving()">
+                  {{ saving() ? 'Saving…' : 'Save changes' }}
+                </button>
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-secondary fl-btn-sm"
+                  (click)="cancelEditing()"
+                  [disabled]="saving()"
+                >
+                  Cancel
+                </button>
+              </form>
+            } @else {
+              @if (confirmingRemoveId() === offering.id) {
+                <div role="status">
+                  <p class="fl-card-text">
+                    Remove “{{ offering.name }}”? It disappears from your profile straight away.
+                  </p>
+                  <button
+                    type="button"
+                    class="fl-btn fl-btn-secondary fl-btn-sm"
+                    (click)="remove(offering)"
+                    [disabled]="removingId() === offering.id"
+                  >
+                    {{ removingId() === offering.id ? 'Removing…' : 'Yes, remove it' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="fl-btn fl-btn-secondary fl-btn-sm"
+                    (click)="cancelRemove()"
+                    [disabled]="removingId() === offering.id"
+                  >
+                    Keep it
+                  </button>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-secondary fl-btn-sm"
+                  (click)="startEditing(offering)"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="fl-btn fl-btn-secondary fl-btn-sm"
+                  (click)="askRemove(offering)"
+                >
+                  Remove
+                </button>
+                @if (removeError()) {
+                  <p class="fl-field-error" role="alert">{{ removeError() }}</p>
+                }
+              }
+            }
+          </article>
+        }
+      </div>
+    }
+
+    <section class="fl-card" aria-label="Add a service">
+      <h2 class="fl-card-title">Add a service</h2>
+      <p class="fl-card-text">
+        Tell customers what you offer. No approval needed - services appear on your profile
+        immediately.
+      </p>
+      @if (categoryError()) {
+        <p class="fl-field-error" role="alert">{{ categoryError() }}</p>
+      }
+      <form class="fl-form" [formGroup]="createForm" (ngSubmit)="create()" novalidate>
+        <div class="fl-field">
+          <label for="offering-name">Service name</label>
+          <input id="offering-name" class="fl-input" type="text" formControlName="name" />
+          @if (createForm.controls.name.touched && createForm.controls.name.invalid) {
+            <p class="fl-field-error" role="alert">Service name is required.</p>
+          }
+        </div>
+        <div class="fl-field">
+          <label for="offering-category">Service category</label>
+          <select id="offering-category" class="fl-input" formControlName="categoryId">
+            <option value="">Select a category</option>
+            @for (category of categories(); track category.id) {
+              <option [value]="category.id">{{ category.name }}</option>
+            }
+          </select>
+          @if (createForm.controls.categoryId.touched && createForm.controls.categoryId.invalid) {
+            <p class="fl-field-error" role="alert">Select a service category.</p>
+          }
+        </div>
+        <div class="fl-field">
+          <label for="offering-description">Description (optional)</label>
+          <textarea
+            id="offering-description"
+            class="fl-input"
+            formControlName="description"
+            rows="3"
+          ></textarea>
+          @if (createForm.controls.description.touched && createForm.controls.description.invalid) {
+            <p class="fl-field-error" role="alert">Keep the description under 500 characters.</p>
+          }
+        </div>
+        <div class="fl-field">
+          <label for="offering-price">Indicative starting price (R)</label>
+          <input
+            id="offering-price"
+            class="fl-input"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="1"
+            formControlName="priceAmount"
+          />
+          @if (createForm.controls.priceAmount.touched && createForm.controls.priceAmount.invalid) {
+            <p class="fl-field-error" role="alert">Enter a rand amount of R0 or more, with up to 2 decimal places.</p>
+          }
+          <p class="fl-form-note">
+            Shown to customers as “from R850”. It is a guide only: Fixlynk does not process
+            payments, so your customer pays you directly for the agreed amount.
+          </p>
+        </div>
+        @if (requiresProviderType()) {
+          <div class="fl-field">
+            <label for="offering-provider-type">Add this service to</label>
+            <select id="offering-provider-type" class="fl-input" formControlName="providerType">
+              <option value="">Select a provider</option>
+              @for (type of providerTypeOptions(); track type) {
+                <option [value]="type">{{ type === 'BUSINESS' ? 'Your business' : 'Your professional profile' }}</option>
+              }
+            </select>
+            @if (createForm.controls.providerType.touched && createForm.controls.providerType.invalid) {
+              <p class="fl-field-error" role="alert">Choose where this service belongs.</p>
+            }
+          </div>
+        }
+        @if (createError()) {
+          <p class="fl-field-error" role="alert">{{ createError() }}</p>
+        }
+        <button type="submit" class="fl-btn fl-btn-primary fl-btn-block" [disabled]="creating()">
+          {{ creating() ? 'Adding…' : 'Add service' }}
+        </button>
+      </form>
+    </section>
+  }
+</div>

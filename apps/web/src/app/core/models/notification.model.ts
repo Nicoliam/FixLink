@@ -9,8 +9,20 @@
 
 export type NotificationType =
   | 'JOB_REQUEST'
+  /**
+   * Step 14 — an OPEN request matches this provider's categories and service
+   * areas. Distinct from JOB_REQUEST, which means "addressed to you": this one
+   * is one of several professionals who may quote.
+   */
+  | 'JOB_REQUEST_OPEN'
   | 'QUOTE_RECEIVED'
   | 'QUOTE_ACCEPTED'
+  /**
+   * Step 15 — the customer withdrew or removed their request. Sent to the
+   * addressed professional and to anyone holding a live quote, since those
+   * quotes are now dead and they would otherwise chase dead work.
+   */
+  | 'JOB_CANCELLED'
   | 'JOB_SCHEDULED'
   | 'JOB_STARTED'
   | 'JOB_COMPLETED'
@@ -52,10 +64,14 @@ export interface NotificationList {
   switch (type) {
     case 'JOB_REQUEST':
       return 'Job request';
+    case 'JOB_REQUEST_OPEN':
+      return 'Open request';
     case 'QUOTE_RECEIVED':
       return 'Quote received';
     case 'QUOTE_ACCEPTED':
       return 'Quote accepted';
+    case 'JOB_CANCELLED':
+      return 'Request cancelled';
     case 'JOB_SCHEDULED':
       return 'Scheduled';
     case 'JOB_STARTED':
@@ -100,6 +116,19 @@ export interface NotificationList {
     roles.includes('BUSINESS_OWNER') ||
     roles.includes('BUSINESS_MANAGER')
   ) {
+    // Step 14: an OPEN request lives on the open-requests board, not the
+    // inbox — the professional has not quoted it yet, so it is not "theirs".
+    // Sending it to `/requests` would 404, which is the worst possible first
+    // impression of a notification that says work is available.
+    if (item.type === 'JOB_REQUEST_OPEN') {
+      return ['/open-requests', item.relatedJobId];
+    }
+    // Step 15: a cancelled request is routed to the LIST, not the detail.
+    // If the customer also deleted it, the detail screen 404s, and a
+    // notification that opens a 404 is worse than one that opens the board.
+    if (item.type === 'JOB_CANCELLED') {
+      return ['/requests'];
+    }
     return ['/requests', item.relatedJobId];
   }
   return ['/'];

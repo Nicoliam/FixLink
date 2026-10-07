@@ -40,5 +40,12 @@
     <a class="fl-btn fl-btn-secondary fl-btn-sm" [routerLink]="['/marketplace/providers', provider().id]">
       View profile
     </a>
+    <a
+      class="fl-btn fl-btn-primary fl-btn-sm"
+      [routerLink]="['/request-job']"
+      [queryParams]="{ provider: provider().id }"
+    >
+      Request job
+    </a>
   </div>
 </article>

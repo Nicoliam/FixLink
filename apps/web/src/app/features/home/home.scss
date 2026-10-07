@@ -716,7 +716,12 @@
 .fl-service-card {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  /* Was `space-between` to pin the price footer to the bottom of each card in
+     the grid row. With the footer gone that would shove the description to the
+     bottom of tall cards and leave a gap under the icon, so the two remaining
+     children now sit together at the top. */
+  justify-content: flex-start;
+  gap: 0.875rem;
   padding: 1.25rem;
   background: var(--st-surface-container-lowest);
   border-radius: 1rem;
@@ -738,7 +743,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
+  /* Spacing to the name comes from the card's `gap`; a margin here would add
+     to it rather than replace it. */
+  flex-shrink: 0;
   font-size: 26px;
   transition: all 0.2s;
 }
@@ -783,28 +790,9 @@
   margin-top: 0.25rem;
 }
 
-.fl-service-footer {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(191, 199, 210, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  line-height: 16px;
-  letter-spacing: 0.02em;
-  font-weight: 700;
-  color: var(--st-primary);
-}
-
-.fl-service-footer .material-symbols-outlined {
-  font-size: 16px;
-  transition: transform 0.2s;
-}
-
-.fl-service-card:hover .fl-service-footer .material-symbols-outlined {
-  transform: translateX(4px);
-}
+/* The card carries no price and no footer: the icon, name and description
+   are the whole card. `.fl-service-card` is still a link, so the hover
+   treatment below is what signals it. */
 
 /* ========== HOW IT WORKS ========== */
 .fl-how-it-works {
@@ -961,13 +949,21 @@
   gap: 0.875rem;
 }
 
+/* No profile photos are exposed by the API, so the avatar is a monogram. */
 .fl-professional-avatar {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.75rem;
-  object-fit: cover;
   border: 1px solid rgba(191, 199, 210, 0.3);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--st-secondary-container);
+  color: var(--st-on-secondary-container);
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 800;
 }
 
 .fl-professional-name {
@@ -975,6 +971,16 @@
   line-height: 28px;
   font-weight: 600;
   color: var(--st-on-surface);
+}
+
+.fl-professional-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.fl-professional-name a:hover {
+  color: var(--st-primary);
+  text-decoration: underline;
 }
 
 .fl-professional-location {
@@ -1085,18 +1091,35 @@
   margin-bottom: 0.5rem;
 }
 
-.fl-portfolio-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
+.fl-professional-proof-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
 }
 
-.fl-portfolio-item {
-  width: 100%;
-  height: 72px;
-  border-radius: 0.5rem;
-  object-fit: cover;
-  border: 1px solid rgba(191, 199, 210, 0.2);
+/* Loading, empty and error states for the featured section. */
+.fl-professionals-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  border: 1px solid rgba(191, 199, 210, 0.4);
+  border-radius: 1rem;
+  background: var(--st-surface-container-lowest);
+  color: var(--st-on-surface-variant);
+  font-weight: 600;
+}
+
+.fl-professional-card-placeholder {
+  min-height: 22rem;
+  background: var(--st-surface-container-low);
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
 .fl-professional-card-footer {
@@ -1107,6 +1130,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+/* Shown only when the provider has not stated a starting price, so the card
+   keeps the same footer height as one that shows a call-out fee. */
+.fl-professional-type {
+  font-size: 11px;
+  color: var(--st-on-surface-variant);
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .fl-professional-price-label {
@@ -1132,6 +1165,15 @@
   gap: 0.5rem;
 }
 
+/* Anchors, not buttons: these are real navigations. */
+.fl-btn-view-profile,
+.fl-btn-request-job {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .fl-btn-view-profile {
   padding: 0.5rem 0.75rem;
   background: var(--st-surface-container-lowest);
@@ -1142,12 +1184,17 @@
   line-height: 18px;
   letter-spacing: 0.01em;
   font-weight: 700;
-  cursor: pointer;
   transition: all 0.15s;
 }
 
 .fl-btn-view-profile:hover {
   background: var(--st-surface-container);
+}
+
+.fl-btn-view-profile:focus-visible,
+.fl-btn-request-job:focus-visible {
+  outline: 2px solid var(--st-primary);
+  outline-offset: 2px;
 }
 
 .fl-btn-request-job {
@@ -1160,7 +1207,6 @@
   letter-spacing: 0.01em;
   font-weight: 700;
   box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
-  cursor: pointer;
   border: none;
   transition: all 0.15s;
 }
@@ -1522,48 +1568,6 @@
 
 .fl-cta-btn .material-symbols-outlined {
   font-size: 20px;
-}
-
-/* ========== FILTER PILLS ========== */
-.fl-filter-bar {
-  margin-top: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-@media (min-width: 768px) {
-  .fl-filter-bar {
-    margin-top: 0;
-  }
-}
-
-.fl-filter-label {
-  font-size: 12px;
-  line-height: 16px;
-  letter-spacing: 0.02em;
-  font-weight: 700;
-  color: var(--st-on-surface-variant);
-}
-
-.fl-filter-pill {
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 12px;
-  line-height: 16px;
-  letter-spacing: 0.02em;
-  font-weight: 600;
-}
-
-.fl-filter-pill.active {
-  background: var(--st-primary);
-  color: var(--st-on-primary);
-}
-
-.fl-filter-pill.inactive {
-  background: var(--st-surface-container-lowest);
-  border: 1px solid rgba(191, 199, 210, 0.3);
-  color: var(--st-on-surface-variant);
 }
 
 /* ========== ANIMATIONS ========== */

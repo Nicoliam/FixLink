@@ -57,6 +57,11 @@ export class AuthService {
     };
     if (payload.phone?.trim()) body['phone'] = payload.phone.trim();
     if (payload.role) body['role'] = payload.role;
+    // The customer profile is created with the account, so its names are sent.
+    // Omitted when blank: the backend then derives a name from the email,
+    // which an empty string would not allow.
+    if (payload.firstName?.trim()) body['firstName'] = payload.firstName.trim();
+    if (payload.lastName?.trim()) body['lastName'] = payload.lastName.trim();
     if (payload.displayName?.trim()) body['displayName'] = payload.displayName.trim();
     if (payload.businessName?.trim()) body['businessName'] = payload.businessName.trim();
     return this.http

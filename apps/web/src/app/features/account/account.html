@@ -1,70 +1,102 @@
-<div class="fl-auth-page">
-  <div class="fl-auth-card" role="main" aria-labelledby="account-title">
-    <span class="fl-pill fl-pill-verified" role="status">✓ Signed in</span>
-    <h1 id="account-title" class="fl-auth-title">My account</h1>
-    <p class="fl-auth-subtitle">Your account details and activity summary.</p>
+<div class="fl-page">
+  <header class="fl-page-header">
+    <p class="fl-eyebrow">Account</p>
+    <h1 class="fl-page-title">My account</h1>
+    <p class="fl-page-subtitle">Your account details and activity summary.</p>
+  </header>
 
-    @if (currentUser(); as user) {
-      <dl class="fl-account-list" data-testid="account-details">
-        <div class="fl-account-row">
-          <dt>Email</dt>
-          <dd>{{ user.email }}</dd>
-        </div>
-        <div class="fl-account-row">
-          <dt>Roles</dt>
-          <dd>
-            @for (role of user.roles; track role) {
-              <span class="fl-pill fl-pill-info">{{ role }}</span>
-            }
-          </dd>
-        </div>
-        <div class="fl-account-row">
-          <dt>Status</dt>
-          <dd>{{ user.status }}</dd>
-        </div>
-        <div class="fl-account-row">
-          <dt>Member since</dt>
-          <dd>{{ memberSince() }}</dd>
-        </div>
-      </dl>
-    } @else {
-      <p class="fl-auth-subtitle" role="status">Loading your session…</p>
-    }
-
-    @if (loading()) {
-      <p class="fl-state-text" role="status">Loading your activity…</p>
-    } @else if (error()) {
-      <div class="fl-state fl-state-error" role="alert">
-        <p class="fl-state-text">{{ error() }}</p>
-      </div>
-    } @else if (stats(); as s) {
-      <section class="fl-account-stats" aria-label="Account statistics">
-        <h2 class="fl-account-section-title">Overview</h2>
+  @if (loading()) {
+    <div class="fl-state" role="status">
+      <p class="fl-state-text">Loading your activity…</p>
+    </div>
+  } @else if (error()) {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ error() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  } @else {
+    @if (stats()) {
+      <section class="fl-account-stats" aria-labelledby="fl-overview-heading">
+        <h2 id="fl-overview-heading" class="fl-account-section-title">Overview</h2>
+        <!--
+          Each card is an anchor, not a div with a click handler: it is then
+          focusable, reachable by keyboard, announced as a link, and works with
+          middle-click and "open in new tab" for free. The icon and the label
+          carry the meaning, so the colour is redundant rather than required.
+        -->
         <div class="fl-stats-grid">
-          <div class="fl-stat">
-            <span class="fl-stat-value">{{ s.totalJobs }}</span>
-            <span class="fl-stat-label">Total jobs</span>
-          </div>
-          <div class="fl-stat">
-            <span class="fl-stat-value">{{ s.completedJobs }}</span>
-            <span class="fl-stat-label">Completed</span>
-          </div>
-          <div class="fl-stat">
-            <span class="fl-stat-value">{{ s.inProgressJobs }}</span>
-            <span class="fl-stat-label">In progress</span>
-          </div>
-          @if (isCustomer() || isProvider()) {
-            <div class="fl-stat">
-              <span class="fl-stat-value">{{ formatZar(s.totalSpent) }}</span>
-              <span class="fl-stat-label">Total spent</span>
-            </div>
+          @for (card of statCards(); track card.label) {
+            <!--
+              The whole class list is bound at once. A static `class` alongside
+              `[class]` would be overwritten by it, so the base class lives in
+              the same string.
+            -->
+            <a
+              [class]="'fl-stat fl-stat--' + card.tone"
+              [routerLink]="card.href"
+              [attr.aria-label]="card.label + ': ' + card.value + '. ' + card.action"
+            >
+              <span class="fl-stat-icon" aria-hidden="true">
+                <span class="material-symbols-outlined">{{ card.icon }}</span>
+              </span>
+              <span class="fl-stat-value">{{ card.value }}</span>
+              <span class="fl-stat-label">{{ card.label }}</span>
+              <span class="fl-stat-go" aria-hidden="true">
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </span>
+            </a>
           }
         </div>
       </section>
+    }
 
-      @if (completedJobs().length > 0) {
-        <section class="fl-account-jobs" aria-label="Completed jobs">
-          <h2 class="fl-account-section-title">Completed jobs</h2>
+    <div class="fl-account-layout">
+      <section class="fl-card" aria-labelledby="account-details-title">
+        <h2 id="account-details-title" class="fl-account-section-title">Account details</h2>
+
+        @if (currentUser(); as user) {
+          <dl class="fl-account-list" data-testid="account-details">
+            <div class="fl-account-row">
+              <dt>Email</dt>
+              <dd>{{ user.email }}</dd>
+            </div>
+            <div class="fl-account-row">
+              <dt>Roles</dt>
+              <dd class="fl-account-pills">
+                @for (role of user.roles; track role) {
+                  <span class="fl-pill fl-pill-info">{{ role }}</span>
+                }
+              </dd>
+            </div>
+            <div class="fl-account-row">
+              <dt>Status</dt>
+              <dd>{{ user.status }}</dd>
+            </div>
+            <div class="fl-account-row">
+              <dt>Member since</dt>
+              <dd>{{ memberSince() }}</dd>
+            </div>
+          </dl>
+        } @else {
+          <p class="fl-state-text" role="status">Loading your session…</p>
+        }
+
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary"
+          (click)="logout()"
+          [disabled]="isLoggingOut()"
+          data-testid="account-logout"
+        >
+          {{ isLoggingOut() ? 'Logging out…' : 'Log out' }}
+        </button>
+      </section>
+
+      <section class="fl-card" aria-labelledby="account-jobs-title">
+        <h2 id="account-jobs-title" class="fl-account-section-title">Completed jobs</h2>
+
+        @if (completedJobs().length > 0) {
           <ul class="fl-job-list">
             @for (job of completedJobs(); track job.id) {
               <li class="fl-job-item">
@@ -85,21 +117,17 @@
               </li>
             }
           </ul>
-        </section>
-      }
-    }
+        } @else {
+          <div class="fl-state" role="status">
+            <h3 class="fl-state-title">No completed jobs yet</h3>
+            <p class="fl-state-text">Completed work will appear here with its full history.</p>
+          </div>
+        }
+      </section>
+    </div>
+  }
 
-    <button
-      type="button"
-      class="fl-btn fl-btn-secondary fl-btn-block"
-      (click)="logout()"
-      [disabled]="isLoggingOut()"
-      data-testid="account-logout"
-    >
-      {{ isLoggingOut() ? 'Logging out…' : 'Log out' }}
-    </button>
-    <p class="fl-form-note">
-      <a class="fl-link" routerLink="/">Back to home</a>
-    </p>
-  </div>
+  <p class="fl-form-note">
+    <a class="fl-link" routerLink="/">Back to home</a>
+  </p>
 </div>

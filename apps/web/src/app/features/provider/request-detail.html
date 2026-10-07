@@ -9,7 +9,9 @@
     <div class="fl-state" role="status">
       <h1 class="fl-state-title">Request not found</h1>
       <p class="fl-state-text">This request may have been removed or the link is incorrect.</p>
-      <button type="button" class="fl-btn fl-btn-primary" (click)="goToRequests()">Back to Requests</button>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="goToRequests()">
+        {{ backLabel() }}
+      </button>
     </div>
   </div>
 } @else if (status() === 'error') {
@@ -23,11 +25,16 @@
 } @else if (request(); as detail) {
   <div class="fl-page fl-page-narrow">
     <nav aria-label="Breadcrumb">
-      <a class="fl-link" routerLink="/requests">← Back to Requests</a>
+      <a class="fl-link" [routerLink]="listRoute()">← {{ backLabel() }}</a>
     </nav>
 
     <p class="fl-eyebrow">{{ detail.reference }}</p>
     <h1 class="fl-page-title">{{ detail.service.name }}</h1>
+    @if (!detail.provider) {
+      <p class="fl-card-text">
+        Open request - the customer has not chosen a professional yet. Quote it before others do.
+      </p>
+    }
     <p class="fl-page-subtitle">
       <span class="fl-pill">{{ statusLabel(detail.status) }}</span>
     </p>
@@ -61,12 +68,12 @@
           <ul>
             @for (item of accepted.items; track item.id) {
               <li class="fl-card-text">
-                {{ item.description }} — {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
+                {{ item.description }} - {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
               </li>
             }
           </ul>
         }
-        <p class="fl-card-text">Agreed amount: {{ formatAmount(accepted.total) }} — payment is arranged directly with the customer.</p>
+        <p class="fl-card-text">Agreed amount: {{ formatAmount(accepted.total) }} - payment is arranged directly with the customer.</p>
 
         @if (canSchedule()) {
           <div aria-label="Schedule job">
@@ -341,7 +348,7 @@
           </div>
         }
 
-        <a class="fl-btn fl-btn-secondary" routerLink="/requests">Back to Requests</a>
+        <a class="fl-btn fl-btn-secondary" [routerLink]="listRoute()">{{ backLabel() }}</a>
       </section>
     } @else if (createdQuote(); as quote) {
       <section class="fl-card" aria-label="Submitted quote">
@@ -354,13 +361,20 @@
           <ul>
             @for (item of quote.items; track item.id) {
               <li class="fl-card-text">
-                {{ item.description }} — {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
+                {{ item.description }} - {{ item.quantity }} × {{ formatAmount(item.unitPrice) }}
               </li>
             }
           </ul>
         }
-        <p class="fl-card-text">The customer will review the details. Payment is arranged directly.</p>
-        <a class="fl-btn fl-btn-secondary" routerLink="/requests">Back to Requests</a>
+        <p class="fl-card-text">
+          @if (detail.provider) {
+            The customer will review the details. Payment is arranged directly.
+          } @else {
+            This request was open to other professionals, so the customer may receive a few quotes
+            before they decide. You will be notified if yours is accepted - it is now in your Requests.
+          }
+        </p>
+        <a class="fl-btn fl-btn-secondary" [routerLink]="listRoute()">{{ backLabel() }}</a>
       </section>
     } @else if (detail.status === 'REQUESTED') {
       <section class="fl-card" aria-label="Submit a quote">

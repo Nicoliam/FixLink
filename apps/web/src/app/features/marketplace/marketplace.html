@@ -5,48 +5,56 @@
       <div class="fl-mp-search-card">
         <form class="fl-mp-search-form" (ngSubmit)="onSearch()">
           <div class="fl-mp-search-group">
-            <span class="material-symbols-outlined fl-mp-search-icon">search</span>
+            <span class="material-symbols-outlined fl-mp-search-icon" aria-hidden="true">search</span>
             <div class="fl-mp-search-field">
               <label class="fl-mp-search-label" for="mp-service">Service</label>
-              <input class="fl-mp-search-input" id="mp-service" type="text" placeholder="What help do you need?" [(ngModel)]="searchService" name="service">
+              <input
+                class="fl-mp-search-input"
+                id="mp-service"
+                type="search"
+                placeholder="What help do you need?"
+                [(ngModel)]="serviceQuery"
+                name="service"
+              />
             </div>
           </div>
-          <div class="fl-mp-search-divider"></div>
+          <div class="fl-mp-search-divider" aria-hidden="true"></div>
           <div class="fl-mp-search-group">
-            <span class="material-symbols-outlined fl-mp-search-icon">location_on</span>
+            <span class="material-symbols-outlined fl-mp-search-icon" aria-hidden="true">location_on</span>
             <div class="fl-mp-search-field">
               <label class="fl-mp-search-label" for="mp-location">Location</label>
-              <input class="fl-mp-search-input" id="mp-location" type="text" placeholder="Suburb or City" [(ngModel)]="searchLocation" name="location">
+              <input
+                class="fl-mp-search-input"
+                id="mp-location"
+                type="search"
+                placeholder="Suburb or City"
+                [(ngModel)]="locationQuery"
+                name="location"
+              />
             </div>
           </div>
           <button class="fl-mp-search-btn" type="submit">
-            <span class="material-symbols-outlined">search</span>
+            <span class="material-symbols-outlined" aria-hidden="true">search</span>
             <span>Search</span>
           </button>
         </form>
       </div>
       <div class="fl-mp-context-bar">
         <div class="fl-mp-breadcrumb">
-          <span class="fl-mp-breadcrumb-title">Handymen near Fourways</span>
-          <span class="fl-mp-count-badge">18 verified professionals</span>
-        </div>
-        <div class="fl-mp-filter-pills">
-          <button class="fl-mp-pill" type="button">
-            <span class="material-symbols-outlined fill-icon">bolt</span>
-            Available Today
-          </button>
-          <button class="fl-mp-pill" type="button">
-            <span class="material-symbols-outlined fill-icon">star</span>
-            Top Rated 4.5+
-          </button>
-          <button class="fl-mp-pill" type="button">
-            <span class="material-symbols-outlined">swap_vert</span>
-            Price: Low to High
-          </button>
-          <button class="fl-mp-pill active" type="button">
-            <span class="material-symbols-outlined fill-icon">verified</span>
-            Verified Only
-          </button>
+          <span class="fl-mp-breadcrumb-title">
+            @if (locationQuery.trim()) {
+              Handymen near {{ locationQuery.trim() }}
+            } @else {
+              Handymen near you
+            }
+          </span>
+          <span class="fl-mp-count-badge">
+            @if (status() === 'loading') {
+              Searching…
+            } @else {
+              {{ total() }} {{ total() === 1 ? 'professional' : 'professionals' }}
+            }
+          </span>
         </div>
       </div>
     </div>
@@ -57,182 +65,123 @@
     <div class="fl-mp-container">
       <div class="fl-mp-layout">
         <!-- FILTERS SIDEBAR -->
-        <aside class="fl-mp-sidebar">
+        <aside class="fl-mp-sidebar" aria-label="Search filters">
           <div class="fl-mp-sidebar-header">
             <h2 class="fl-mp-sidebar-title">
-              <span class="material-symbols-outlined">tune</span>
+              <span class="material-symbols-outlined" aria-hidden="true">tune</span>
               Filters
             </h2>
-            <button class="fl-mp-reset-btn" type="button" (click)="resetFilters()">Reset Filters</button>
+            @if (hasActiveFilters()) {
+              <button class="fl-mp-reset-btn" type="button" (click)="resetFilters()">Reset Filters</button>
+            }
           </div>
 
           <div class="fl-mp-filter-group">
-            <label class="fl-mp-filter-label">Service Category</label>
-            <div class="fl-mp-filter-options">
-              @for (cat of categories(); track cat.name) {
-                <label class="fl-mp-check">
-                  <input type="checkbox" [checked]="cat.checked" (change)="toggleCategory($index)">
-                  <span>{{ cat.name }}</span>
-                </label>
-              }
-            </div>
+            <label class="fl-mp-filter-label" for="mp-category">Service Category</label>
+            @if (categories().length === 0) {
+              <p class="fl-mp-filter-value" role="status">Categories unavailable.</p>
+            } @else {
+              <div class="fl-mp-filter-options" id="mp-category">
+                @for (category of categories(); track category.id) {
+                  <label class="fl-mp-check">
+                    <input
+                      type="radio"
+                      name="mp-category"
+                      [value]="category.slug"
+                      [checked]="selectedCategory() === category.slug"
+                      (change)="selectCategory(category.slug)"
+                    />
+                    <span>{{ category.name }}</span>
+                  </label>
+                }
+              </div>
+            }
           </div>
 
           <div class="fl-mp-filter-group">
-            <div class="fl-mp-filter-header">
-              <label class="fl-mp-filter-label">Distance Radius</label>
-              <span class="fl-mp-filter-value">{{ distanceRadius() }} km</span>
-            </div>
-            <input class="fl-mp-range" type="range" min="5" max="50" [value]="distanceRadius()" (input)="distanceRadius.set(+$any($event.target).value)">
-            <div class="fl-mp-range-labels">
-              <span>5km</span>
-              <span>10km</span>
-              <span>25km+</span>
-            </div>
-          </div>
-
-          <div class="fl-mp-filter-group">
-            <label class="fl-mp-filter-label">Minimum Rating</label>
-            <div class="fl-mp-rating-grid">
-              <button class="fl-mp-rating-btn active" type="button" (click)="minRating.set('4.5')">
-                <span class="material-symbols-outlined fill-icon">star</span>
-                4.5+ stars
-              </button>
-              <button class="fl-mp-rating-btn" type="button" (click)="minRating.set('4.0')">
-                <span class="material-symbols-outlined">star</span>
-                4.0+ stars
-              </button>
-            </div>
-          </div>
-
-          <div class="fl-mp-filter-group">
-            <label class="fl-mp-filter-label">Trust &amp; Verification</label>
-            <div class="fl-mp-filter-options">
+            <span class="fl-mp-filter-label" id="mp-trust-label">Trust &amp; Verification</span>
+            <div class="fl-mp-filter-options" role="group" aria-labelledby="mp-trust-label">
               <label class="fl-mp-check">
-                <input type="checkbox" [checked]="verifiedOnly()" (change)="verifiedOnly.set($any($event.target).checked)">
+                <input
+                  type="checkbox"
+                  [checked]="verifiedOnly()"
+                  (change)="verifiedOnly.set($any($event.target).checked); applyFilters()"
+                />
                 <span>Verified Professionals Only</span>
               </label>
-              <label class="fl-mp-check">
-                <input type="checkbox" [checked]="verifiedCerts()" (change)="verifiedCerts.set($any($event.target).checked)">
-                <span>Verified Certificates Only</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="fl-mp-filter-group">
-            <label class="fl-mp-filter-label">Availability</label>
-            <div class="fl-mp-filter-options">
-              <label class="fl-mp-check">
-                <input type="checkbox" [checked]="availableToday()" (change)="availableToday.set($any($event.target).checked)">
-                <span>Available Today</span>
-              </label>
-              <label class="fl-mp-check">
-                <input type="checkbox" [checked]="thisWeekend()" (change)="thisWeekend.set($any($event.target).checked)">
-                <span>This Weekend</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="fl-mp-filter-group">
-            <div class="fl-mp-filter-header">
-              <label class="fl-mp-filter-label">Price Range (ZAR)</label>
-              <span class="fl-mp-filter-value">R300 - R1,200/hr</span>
-            </div>
-            <input class="fl-mp-range" type="range" min="300" max="1500" [value]="priceRange()" (input)="priceRange.set(+$any($event.target).value)">
-            <div class="fl-mp-range-labels">
-              <span class="fl-mp-price-tag">R300</span>
-              <span class="fl-mp-price-tag">R1,200</span>
             </div>
           </div>
         </aside>
 
         <!-- RESULTS -->
-        <section class="fl-mp-results">
-          @for (pro of results(); track pro.id) {
-            <article class="fl-mp-card">
-              <div class="fl-mp-card-side">
-                <div class="fl-mp-avatar-wrap">
-                  <img class="fl-mp-avatar" [src]="pro.avatar" [alt]="pro.name">
-                  <span class="fl-mp-online-dot" title="Online Now"></span>
-                </div>
-                <div class="fl-mp-avatar-info">
-                  <div class="fl-mp-rating">
-                    <span class="material-symbols-outlined fill-icon">star</span>
-                    <span class="fl-mp-rating-value">{{ pro.rating }}</span>
-                    <span class="fl-mp-reviews">({{ pro.reviews }} reviews)</span>
-                  </div>
-                  <div class="fl-mp-response">
-                    <span class="material-symbols-outlined">schedule</span>
-                    {{ pro.responseTime }}
-                  </div>
-                </div>
-              </div>
-              <div class="fl-mp-card-body">
-                <div class="fl-mp-card-top">
-                  <div>
-                    <h3 class="fl-mp-card-name">{{ pro.name }}</h3>
-                    <div class="fl-mp-card-location">
-                      <span class="material-symbols-outlined">location_on</span>
-                      <span>{{ pro.location }} &bull; {{ pro.distance }}</span>
-                    </div>
-                  </div>
-                  <div class="fl-mp-card-price">
-                    <span class="fl-mp-price">{{ pro.price }}</span>
-                    <span class="fl-mp-price-unit">per call-out</span>
-                  </div>
-                </div>
-                <div class="fl-mp-badges">
-                  @for (badge of pro.badges; track badge.label) {
-                    <span class="fl-mp-badge" [class]="badge.class">
-                      <span class="material-symbols-outlined fill-icon">{{ badge.icon }}</span>
-                      {{ badge.label }}
-                    </span>
-                  }
-                </div>
-                <div class="fl-mp-skills">
-                  @for (skill of pro.skills; track skill) {
-                    <span class="fl-mp-skill">{{ skill }}</span>
-                  }
-                </div>
-                <div class="fl-mp-portfolio">
-                  <span class="fl-mp-portfolio-label">Recent Completed Work</span>
-                  <div class="fl-mp-portfolio-grid">
-                    @for (item of pro.portfolio; track item.label) {
-                      <div class="fl-mp-portfolio-item">
-                        <img [src]="item.src" [alt]="item.label">
-                        <span class="fl-mp-portfolio-tag">{{ item.label }}</span>
-                      </div>
-                    }
-                  </div>
-                </div>
-                <div class="fl-mp-card-actions">
-                  <button class="fl-mp-btn-secondary" type="button">View Profile</button>
-                  <button class="fl-mp-btn-primary" type="button">Request Job</button>
-                </div>
-              </div>
-            </article>
-          }
+        <section class="fl-mp-results" aria-live="polite" aria-busy="{{ status() === 'loading' }}">
+          @if (status() === 'loading') {
+            <div class="fl-state" role="status">
+              <p>Loading professionals…</p>
+            </div>
+          } @else if (status() === 'error') {
+            <div class="fl-state fl-state-error" role="alert">
+              <h2 class="fl-state-title">Something went wrong</h2>
+              <p class="fl-state-text">{{ errorMessage() }}</p>
+              <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+            </div>
+          } @else if (status() === 'empty') {
+            <div class="fl-state" role="status">
+              <h2 class="fl-state-title">No professionals found</h2>
+              <p class="fl-state-text">
+                Try a different service, suburb or category, or clear your filters to see everyone nearby.
+              </p>
+              <button type="button" class="fl-btn fl-btn-primary" (click)="resetFilters()">Clear filters</button>
+            </div>
+          } @else {
+            <div class="fl-provider-grid">
+              @for (provider of providers(); track provider.id) {
+                <app-provider-card [provider]="provider" />
+              }
+            </div>
 
-          <!-- PAGINATION -->
-          <div class="fl-mp-pagination">
-            <div class="fl-mp-pagination-info">
-              Showing <strong>1 - 4</strong> of <strong>{{ totalResults }}</strong> handymen
-            </div>
-            <div class="fl-mp-pagination-controls">
-              <button class="fl-mp-page-btn" type="button" disabled>
-                <span class="material-symbols-outlined">chevron_left</span>
-              </button>
-              <button class="fl-mp-page-btn active" type="button">1</button>
-              <button class="fl-mp-page-btn" type="button">2</button>
-              <button class="fl-mp-page-btn" type="button">3</button>
-              <span class="fl-mp-page-ellipsis">&hellip;</span>
-              <button class="fl-mp-page-btn" type="button">5</button>
-              <button class="fl-mp-page-btn" type="button">
-                <span class="material-symbols-outlined">chevron_right</span>
-              </button>
-            </div>
-            <div class="fl-mp-pagination-page">Page 1 of {{ totalPages }}</div>
-          </div>
+            <!-- PAGINATION -->
+            @if (totalPages() > 1) {
+              <div class="fl-mp-pagination">
+                <div class="fl-mp-pagination-info">
+                  Showing <strong>{{ rangeStart() }} - {{ rangeEnd() }}</strong> of
+                  <strong>{{ total() }}</strong> professionals
+                </div>
+                <div class="fl-mp-pagination-controls">
+                  <button
+                    class="fl-mp-page-btn"
+                    type="button"
+                    [disabled]="!hasPreviousPage()"
+                    (click)="goToPage(page() - 1)"
+                  >
+                    <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                    <span class="fl-visually-hidden">Previous page</span>
+                  </button>
+                  @for (candidate of pages(); track candidate) {
+                    <button
+                      class="fl-mp-page-btn"
+                      type="button"
+                      [class.active]="candidate === page()"
+                      [attr.aria-current]="candidate === page() ? 'page' : null"
+                      (click)="goToPage(candidate)"
+                    >
+                      {{ candidate }}
+                    </button>
+                  }
+                  <button
+                    class="fl-mp-page-btn"
+                    type="button"
+                    [disabled]="!hasNextPage()"
+                    (click)="goToPage(page() + 1)"
+                  >
+                    <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                    <span class="fl-visually-hidden">Next page</span>
+                  </button>
+                </div>
+                <div class="fl-mp-pagination-page">Page {{ page() }} of {{ totalPages() }}</div>
+              </div>
+            }
+          }
         </section>
       </div>
     </div>

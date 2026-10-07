@@ -8,6 +8,7 @@ import type {
   CompleteJobResult,
   CreateJobRequest,
   CreateQuoteRequest,
+  DeleteJobResult,
   Job,
   JobImage,
   JobImageList,
@@ -18,6 +19,8 @@ import type {
   ProviderRequest,
   ProviderRequestList,
   Quote,
+  UpdateJobRequest,
+  UpdatedJobResult,
   WorkPhase,
 } from '../models/job.model';
 
@@ -37,19 +40,69 @@ export class JobService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);
 
-  /** Submit a marketplace job request; resolves with the REQUESTED job. */
+  /**
+   * Submit a marketplace job request; resolves with the REQUESTED job.
+   *
+   * `providerId` is optional. When it is absent or blank the key is omitted
+   * entirely and the backend posts an OPEN REQUEST that matching professionals
+   * find themselves. Sending `providerId: ''` would be equivalent, but omitting
+   * it states the intent plainly in the request body.
+   */
   createJob(payload: CreateJobRequest): Observable<Job> {
     const body: Record<string, string> = {
-      providerId: payload.providerId.trim(),
       serviceId: payload.serviceId.trim(),
       description: payload.description.trim(),
       location: payload.location.trim(),
     };
+    if (payload.providerId?.trim()) body['providerId'] = payload.providerId.trim();
     if (payload.preferredDate?.trim()) body['preferredDate'] = payload.preferredDate.trim();
     if (payload.preferredTime?.trim()) body['preferredTime'] = payload.preferredTime.trim();
     if (payload.notes?.trim()) body['notes'] = payload.notes.trim();
     return this.http
       .post<ApiSuccess<Job>>(`${this.baseUrl}/jobs`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Step 15 - correct an owned request before a quote is accepted.
+   *
+   * Only the supplied keys are sent, so a one-field edit does not blank the
+   * rest of the form. The backend refuses an accepted job with 409, which the
+   * caller surfaces rather than retrying.
+   */
+  updateJob(id: string, payload: UpdateJobRequest): Observable<UpdatedJobResult> {
+    const body: Record<string, unknown> = {};
+    if (payload.description !== undefined) body['description'] = payload.description;
+    if (payload.location !== undefined) body['location'] = payload.location;
+    // Sent even when null: that is how a preference is cleared.
+    if (payload.preferredDate !== undefined) body['preferredDate'] = payload.preferredDate;
+    if (payload.preferredTime !== undefined) body['preferredTime'] = payload.preferredTime;
+    return this.http
+      .patch<ApiSuccess<UpdatedJobResult>>(`${this.baseUrl}/jobs/${encodeURIComponent(id)}`, body)
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Step 15 - withdraw a request while keeping its record.
+   *
+   * Use this for "I found someone cheaper": the job stays visible at
+   * CANCELLED with its history. `deleteJob` is for "that was a mistake".
+   */
+  cancelJob(id: string): Observable<Job> {
+    return this.http
+      .post<ApiSuccess<Job>>(`${this.baseUrl}/jobs/${encodeURIComponent(id)}/cancel`, {})
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Step 15 - remove an owned request from view.
+   *
+   * A soft delete server-side: quotes, history and photos survive so a
+   * request a professional already quoted stays auditable.
+   */
+  deleteJob(id: string): Observable<DeleteJobResult> {
+    return this.http
+      .delete<ApiSuccess<DeleteJobResult>>(`${this.baseUrl}/jobs/${encodeURIComponent(id)}`)
       .pipe(map((res) => res.data));
   }
 
@@ -69,7 +122,10 @@ export class JobService {
       .pipe(map((res) => res.data));
   }
 
-  /** List marketplace requests addressed to the authenticated provider. */
+  /**
+   * List marketplace requests the authenticated provider can act on: those
+   * addressed to them, plus any open request they have already quoted.
+   */
   listProviderRequests(page = 1, pageSize = 20, status?: string): Observable<ProviderRequestList> {
     let params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
     if (status?.trim()) params = params.set('status', status.trim());
@@ -78,14 +134,41 @@ export class JobService {
       .pipe(map((res) => res.data));
   }
 
-  /** Retrieve one addressed request with its quotes. */
+  /** Retrieve one addressed (or already-quoted) request with its quotes. */
   getProviderRequest(id: string): Observable<ProviderRequest> {
     return this.http
       .get<ApiSuccess<ProviderRequest>>(`${this.baseUrl}/provider/requests/${encodeURIComponent(id)}`)
       .pipe(map((res) => res.data));
   }
 
-  /** Submit a quote for an addressed REQUESTED job (→ QUOTED). */
+  /**
+   * Step 14 — open requests matching this provider's service categories AND
+   * published service areas. Already-quoted requests are excluded (they are in
+   * the inbox), as are requests that already hold three quotes.
+   *
+   * Only `page`/`pageSize` are sent: the endpoint accepts no category, area or
+   * radius parameter, because the match is computed server-side from the
+   * caller's own profile. There is no distance filter to ask for.
+   */
+  listOpenRequests(page = 1, pageSize = 20): Observable<ProviderRequestList> {
+    const params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
+    return this.http
+      .get<ApiSuccess<ProviderRequestList>>(`${this.baseUrl}/provider/open-requests`, { params })
+      .pipe(map((res) => res.data));
+  }
+
+  /** Step 14 — one open request this provider may quote; others read as 404. */
+  getOpenRequest(id: string): Observable<ProviderRequest> {
+    return this.http
+      .get<ApiSuccess<ProviderRequest>>(`${this.baseUrl}/provider/open-requests/${encodeURIComponent(id)}`)
+      .pipe(map((res) => res.data));
+  }
+
+  /**
+   * Submit a quote. On an ADDRESSED job this is the only provider that can.
+   * On an OPEN job up to 3 matching providers can, the first moves it to
+   * QUOTED, and the 4th gets 409 CONFLICT.
+   */
   createQuote(jobId: string, payload: CreateQuoteRequest): Observable<Quote> {
     const body: Record<string, unknown> = { total: payload.total };
     if (payload.currency?.trim()) body['currency'] = payload.currency.trim().toUpperCase();
@@ -166,6 +249,23 @@ export class JobService {
   }
 
   /** List authorized photo metadata for a job (customer or provider). */
+  /**
+   * Attach a photo of the problem to a request the caller owns.
+   *
+   * Only valid while the job is REQUESTED or QUOTED; the backend enforces both
+   * the state and the per-job cap, so this can fail with 409/422.
+   */
+  uploadJobRequestImage(jobId: string, file: File): Observable<JobImage> {
+    const form = new FormData();
+    form.append('image', file, file.name);
+    return this.http
+      .post<ApiSuccess<JobImage>>(
+        `${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/request-images`,
+        form,
+      )
+      .pipe(map((res) => res.data));
+  }
+
   listJobImages(jobId: string): Observable<JobImage[]> {
     return this.http
       .get<ApiSuccess<JobImageList>>(`${this.baseUrl}/jobs/${encodeURIComponent(jobId)}/images`)

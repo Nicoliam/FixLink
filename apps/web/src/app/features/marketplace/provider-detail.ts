@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { MarketplaceService } from '../../core/services/marketplace.service';
+import { SavedProvidersService } from '../../core/services/saved-providers.service';
+import { AuthService } from '../../core/services/auth.service';
 import { getApiErrorCode, getApiErrorMessage } from '../../core/models/api.model';
 import type {
   PortfolioProject,
@@ -20,6 +22,12 @@ type ProfileStatus = 'loading' | 'ready' | 'error' | 'not-found';
  * services, service areas, portfolio with Before/After, approved
  * certificates and visible reviews. Request-a-job CTA routes to the
  * request foundation page (submission itself arrives in Stage 6B).
+ *
+ * The profile is public, so the save control is a progressive enhancement:
+ * it renders only for a signed-in CUSTOMER, and its saved/unsaved state is a
+ * UX hint. The backend re-checks the role and derives ownership, so a
+ * tampered client can neither save for somebody else nor read another
+ * customer's list.
  */
 @Component({
   selector: 'app-provider-detail',
@@ -29,6 +37,8 @@ type ProfileStatus = 'loading' | 'ready' | 'error' | 'not-found';
 })
 export class ProviderDetailComponent implements OnInit {
   private readonly api = inject(MarketplaceService);
+  private readonly saved = inject(SavedProvidersService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -40,6 +50,14 @@ export class ProviderDetailComponent implements OnInit {
   protected readonly certificates = signal<ProviderCertificate[]>([]);
   protected readonly reviews = signal<ProviderReview[]>([]);
   protected readonly reviewTotal = signal(0);
+
+  /** Only a signed-in customer may bookmark; the backend refuses other roles. */
+  protected readonly canSave = computed(
+    () => this.auth.isAuthenticated() && (this.auth.currentUser()?.roles ?? []).includes('CUSTOMER'),
+  );
+  protected readonly isSaved = signal(false);
+  protected readonly isSaving = signal(false);
+  protected readonly saveError = signal('');
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
@@ -55,6 +73,7 @@ export class ProviderDetailComponent implements OnInit {
           this.profile.set(profile);
           this.status.set('ready');
           this.loadSections(id);
+          if (this.canSave()) this.loadSavedState(id);
         },
         error: (error: unknown) => {
           const code = getApiErrorCode(error);
@@ -66,6 +85,49 @@ export class ProviderDetailComponent implements OnInit {
           }
         },
       });
+  }
+
+  /** Bookmark or un-bookmark this provider, then reflect the new state. */
+  protected toggleSaved(): void {
+    const provider = this.profile();
+    if (!provider || this.isSaving() || !this.canSave()) return;
+    const wasSaved = this.isSaved();
+    this.isSaving.set(true);
+    this.saveError.set('');
+    const settle = {
+      next: () => {
+        this.isSaved.set(!wasSaved);
+        this.isSaving.set(false);
+      },
+      error: (error: unknown) => {
+        this.saveError.set(
+          getApiErrorMessage(
+            error,
+            wasSaved
+              ? 'Could not remove this professional from your saved list.'
+              : 'Could not save this professional.',
+          ),
+        );
+        this.isSaving.set(false);
+      },
+    };
+    if (wasSaved) {
+      this.saved.remove(provider.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(settle);
+    } else {
+      this.saved.save(provider.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(settle);
+    }
+  }
+
+  private loadSavedState(id: string): void {
+    this.saved
+      .state(id)
+      .pipe(
+        // A failed lookup must not break the public profile: the control
+        // simply stays in its unsaved state and the customer can retry.
+        catchError(() => of(null)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((state) => this.isSaved.set(state?.saved ?? false));
   }
 
   protected retry(): void {

@@ -62,7 +62,7 @@ export class HowItWorksComponent {
       iconClass: 'primary-fixed',
       detail: [
         'Quotes are itemised in ZAR.',
-        'You choose who does the job — no pressure.',
+        'You choose who does the job - no pressure.',
         'No platform payment processing in the MVP.',
       ],
     },

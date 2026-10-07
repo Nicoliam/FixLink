@@ -32,7 +32,9 @@ type WorkStatus = 'idle' | 'loading' | 'ready' | 'error';
  * Fixlynk provider request detail — Stage 6C (`/requests/:id`) + Stage
  * 6D (accepted-quote display) + Stage 6E (scheduling and start) +
  * Stage 6F (work documentation and completion: IN_PROGRESS →
- * COMPLETED, read-only afterwards).
+ * COMPLETED, read-only afterwards). Step 14 reuses this same component for
+ * `/open-requests/:id`, which serves an UNADDRESSED request the provider may
+ * quote.
  *
  * Shows the request context needed to quote, the submitted quote when one
  * exists, and the quote form for REQUESTED jobs. When the customer
@@ -58,6 +60,13 @@ export class RequestDetailComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+
+  /**
+   * True when this screen was opened from the open-request board rather than
+   * the inbox. Read once from the route in ngOnInit and never from a query
+   * parameter the provider could hand-craft to change what is authorized.
+   */
+  private fromBoard = false;
 
   protected readonly status = signal<RequestDetailStatus>('loading');
   protected readonly errorMessage = signal('');
@@ -174,6 +183,15 @@ export class RequestDetailComponent implements OnInit, OnDestroy {
     note: ['', [Validators.required, Validators.maxLength(2000)]],
   });
 
+  /** Which list "back" returns to: the board, or the inbox. */
+  protected listRoute(): string {
+    return this.fromBoard ? '/open-requests' : '/requests';
+  }
+
+  protected backLabel(): string {
+    return this.fromBoard ? 'Back to Open Requests' : 'Back to Requests';
+  }
+
   protected get items(): FormArray<FormGroup> {
     return this.form.get('items') as FormArray<FormGroup>;
   }
@@ -184,6 +202,10 @@ export class RequestDetailComponent implements OnInit, OnDestroy {
       this.status.set('not-found');
       return;
     }
+    // `data` is optional on a real ActivatedRoute snapshot and absent on some
+    // test stubs, so this reads defensively: an absent value means the inbox,
+    // which is the safe default because it is the older, known path.
+    this.fromBoard = (this.route.snapshot.data?.['source'] ?? 'inbox') === 'open';
     // Forward the completion-note input into a signal so the Complete
     // Job enablement stays in sync with what the provider typed.
     this.completionForm
@@ -192,8 +214,8 @@ export class RequestDetailComponent implements OnInit, OnDestroy {
       .subscribe((value: unknown) => {
         this.completionNoteValue.set(typeof value === 'string' ? value : '');
       });
-    this.api
-      .getProviderRequest(id)
+    const load$ = this.fromBoard ? this.api.getOpenRequest(id) : this.api.getProviderRequest(id);
+    load$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (detail) => {
@@ -564,7 +586,12 @@ export class RequestDetailComponent implements OnInit, OnDestroy {
       });
   }
 
+  /**
+   * Back to whichever list this screen came from. Sending someone who opened an
+   * open request back to the inbox would land them on a list the request is not
+   * in until they have quoted.
+   */
   protected goToRequests(): void {
-    void this.router.navigate(['/requests']);
+    void this.router.navigate([this.fromBoard ? '/open-requests' : '/requests']);
   }
 }

@@ -1,0 +1,65 @@
+<div class="fl-page">
+  <p class="fl-eyebrow">Open requests</p>
+  <h1 class="fl-page-title">Work near you</h1>
+  <p class="fl-page-subtitle">
+    Job requests from customers who have not chosen a professional yet, matched to the services and
+    areas on your profile. The first {{ quoteCap }} professionals to quote are accepted.
+  </p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading open requests…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h1 class="fl-state-title">Something went wrong</h1>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
+    </div>
+  } @else if (status() === 'empty') {
+    <!--
+      The empty state names the two reasons the board is empty, because both are
+      invisible to the user otherwise and both are fixable by them. "Nothing
+      here" is the least helpful thing a provider can be told.
+    -->
+    <div class="fl-state" role="status">
+      <h1 class="fl-state-title">No matching requests right now</h1>
+      <p class="fl-state-text">
+        We only show requests for services on your profile, in the areas you service. Check that both
+        are filled in - this board stays empty until they are.
+      </p>
+      <div class="fl-state-actions">
+        <a class="fl-btn fl-btn-secondary" routerLink="/my-services">My services</a>
+        <a class="fl-btn fl-btn-secondary" routerLink="/my-services">My service areas</a>
+      </div>
+    </div>
+  } @else {
+    @if (someAlreadyQuoted()) {
+      <p class="fl-card-text" role="status">
+        Some of these already have quotes, so they may close before you get to them. Quote the ones you
+        want.
+      </p>
+    }
+    <div class="fl-provider-grid">
+      @for (item of requests(); track item.id) {
+        <article class="fl-card">
+          <p class="fl-card-label">{{ item.reference }}</p>
+          <h2 class="fl-card-title">
+            <a class="fl-link" [routerLink]="['/open-requests', item.id]">{{ item.service.name }}</a>
+          </h2>
+          <p class="fl-card-text">{{ item.location }}</p>
+          <p class="fl-card-text">{{ item.customer.displayName }} · Requested {{ item.createdAt }}</p>
+          @if (item.preferredDate) {
+            <p class="fl-card-text">Preferred: {{ formatScheduled(item.scheduledAt) }}</p>
+          }
+          <p class="fl-card-text">
+            {{ statusLabel(item.status) }}
+            @if (item.quotes.length > 0) {
+              · You have quoted
+            }
+          </p>
+        </article>
+      }
+    </div>
+  }
+</div>

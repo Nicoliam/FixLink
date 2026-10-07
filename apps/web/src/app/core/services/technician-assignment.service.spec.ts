@@ -88,7 +88,7 @@ const assignmentDetail: JobAssignmentDetail = {
   ],
 };
 
-describe('BusinessService — Stage 7C technician assignment', () => {
+describe('BusinessService - Stage 7C technician assignment', () => {
   let service: BusinessService;
   let httpMock: HttpTestingController;
 
@@ -127,7 +127,7 @@ describe('BusinessService — Stage 7C technician assignment', () => {
   });
 });
 
-describe('TechnicianService — Stage 7C My Jobs', () => {
+describe('TechnicianService - Stage 7C My Jobs', () => {
   let service: TechnicianService;
   let httpMock: HttpTestingController;
 

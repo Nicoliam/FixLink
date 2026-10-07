@@ -457,7 +457,7 @@ function makePartsRequest(overrides: { id?: string; status?: 'PENDING' | 'APPROV
     ],
     reviewedBy: reviewed ? '9' : null,
     reviewedAt: reviewed ? '2026-09-21T13:00:00.000Z' : null,
-    reviewNotes: reviewed ? 'Genuine part required — approved.' : null,
+    reviewNotes: reviewed ? 'Genuine part required - approved.' : null,
     approvals: reviewed
       ? [
           {
@@ -467,7 +467,7 @@ function makePartsRequest(overrides: { id?: string; status?: 'PENDING' | 'APPROV
             requestedBy: '7',
             reviewedBy: '9',
             status: status === 'PARTS_AVAILABLE' ? 'APPROVED' : status,
-            comments: 'Genuine part required — approved.',
+            comments: 'Genuine part required - approved.',
             reviewedAt: '2026-09-21T13:00:00.000Z',
             createdAt: '2026-09-21T13:00:00.000Z',
           },

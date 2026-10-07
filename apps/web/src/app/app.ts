@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
-import { NgOptimizedImage } from '@angular/common';
+import { NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/services/auth.service';
@@ -29,7 +29,7 @@ const BUSINESS_ROLES = ['BUSINESS_OWNER', 'BUSINESS_MANAGER'];
  */
 @Component({
   selector: 'app-root',
-  imports: [NgOptimizedImage, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [NgOptimizedImage, NgTemplateOutlet, RouterLink, RouterLinkActive, RouterOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
 })
@@ -39,13 +39,20 @@ export class App {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** Customer navigation: track and review own job requests. */
+  /**
+   * Customer session: replaces the marketing Login / Create account /
+   * search CTA with My Jobs + Account navigation and the session actions.
+   */
   protected readonly showMyJobs = computed(
     () => this.auth.isAuthenticated() && (this.auth.currentUser()?.roles ?? []).includes('CUSTOMER'),
   );
 
-  /** Provider navigation: marketplace requests addressed to the provider. */
-  protected readonly showRequests = computed(
+  /**
+   * Provider session: PROFESSIONAL, BUSINESS_OWNER or BUSINESS_MANAGER.
+   * Providers get the workspace header (Requests + notifications + logout)
+   * instead of the marketing navigation.
+   */
+  protected readonly isProvider = computed(
     () =>
       this.auth.isAuthenticated() &&
       (this.auth.currentUser()?.roles ?? []).some((role) => PROVIDER_ROLES.includes(role)),
@@ -75,6 +82,7 @@ export class App {
   protected readonly panelLoading = signal(false);
   protected readonly panelError = signal('');
   protected readonly panelItems = signal<NotificationItem[]>([]);
+  protected readonly isLoggingOut = signal(false);
 
   protected readonly typeLabel = notificationTypeLabel;
   protected readonly formatTime = formatNotificationTime;
@@ -155,5 +163,20 @@ export class App {
       return;
     }
     void this.router.navigate(destination);
+  }
+
+  /**
+   * End the provider session from the header. AuthService.logout() always
+   * clears local state, so the marketing header returns regardless of the
+   * network outcome.
+   */
+  protected logout(): void {
+    if (this.isLoggingOut()) return;
+    this.isLoggingOut.set(true);
+    this.auth.logout().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => void this.router.navigate(['/']),
+      error: () => void this.router.navigate(['/']),
+      complete: () => this.isLoggingOut.set(false),
+    });
   }
 }

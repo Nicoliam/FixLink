@@ -1,0 +1,133 @@
+<div class="fl-page fl-page-narrow">
+  <nav aria-label="Breadcrumb">
+    <a class="fl-link" routerLink="/my-services">← Back to my services</a>
+  </nav>
+
+  <p class="fl-eyebrow">Coverage</p>
+  <h1 class="fl-page-title">My service areas</h1>
+  <p class="fl-page-subtitle">
+    The areas you work in. Customers who post a job without choosing a professional are matched to
+    you when your services <em>and</em> these areas both fit - so an empty list here means no new
+    requests reach you.
+  </p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading your service areas…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">Something went wrong</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+      <button type="button" class="fl-btn fl-btn-primary" (click)="reload()">Try again</button>
+    </div>
+  } @else {
+    @if (isEmpty()) {
+      <div class="fl-state" role="status">
+        <h2 class="fl-state-title">No areas yet</h2>
+        <p class="fl-state-text">
+          Add the first area you service. Until you do, you will not be alerted about open requests,
+          even though your services are listed.
+        </p>
+      </div>
+    }
+
+    <form class="fl-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <div formArrayName="areas">
+        @for (group of areas.controls; track group; let i = $index) {
+          <fieldset class="fl-areas-row" [formGroupName]="i">
+            <legend class="fl-visually-hidden">Area {{ i + 1 }}</legend>
+
+            <div class="fl-field">
+              <label [for]="'area-name-' + i">Area or suburb</label>
+              <input
+                [id]="'area-name-' + i"
+                class="fl-input"
+                type="text"
+                formControlName="areaName"
+                [maxlength]="nameMax"
+                autocomplete="address-level3"
+              />
+              @if (areaInvalid(group, 'areaName')) {
+                <p class="fl-field-error" role="alert">Name the area you service (up to {{ nameMax }} characters).</p>
+              } @else if (duplicateNames().has(nameOf(group).toLowerCase())) {
+                <p class="fl-field-error" role="alert">This area is listed more than once.</p>
+              }
+            </div>
+
+            <div class="fl-field">
+              <label [for]="'area-city-' + i">City <span class="fl-optional">(optional)</span></label>
+              <input
+                [id]="'area-city-' + i"
+                class="fl-input"
+                type="text"
+                formControlName="city"
+                [maxlength]="cityMax"
+                autocomplete="address-level2"
+              />
+              @if (areaInvalid(group, 'city')) {
+                <p class="fl-field-error" role="alert">Keep the city under {{ cityMax }} characters.</p>
+              }
+            </div>
+
+            <div class="fl-field">
+              <label [for]="'area-province-' + i">Province <span class="fl-optional">(optional)</span></label>
+              <input
+                [id]="'area-province-' + i"
+                class="fl-input"
+                type="text"
+                formControlName="province"
+                [maxlength]="provinceMax"
+                autocomplete="address-level1"
+              />
+              @if (areaInvalid(group, 'province')) {
+                <p class="fl-field-error" role="alert">Keep the province under {{ provinceMax }} characters.</p>
+              }
+            </div>
+
+            <button
+              type="button"
+              class="fl-btn fl-btn-secondary fl-btn-sm"
+              (click)="removeArea(i)"
+              [disabled]="saving()"
+            >
+              Remove area
+              <span class="fl-visually-hidden">: {{ nameOf(group) || 'new area' }}</span>
+            </button>
+          </fieldset>
+        }
+      </div>
+
+      <p class="fl-form-note">
+        Up to {{ maxAreas }} areas. Use labels like “Randburg &amp; surrounds” - Fixlynk compares
+        them with what the customer types, so specific beats broad.
+      </p>
+
+      <div class="fl-form-actions">
+        <button
+          type="button"
+          class="fl-btn fl-btn-secondary"
+          (click)="addArea()"
+          [disabled]="!canAdd() || saving()"
+        >
+          Add an area
+        </button>
+        <button type="submit" class="fl-btn fl-btn-primary" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : 'Save areas' }}
+        </button>
+      </div>
+
+      @if (atCap()) {
+        <p class="fl-form-note">You have reached the maximum of {{ maxAreas }} areas.</p>
+      }
+      @if (saveError()) {
+        <p class="fl-alert fl-alert-error" role="alert">{{ saveError() }}</p>
+      }
+      @if (saved()) {
+        <p class="fl-alert fl-alert-success" role="status">
+          Service areas saved. New open requests in these areas will now reach you.
+        </p>
+      }
+    </form>
+  }
+</div>

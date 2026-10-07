@@ -1,6 +1,6 @@
 <header class="fl-stitch-header">
   <div class="fl-stitch-header-inner">
-    <a class="fl-stitch-brand" routerLink="/" aria-label="Fixlynk home">
+    <ng-template #brandMark>
       <img
         class="fl-stitch-brand-logo"
         ngSrc="brand/fixlynk-logo.svg"
@@ -9,19 +9,122 @@
         priority
         alt="Fixlynk"
       />
-    </a>
-    <nav class="fl-stitch-nav" aria-label="Primary">
-      <a class="fl-stitch-nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
-      <a class="fl-stitch-nav-link" routerLink="/marketplace" routerLinkActive="active">Find a Handyman</a>
-      </nav>
-    <div class="fl-stitch-actions">
-      <a class="fl-stitch-login" routerLink="/login" routerLinkActive="active">Login</a>
-      <a class="fl-stitch-join" routerLink="/register" [queryParams]="{ role: 'PROFESSIONAL' }" routerLinkActive="active">Join as an Artisan</a>
-      <a class="fl-stitch-cta" routerLink="/marketplace">
-        <span class="material-symbols-outlined">search</span>
-        <span>Find a Handyman</span>
+    </ng-template>
+
+    <ng-template #sessionActions>
+      <div class="fl-bell-wrap">
+        <button
+          type="button"
+          class="fl-bell"
+          (click)="togglePanel()"
+          [attr.aria-expanded]="panelOpen()"
+          aria-controls="fl-notification-panel"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+          <span class="fl-visually-hidden">Notifications</span>
+          @if (notifications.unreadCount() > 0) {
+            <span class="fl-bell-badge">{{ notifications.unreadCount() }}</span>
+          }
+        </button>
+        @if (panelOpen()) {
+          <div class="fl-bell-panel" id="fl-notification-panel" role="region" aria-label="Recent notifications">
+            <div class="fl-bell-panel-head">
+              <h2 class="fl-bell-panel-title">Notifications</h2>
+              <div class="fl-notifications-toolbar">
+                <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="markAllRead()">
+                  Mark all read
+                </button>
+                <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="closePanel()">Close</button>
+              </div>
+            </div>
+            @if (panelLoading()) {
+              <p role="status">Loading your notifications…</p>
+            } @else if (panelError()) {
+              <p role="alert">{{ panelError() }}</p>
+            } @else if (panelItems().length === 0) {
+              <p role="status">You have no notifications yet.</p>
+            } @else {
+              <ul class="fl-notification-list">
+                @for (item of panelItems(); track item.id) {
+                  <li>
+                    <button
+                      type="button"
+                      class="fl-notification-open"
+                      (click)="openPanelItem(item)"
+                      [attr.aria-label]="(item.read ? 'Open ' : 'Mark as read and open ') + item.title"
+                    >
+                      <span class="fl-notification-top">
+                        <span class="fl-pill fl-pill-info">{{ typeLabel(item.type) }}</span>
+                        @if (!item.read) {
+                          <span class="fl-notification-dot" aria-label="Unread"></span>
+                        }
+                        <span class="fl-notification-time">{{ formatTime(item.createdAt) }}</span>
+                      </span>
+                      <span class="fl-notification-title">{{ item.title }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+              <a class="fl-btn fl-btn-secondary fl-btn-sm" routerLink="/notifications" (click)="closePanel()">
+                View all notifications
+              </a>
+            }
+          </div>
+        }
+      </div>
+      <button
+        type="button"
+        class="fl-stitch-signout"
+        (click)="logout()"
+        [disabled]="isLoggingOut()"
+      >
+        {{ isLoggingOut() ? 'Logging out…' : 'Log out' }}
+      </button>
+    </ng-template>
+
+    @if (isProvider()) {
+      <span class="fl-stitch-brand">
+        <ng-container [ngTemplateOutlet]="brandMark" />
+      </span>
+    } @else {
+      <a class="fl-stitch-brand" routerLink="/" aria-label="Fixlynk home">
+        <ng-container [ngTemplateOutlet]="brandMark" />
       </a>
-    </div>
+    }
+    @if (isProvider()) {
+      <nav class="fl-stitch-nav fl-stitch-nav-provider" aria-label="Primary">
+        <a class="fl-stitch-nav-link" routerLink="/requests" routerLinkActive="active">Requests</a>
+        <!-- Step 14: the board of unaddressed requests matching this provider. -->
+        <a class="fl-stitch-nav-link" routerLink="/open-requests" routerLinkActive="active">Open requests</a>
+        <a class="fl-stitch-nav-link" routerLink="/my-services" routerLinkActive="active">My services</a>
+        <a class="fl-stitch-nav-link" routerLink="/my-areas" routerLinkActive="active">My areas</a>
+        <a class="fl-stitch-nav-link" routerLink="/account" routerLinkActive="active">Account</a>
+      </nav>
+      <div class="fl-stitch-actions">
+        <ng-container [ngTemplateOutlet]="sessionActions" />
+      </div>
+    } @else {
+      <nav class="fl-stitch-nav" aria-label="Primary">
+        <a class="fl-stitch-nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
+        <a class="fl-stitch-nav-link" routerLink="/marketplace" routerLinkActive="active">Find a Handyman</a>
+        @if (showMyJobs()) {
+          <a class="fl-stitch-nav-link" routerLink="/my-jobs" routerLinkActive="active">My Jobs</a>
+          <a class="fl-stitch-nav-link" routerLink="/account" routerLinkActive="active">Account</a>
+        }
+      </nav>
+      <div class="fl-stitch-actions">
+        @if (showMyJobs()) {
+          <ng-container [ngTemplateOutlet]="sessionActions" />
+        } @else {
+          <a class="fl-stitch-login" routerLink="/login" routerLinkActive="active">Login</a>
+          <a class="fl-stitch-join" routerLink="/register" routerLinkActive="active">Create account</a>
+          <a class="fl-stitch-cta" routerLink="/marketplace">
+            <span class="material-symbols-outlined">search</span>
+            <span>Find a Handyman</span>
+          </a>
+        }
+      </div>
+    }
   </div>
 </header>
 
@@ -70,7 +173,7 @@
         <h4 class="fl-stitch-footer-col-title">Trust &amp; Safety</h4>
         <ul class="fl-stitch-footer-list">
           <li><a href="#">Trust &amp; Safety</a></li>
-          <li><a routerLink="/register" [queryParams]="{ role: 'PROFESSIONAL' }">Join as an Artisan</a></li>
+          <li><a routerLink="/register">Create account</a></li>
           <li><a href="#">Background Checks</a></li>
           <li><a href="#">Privacy Policy</a></li>
           <li><a href="#">Terms of Service</a></li>

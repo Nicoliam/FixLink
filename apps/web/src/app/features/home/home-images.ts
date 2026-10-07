@@ -103,7 +103,7 @@ export const HOME_IMAGES = {
     height: 900,
     alt: 'A leaking kitchen pipe and damaged cabinet photographed before repair as part of a Fixlynk job.',
     tone: 'slate',
-    label: 'Before — document the problem',
+    label: 'Before - document the problem',
   },
   during: {
     src: '/images/homepage/fixlynk-during.jpg',
@@ -111,7 +111,7 @@ export const HOME_IMAGES = {
     height: 900,
     alt: 'A technician part-way through an electrical installation, wiring in progress, photographed during a Fixlynk job.',
     tone: 'primary',
-    label: 'During — keep track of the work',
+    label: 'During - keep track of the work',
   },
   after: {
     src: '/images/homepage/fixlynk-after.jpg',
@@ -119,7 +119,7 @@ export const HOME_IMAGES = {
     height: 900,
     alt: 'A completed, neatly installed kitchen tap and counter photographed after a Fixlynk job.',
     tone: 'trust',
-    label: 'After — show what was completed',
+    label: 'After - show what was completed',
   },
   trust: {
     src: '/images/homepage/fixlynk-trust.jpg',

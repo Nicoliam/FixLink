@@ -37,6 +37,9 @@ export interface JobServiceSummary {
   id: string;
   name: string;
   slug: string;
+  /** Platform category bucket; the backend resolves it, never the client. */
+  categoryId: string;
+  categoryName: string;
 }
 
 export interface Job {
@@ -45,7 +48,14 @@ export interface Job {
   source: JobSource;
   status: JobStatus;
   customerId: string;
-  provider: JobProviderSummary;
+  /**
+   * `null` on an OPEN REQUEST — posted without choosing a professional.
+   *
+   * The backend offers such a job to every provider matching it on category
+   * and service area, and up to 3 of them may quote. Render "Matching
+   * professionals" rather than a name when this is null.
+   */
+  provider: JobProviderSummary | null;
   service: JobServiceSummary;
   description: string;
   location: string;
@@ -67,9 +77,66 @@ export interface Job {
   quotes?: Quote[];
 }
 
-/** Body sent to POST /api/v1/jobs. Ownership is established server-side. */
+/**
+ * Step 15 - body for `PATCH /api/v1/jobs/:id`.
+ *
+ * Every field is optional and an omitted key means "leave this alone", so a
+ * one-field correction never rewrites the rest of the form.
+ *
+ * `serviceId` and `providerId` are absent ON PURPOSE. They decide which
+ * professionals match the request and who does the work, so a wrong choice
+ * there is corrected by cancelling and reposting rather than by editing. The
+ * backend rejects them outright rather than ignoring them.
+ *
+ * A `null` preferred date or time CLEARS that preference, which is the only
+ * way to remove one.
+ */
+export interface UpdateJobRequest {
+  description?: string;
+  location?: string;
+  preferredDate?: string | null;
+  preferredTime?: string | null;
+}
+
+/** Result of `PATCH /api/v1/jobs/:id`. */
+export interface UpdatedJobResult {
+  job: Job;
+  /**
+   * True when the request already held active quotes, so the customer must be
+   * warned that those quotes were priced on the earlier description. The
+   * server decides this, not the client: the client does not reliably know
+   * whether a quote is still live.
+   */
+  quotedRequestsChanged: boolean;
+}
+
+/** Result of `DELETE /api/v1/jobs/:id`. Matches the existing image-delete shape. */
+export interface DeleteJobResult {
+  deleted: true;
+}
+
+/**
+ * Step 15 - statuses in which the customer may still edit, cancel or delete
+ * their own request. Mirrors CUSTOMER_MUTABLE_STATUSES in the backend, which
+ * is where the rule is enforced; the UI hides the actions past this point so
+ * it never offers something the API will refuse.
+ */
+export const CUSTOMER_MUTABLE_JOB_STATUSES: readonly JobStatus[] = ['REQUESTED', 'QUOTED'];
+
+/** May the customer still change this job? */
+export function isCustomerMutable(job: Pick<Job, 'status'>): boolean {
+  return CUSTOMER_MUTABLE_JOB_STATUSES.includes(job.status);
+}
+
+
+/**
+ * Body sent to POST /api/v1/jobs. Ownership is established server-side.
+ *
+ * `providerId` is optional: omit it (or send an empty string) to post an open
+ * request that matching professionals find themselves.
+ */
 export interface CreateJobRequest {
-  providerId: string;
+  providerId?: string;
   serviceId: string;
   description: string;
   location: string;
@@ -77,6 +144,15 @@ export interface CreateJobRequest {
   preferredTime?: string;
   notes?: string;
 }
+
+/**
+ * Which population a job photo belongs to (migration 017).
+ *
+ * REQUEST photos are the customer's own evidence of the problem, attached while
+ * the request is still REQUESTED/QUOTED. WORK photos are the professional's or
+ * technician's Before/During/After execution record.
+ */
+export type JobImageContext = 'REQUEST' | 'WORK';
 
 export interface JobList {
   items: Job[];
@@ -136,7 +212,8 @@ export interface ProviderRequest {
   reference: string;
   source: JobSource;
   status: JobStatus;
-  provider: JobProviderSummary;
+  /** `null` on an open request the professional is considering. */
+  provider: JobProviderSummary | null;
   service: JobServiceSummary;
   description: string;
   location: string;
@@ -150,6 +227,14 @@ export interface ProviderRequest {
   confirmedAt?: string | null;
   closedAt?: string | null;
   customer: { displayName: string };
+  /**
+   * The VIEWING provider's own quotes only.
+   *
+   * On an addressed request that is the whole set (only the addressed provider
+   * may quote). On an open request it is just theirs — competing quotes stay
+   * invisible so professionals are not anchored to each other's prices. The
+   * customer sees all of them.
+   */
   quotes: Quote[];
 }
 
@@ -226,6 +311,31 @@ export function jobStatusLabel(status: JobStatus): string {  switch (status) {
  */
 const SCHEDULE_TIME_ZONE = 'Africa/Johannesburg';
 
+/**
+ * Step 14 — how many professionals may quote one open request.
+ *
+ * Mirrors MAX_QUOTES_PER_OPEN_JOB in the backend, which is where the limit is
+ * actually ENFORCED (inside the quote transaction). This copy exists only so
+ * the copy can say the same number; the two must not drift, so any change here
+ * needs the same change there.
+ */
+export const MAX_QUOTES_PER_OPEN_REQUEST = 3;
+
+/**
+ * Step 14 — how a job's other party is described.
+ *
+ * An OPEN request has `provider === null`: nobody was chosen, so naming a
+ * "provider" would be a lie. One helper for every screen keeps that wording
+ * consistent, and it deliberately does not say "no provider" — that reads as
+ * an error, when it is a request actively collecting quotes.
+ */
+export const OPEN_REQUEST_PROVIDER_LABEL = 'Matching professionals';
+
+/** The provider's name, or the open-request wording when nobody was chosen. */
+export function jobProviderLabel(job: Pick<Job, 'provider'>): string {
+  return job.provider?.name ?? OPEN_REQUEST_PROVIDER_LABEL;
+}
+
 export function formatScheduledAt(iso: string | null | undefined): string {
   if (!iso) return '';
   const instant = new Date(iso);
@@ -270,6 +380,8 @@ export interface JobImage {
   jobId: string;
   uploadedBy: string;
   phase: WorkPhase;
+  /** REQUEST for customer evidence of the problem, WORK for execution record. */
+  context: JobImageContext;
   originalFilename: string | null;
   mimeType: string;
   size: number;

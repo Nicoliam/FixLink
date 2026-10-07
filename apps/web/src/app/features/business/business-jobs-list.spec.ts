@@ -81,7 +81,7 @@ function pageOf(items: BusinessBoardJob[], total = items.length) {
   return { items, total, page: 1, pageSize: 20 };
 }
 
-describe('BusinessJobsListComponent — Stage 7G job board', () => {
+describe('BusinessJobsListComponent - Stage 7G job board', () => {
   let fixture: ComponentFixture<BusinessJobsListComponent>;
 
   async function setup(options: {

@@ -64,6 +64,26 @@ describe('JobService', () => {
     req.flush({ success: true, data: {}, message: 'ok' });
   });
 
+  it('omits providerId entirely when none was chosen, so the job posts as an open request', () => {
+    service
+      .createJob({ serviceId: '1', description: 'x'.repeat(20), location: 'Randburg, Johannesburg' })
+      .subscribe();
+    const req = httpMock.expectOne(`${API}/jobs`);
+    // The key must be ABSENT, not blank: a blank providerId would be ambiguous
+    // between "the client forgot" and "the customer skipped step 02".
+    expect('providerId' in req.request.body).toBe(false);
+    req.flush({ success: true, data: { id: '7' }, message: 'ok' });
+  });
+
+  it('omits a blank providerId rather than sending an empty string', () => {
+    service
+      .createJob({ providerId: '   ', serviceId: '1', description: 'x'.repeat(20), location: 'Pretoria' })
+      .subscribe();
+    const req = httpMock.expectOne(`${API}/jobs`);
+    expect('providerId' in req.request.body).toBe(false);
+    req.flush({ success: true, data: { id: '7' }, message: 'ok' });
+  });
+
   it('lists the customer jobs with pagination', () => {
     let result: unknown = null;
     service.listMyJobs(2, 10).subscribe((list) => (result = list));
@@ -92,6 +112,27 @@ describe('JobService', () => {
     expect(req.request.params.get('status')).toBeNull();
     req.flush({ success: true, data: { items: [], total: 0, page: 1, pageSize: 20 }, message: 'ok' });
     expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 20 });
+  });
+
+  it('lists open requests with pagination and no match filters', () => {
+    let result: unknown = null;
+    service.listOpenRequests(1, 20).subscribe((list) => (result = list));
+    const req = httpMock.expectOne((r) => r.url === `${API}/provider/open-requests`);
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('page')).toBe('1');
+    expect(req.request.params.get('pageSize')).toBe('20');
+    // No category, area or radius: the match is computed server-side, and
+    // sending a parameter the endpoint does not accept would be a 422.
+    expect([...req.request.params.keys()].sort()).toEqual(['page', 'pageSize']);
+    req.flush({ success: true, data: { items: [], total: 0, page: 1, pageSize: 20 }, message: 'ok' });
+    expect(result).toEqual({ items: [], total: 0, page: 1, pageSize: 20 });
+  });
+
+  it('fetches a single open request by id', () => {
+    service.getOpenRequest('9').subscribe();
+    const req = httpMock.expectOne(`${API}/provider/open-requests/9`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: { id: '9' }, message: 'ok' });
   });
 
   it('fetches a single provider request by id', () => {

@@ -48,10 +48,28 @@
           }
         </div>
       </div>
-      <a class="fl-btn fl-btn-primary" [routerLink]="['/request-job']" [queryParams]="{ provider: provider.id }">
-        Request a job
-      </a>
+      <div class="fl-profile-actions">
+        @if (canSave()) {
+          <button
+            type="button"
+            class="fl-btn fl-btn-secondary"
+            (click)="toggleSaved()"
+            [disabled]="isSaving()"
+            [attr.aria-pressed]="isSaved()"
+          >
+            <span class="material-symbols-outlined" aria-hidden="true">{{ isSaved() ? 'bookmark' : 'bookmark_add' }}</span>
+            {{ isSaved() ? 'Saved' : 'Save' }}
+          </button>
+        }
+        <a class="fl-btn fl-btn-primary" [routerLink]="['/request-job']" [queryParams]="{ provider: provider.id }">
+          Request a job
+        </a>
+      </div>
     </header>
+
+    @if (saveError()) {
+      <p class="fl-alert fl-alert-error" role="alert">{{ saveError() }}</p>
+    }
 
     @if (provider.bio) {
       <section class="fl-card" aria-labelledby="fl-about-heading">

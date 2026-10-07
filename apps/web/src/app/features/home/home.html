@@ -16,7 +16,10 @@
           Connect with skilled local professionals for repairs, maintenance and home improvement. Vetted background checks, upfront pricing, and real work photos.
         </p>
         <div class="fl-search-card" id="search-anchor">
-          <form class="fl-search-form" (ngSubmit)="onSearch()">
+          <form
+            class="fl-search-form"
+            (ngSubmit)="onSearch({ service: searchNeed, location: searchLocation })"
+          >
             <div class="fl-search-input-group">
               <span class="material-symbols-outlined fl-search-input-icon">search</span>
               <div class="fl-search-input-wrapper">
@@ -130,10 +133,6 @@
               <h3 class="fl-service-name">{{ service.name }}</h3>
               <p class="fl-service-description">{{ service.description }}</p>
             </div>
-            <div class="fl-service-footer">
-              <span>From {{ service.price }}</span>
-              <span class="material-symbols-outlined">chevron_right</span>
-            </div>
           </a>
         }
       </div>
@@ -174,71 +173,115 @@
     <div class="fl-section-container">
       <div class="fl-section-header">
         <div>
-          <span class="fl-section-eyebrow">Handpicked Artisans</span>
+          <span class="fl-section-eyebrow">Verified Artisans</span>
           <h2 class="fl-section-title">Trusted Professionals Near You</h2>
-          <p class="fl-section-subtitle">Top-rated handymen currently available in Fourways, Sandton &amp; Bryanston.</p>
+          <p class="fl-section-subtitle">Identity-verified professionals with published work and customer reviews.</p>
         </div>
-        <div class="fl-filter-bar">
-          <span class="fl-filter-label">Filter:</span>
-          <span class="fl-filter-pill active">Available Today</span>
-          <span class="fl-filter-pill inactive">Top Rated</span>
-        </div>
+        <a class="fl-section-link" routerLink="/marketplace">
+          <span>View all professionals</span>
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+        </a>
       </div>
-      <div class="fl-professionals-grid">
-        @for (pro of professionals(); track pro.name) {
-          <div class="fl-professional-card">
-            <div class="fl-professional-card-body">
-              <div class="fl-professional-header">
-                <div class="fl-professional-info">
-                  <img class="fl-professional-avatar" [src]="pro.avatar" [alt]="pro.name">
-                  <div>
-                    <h3 class="fl-professional-name">{{ pro.name }}</h3>
-                    <div class="fl-professional-location">
-                      <span class="material-symbols-outlined">location_on</span>
-                      <span>{{ pro.location }}</span>
+      <div
+        class="fl-professionals-grid"
+        aria-live="polite"
+        [attr.aria-busy]="featuredStatus() === 'loading'"
+      >
+        @if (featuredStatus() === 'loading') {
+          @for (placeholder of [1, 2, 3]; track placeholder) {
+            <div class="fl-professional-card fl-professional-card-placeholder" aria-hidden="true"></div>
+          }
+          <p class="fl-visually-hidden" role="status">Loading professionals&hellip;</p>
+        } @else if (featuredStatus() === 'error') {
+          <div class="fl-professionals-state" role="alert">
+            <p>{{ featuredError() }}</p>
+            <button type="button" class="fl-btn-request-job" (click)="retryFeatured()">Try again</button>
+          </div>
+        } @else if (featuredStatus() === 'empty') {
+          <div class="fl-professionals-state">
+            <p>No verified professionals are listed yet.</p>
+            <a class="fl-btn-request-job" routerLink="/marketplace">Browse the marketplace</a>
+          </div>
+        } @else {
+          @for (pro of professionals(); track pro.id) {
+            <article class="fl-professional-card" [attr.aria-label]="pro.name">
+              <div class="fl-professional-card-body">
+                <div class="fl-professional-header">
+                  <div class="fl-professional-info">
+                    <span class="fl-professional-avatar" aria-hidden="true">{{ monogram(pro) }}</span>
+                    <div>
+                      <h3 class="fl-professional-name">
+                        <a [routerLink]="['/marketplace/providers', pro.id]">{{ pro.name }}</a>
+                      </h3>
+                      <div class="fl-professional-location">
+                        <span class="material-symbols-outlined" aria-hidden="true">location_on</span>
+                        <span>{{ areaLabel(pro) }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <span class="fl-verified-badge">
-                  <span class="material-symbols-outlined fill-icon">verified</span>
-                  <span>Verified</span>
-                </span>
-              </div>
-              <div class="fl-professional-skills">
-                @for (skill of pro.skills; track skill) {
-                  <span class="fl-skill-tag">{{ skill }}</span>
-                }
-              </div>
-              <div class="fl-professional-metrics">
-                <div class="fl-professional-rating">
-                  <span class="star">&#9733; {{ pro.rating }}</span>
-                  <span class="review-count">({{ pro.reviews }} reviews)</span>
-                </div>
-                <div class="fl-professional-exp">
-                  <span class="material-symbols-outlined">work_history</span>
-                  <span>{{ pro.experience }}</span>
-                </div>
-              </div>
-              <div class="fl-portfolio-section">
-                <span class="fl-portfolio-label">Recent Verified Work</span>
-                <div class="fl-portfolio-grid">
-                  @for (img of pro.portfolio; track img) {
-                    <img class="fl-portfolio-item" [src]="img" alt="Completed work by {{ pro.name }}">
+                  @if (pro.isVerified) {
+                    <span class="fl-verified-badge">
+                      <span class="material-symbols-outlined fill-icon" aria-hidden="true">verified</span>
+                      <span>Verified</span>
+                    </span>
                   }
                 </div>
+                @if (pro.services.length > 0) {
+                  <div class="fl-professional-skills">
+                    @for (skill of pro.services.slice(0, 3); track skill.id) {
+                      <span class="fl-skill-tag">{{ skill.name }}</span>
+                    }
+                  </div>
+                }
+                <div class="fl-professional-metrics">
+                  <div class="fl-professional-rating">
+                    @if (pro.ratingCount > 0) {
+                      <span class="star">&#9733; {{ pro.ratingAvg.toFixed(1) }}</span>
+                      <span class="review-count">({{ pro.ratingCount }} reviews)</span>
+                    } @else {
+                      <span class="review-count">New on Fixlynk</span>
+                    }
+                  </div>
+                  @if (experienceLabel(pro); as experience) {
+                    <div class="fl-professional-exp">
+                      <span class="material-symbols-outlined" aria-hidden="true">work_history</span>
+                      <span>{{ experience }}</span>
+                    </div>
+                  }
+                </div>
+                <div class="fl-portfolio-section">
+                  <span class="fl-portfolio-label">Credentials</span>
+                  <ul class="fl-professional-proof-list">
+                    @if (pro.portfolioCount > 0) {
+                      <li class="fl-skill-tag">
+                        {{ pro.portfolioCount }} portfolio {{ pro.portfolioCount === 1 ? 'project' : 'projects' }}
+                      </li>
+                    }
+                    @if (pro.approvedCertificateCount > 0) {
+                      <li class="fl-skill-tag">{{ pro.approvedCertificateCount }} approved {{ pro.approvedCertificateCount === 1 ? 'certificate' : 'certificates' }}</li>
+                    }
+                    @if (pro.portfolioCount === 0 && pro.approvedCertificateCount === 0) {
+                      <li class="fl-skill-tag">Portfolio in progress</li>
+                    }
+                  </ul>
+                </div>
               </div>
-            </div>
-            <div class="fl-professional-card-footer">
-              <div>
-                <span class="fl-professional-price-label">Starting from</span>
-                <span class="fl-professional-price">{{ pro.price }}</span>
+              <div class="fl-professional-card-footer">
+                @if (fromPrice(pro); as price) {
+                  <div>
+                    <span class="fl-professional-price-label">Call out from</span>
+                    <span class="fl-professional-price">{{ price }}</span>
+                  </div>
+                } @else {
+                  <span class="fl-professional-type">{{ pro.providerType === 'business' ? 'Service business' : 'Professional' }}</span>
+                }
+                <div class="fl-professional-actions">
+                  <a class="fl-btn-view-profile" [routerLink]="['/marketplace/providers', pro.id]">View Profile</a>
+                  <a class="fl-btn-request-job" [routerLink]="['/request-job']" [queryParams]="{ provider: pro.id }">Request Job</a>
+                </div>
               </div>
-              <div class="fl-professional-actions">
-                <button class="fl-btn-view-profile" type="button">View Profile</button>
-                <button class="fl-btn-request-job" type="button">Request Job</button>
-              </div>
-            </div>
-          </div>
+            </article>
+          }
         }
       </div>
     </div>
@@ -277,42 +320,42 @@
           </div>
           <h2 class="fl-split-title">See their work before you hire.</h2>
           <p class="fl-split-description">
-            Every professional can showcase their previous work, experience, qualifications and customer reviews — so you can make a confident decision without taking chances.
+            Every professional can showcase their previous work, experience, qualifications and customer reviews - so you can make a confident decision without taking chances.
           </p>
           <ul class="fl-checklist">
             <li class="fl-checklist-item">
               <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
               <div class="flex-1">
                 <span class="fl-checklist-title">Previous work</span>
-                <span class="fl-checklist-text"> — High resolution photos of completed local projects.</span>
+                <span class="fl-checklist-text"> - High resolution photos of completed local projects.</span>
               </div>
             </li>
             <li class="fl-checklist-item">
               <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
               <div class="flex-1">
                 <span class="fl-checklist-title">Certificates &amp; Trade Tests</span>
-                <span class="fl-checklist-text"> — Verified trade diplomas and South African COC accreditations.</span>
+                <span class="fl-checklist-text"> - Verified trade diplomas and South African COC accreditations.</span>
               </div>
             </li>
             <li class="fl-checklist-item">
               <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
               <div class="flex-1">
                 <span class="fl-checklist-title">Customer reviews</span>
-                <span class="fl-checklist-text"> — Rated exclusively by confirmed clients who paid through the platform.</span>
+                <span class="fl-checklist-text"> - Rated exclusively by confirmed clients who paid through the platform.</span>
               </div>
             </li>
             <li class="fl-checklist-item">
               <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
               <div class="flex-1">
                 <span class="fl-checklist-title">Verified experience</span>
-                <span class="fl-checklist-text"> — Track record of documented on-site home service years.</span>
+                <span class="fl-checklist-text"> - Track record of documented on-site home service years.</span>
               </div>
             </li>
             <li class="fl-checklist-item">
               <div class="fl-checklist-icon"><span class="material-symbols-outlined">check</span></div>
               <div class="flex-1">
                 <span class="fl-checklist-title">Local service area</span>
-                <span class="fl-checklist-text"> — Precise radius coverage for Fourways, Sandton, Bryanston &amp; Randburg.</span>
+                <span class="fl-checklist-text"> - Precise radius coverage for Fourways, Sandton, Bryanston &amp; Randburg.</span>
               </div>
             </li>
           </ul>

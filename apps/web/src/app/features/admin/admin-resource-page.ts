@@ -163,7 +163,7 @@ export class AdminResourcePage implements OnInit {
       case 'audit-logs': return 'LOGGED';
     }
   }
-  protected date(value: string | null | undefined): string { return value ? new Date(value).toLocaleDateString('en-ZA') : '—'; }
+  protected date(value: string | null | undefined): string { return value ? new Date(value).toLocaleDateString('en-ZA') : '-'; }
   protected updatedAt(item: AdminListItem): string { return 'updatedAt' in item ? item.updatedAt : item.createdAt; }
   protected detailPath(item: AdminListItem): string[] { return ['/admin', this.resource() === 'verifications' ? 'verification' : this.resource(), item.id]; }
   protected badgeClass(value: string): string { return value === 'ACTIVE' || value === 'VERIFIED' || value === 'APPROVED' || value === 'RESOLVED' || value === 'VISIBLE' ? 'admin-badge-success' : value === 'PENDING' || value === 'OPEN' || value === 'IN_REVIEW' || value === 'NEEDS_INFO' ? 'admin-badge-warning' : value === 'SUSPENDED' || value === 'REJECTED' || value === 'DISMISSED' || value === 'HIDDEN' ? 'admin-badge-danger' : 'admin-badge-neutral'; }

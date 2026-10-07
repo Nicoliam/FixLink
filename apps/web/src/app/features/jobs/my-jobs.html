@@ -7,19 +7,51 @@
   <h1 class="fl-page-title">Your job requests</h1>
   <p class="fl-page-subtitle">Track the requests you have sent to professionals.</p>
 
+  <!--
+    CUSTOMER-only: `POST /api/v1/jobs` is CUSTOMER-only server-side, so offering
+    the wizard to another role would lead to a 403 one tap later. Hidden rather
+    than shown broken.
+  -->
+  @if (canRequest()) {
+    <section class="fl-card fl-my-jobs-start" aria-labelledby="fl-start-job-heading">
+      <h2 id="fl-start-job-heading" class="fl-card-title">Request a new job</h2>
+      <p class="fl-card-text">
+        Four transparent steps: tell us what you need, find the right professional, review, then send.
+      </p>
+      <!--
+        No saved-professional list here, deliberately. This page is for tracking
+        work; who the customer has bookmarked is only relevant at the moment they
+        are choosing one, and step 02 of the wizard already offers them there -
+        first, when they have any. Repeating the list here put a second copy of
+        the same information on a page whose job is status tracking, and it grew a
+        second loading/error path for it. One place, one purpose.
+      -->
+      <div class="fl-my-jobs-cta">
+        <a class="fl-btn fl-btn-primary" routerLink="/request-job">
+          Start a request
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+        </a>
+        <a class="fl-btn fl-btn-secondary" routerLink="/marketplace">
+          <span class="material-symbols-outlined" aria-hidden="true">search</span>
+          Search the marketplace
+        </a>
+      </div>
+    </section>
+  }
+
   @if (status() === 'loading') {
     <div class="fl-state" role="status">
       <p>Loading your jobs…</p>
     </div>
   } @else if (status() === 'error') {
     <div class="fl-state fl-state-error" role="alert">
-      <h1 class="fl-state-title">Something went wrong</h1>
+      <h2 class="fl-state-title">Something went wrong</h2>
       <p class="fl-state-text">{{ errorMessage() }}</p>
       <button type="button" class="fl-btn fl-btn-primary" (click)="retry()">Try again</button>
     </div>
   } @else if (status() === 'empty') {
     <div class="fl-state" role="status">
-      <h1 class="fl-state-title">No job requests yet</h1>
+      <h2 class="fl-state-title">No job requests yet</h2>
       <p class="fl-state-text">Find a professional in the marketplace and send your first request.</p>
       <a class="fl-btn fl-btn-primary" routerLink="/marketplace">Browse the marketplace</a>
     </div>
@@ -31,7 +63,7 @@
           <h2 class="fl-card-title">
             <a class="fl-link" [routerLink]="['/my-jobs', job.id]">{{ job.service.name }}</a>
           </h2>
-          <p class="fl-card-text">{{ job.provider.name }} · {{ statusLabel(job.status) }}</p>
+          <p class="fl-card-text">{{ providerLabel(job) }} · {{ statusLabel(job.status) }}</p>
           <p class="fl-card-text">{{ job.location }}</p>
           @if (job.preferredDate) {
             <p class="fl-card-text">Preferred date: {{ job.preferredDate }}</p>

@@ -21,6 +21,7 @@ const base: NotificationItem = {
 describe('notification model helpers', () => {
   it('labels every notification type', () => {
     expect(notificationTypeLabel('JOB_REQUEST')).toBe('Job request');
+    expect(notificationTypeLabel('JOB_REQUEST_OPEN')).toBe('Open request');
     expect(notificationTypeLabel('QUOTE_RECEIVED')).toBe('Quote received');
     expect(notificationTypeLabel('QUOTE_ACCEPTED')).toBe('Quote accepted');
     expect(notificationTypeLabel('JOB_SCHEDULED')).toBe('Scheduled');
@@ -61,6 +62,24 @@ describe('notification model helpers', () => {
   it('routes providers to the marketplace request detail', () => {
     expect(notificationRouteFor(base, ['PROFESSIONAL'])).toEqual(['/requests', '9']);
     expect(notificationRouteFor(base, ['BUSINESS_OWNER'])).toEqual(['/requests', '9']);
+  });
+
+  // Step 14 — an open request belongs on the board, not in the inbox.
+  it('routes an open-request alert to the board, because the request is not in the inbox yet', () => {
+    const alert: NotificationItem = {
+      ...base,
+      type: 'JOB_REQUEST_OPEN',
+      title: 'New job request in your area',
+    };
+    expect(notificationRouteFor(alert, ['PROFESSIONAL'])).toEqual(['/open-requests', '9']);
+    expect(notificationRouteFor(alert, ['BUSINESS_OWNER'])).toEqual(['/open-requests', '9']);
+    // A CUSTOMER must never be sent to a provider board, whatever the payload.
+    expect(notificationRouteFor(alert, ['CUSTOMER'])).toEqual(['/my-jobs', '9']);
+  });
+
+  it('still routes an addressed JOB_REQUEST to the inbox', () => {
+    // The two types mean different things and must not collapse into one route.
+    expect(notificationRouteFor(base, ['PROFESSIONAL'])).toEqual(['/requests', '9']);
   });
 
   it('never routes internal jobs to customer screens', () => {

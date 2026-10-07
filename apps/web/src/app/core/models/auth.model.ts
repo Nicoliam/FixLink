@@ -66,6 +66,12 @@ export interface RegisterRequest {
   password: string;
   phone?: string;
   role?: SelfRegisterRole;
+  /**
+   * CUSTOMER only — creates `customer_profiles` at signup. Both are optional
+   * on the wire; when absent the backend derives a name from the email.
+   */
+  firstName?: string;
+  lastName?: string;
   /** PROFESSIONAL only — the name shown to customers on the provider profile. */
   displayName?: string;
   /** BUSINESS_OWNER only — the name shown on the business profile. */

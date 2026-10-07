@@ -237,7 +237,7 @@
                 </button>
               } @else {
                 <audio controls [src]="recordedAudioUrl()" preload="metadata"></audio>
-                <p class="fl-card-text">Recorded clip · {{ recordedDuration() }}s — listen before uploading.</p>
+                <p class="fl-card-text">Recorded clip · {{ recordedDuration() }}s - listen before uploading.</p>
                 <button
                   type="button"
                   class="fl-btn fl-btn-secondary"
@@ -370,7 +370,7 @@
             <div role="status" aria-label="Awaiting parts">
               <p class="fl-card-text"><strong>Job Status: Awaiting Parts</strong></p>
               @if (allPartsAvailable()) {
-                <p class="fl-card-text">Parts Available — Job ready to continue.</p>
+                <p class="fl-card-text">Parts Available - Job ready to continue.</p>
                 @if (resumeError()) {
                   <p class="fl-alert-error" role="alert">{{ resumeError() }}</p>
                 }
@@ -466,7 +466,7 @@
                       <p class="fl-card-text">{{ partsRequest.reviewNotes }}</p>
                     }
                   } @else if (partsRequest.status === 'PARTS_AVAILABLE') {
-                    <p class="fl-card-text"><strong>Parts Available — Job ready to continue.</strong></p>
+                    <p class="fl-card-text"><strong>Parts Available - Job ready to continue.</strong></p>
                   }
                   @if (partsPhotoUrl(partsRequest.id)) {
                     <img class="fl-photo" [src]="partsPhotoUrl(partsRequest.id)" alt="Parts request photo evidence" loading="lazy" />

@@ -6,9 +6,11 @@
   footerLinkTo="/login"
 >
   @if (onStepOne) {
-    <!-- STEP 1 — account type only. No email/password fields are rendered. -->
-    <form [formGroup]="roleForm" (ngSubmit)="continueToDetails()" novalidate class="fl-form">
-      <p class="fl-step-hint" data-testid="register-step-indicator">Step 1 of 2</p>
+    <!-- STEP 1 - account type only. No email/password fields are rendered. -->
+    <form [formGroup]="roleForm" (ngSubmit)="continueFromRole()" novalidate class="fl-form">
+      <p class="fl-step-hint" data-testid="register-step-indicator">
+        Step 1 of {{ totalSteps }}
+      </p>
 
       <fieldset class="fl-field">
         <legend class="fl-label" style="margin-bottom: 0.75rem">I am joining as</legend>
@@ -31,22 +33,77 @@
 
       <button type="submit" class="fl-btn fl-btn-primary fl-btn-block"
         data-testid="register-continue">
-        Continue
+        {{ isProviderRole ? 'Choose your services' : 'Continue' }}
       </button>
     </form>
-  } @else {
-    <!-- STEP 2 — account details. The selected account type is shown and retained. -->
+  } @else if (onDetailsStep) {
+    <!-- STEP 3 for a provider (step 2 for a customer) - account details. The
+         selected account type is shown and retained. A provider reaches this
+         only after ticking their services, so "Create account" is the last
+         thing they do. -->
     <form [formGroup]="detailsForm" (ngSubmit)="submit()" novalidate class="fl-form">
-      <p class="fl-step-hint" data-testid="register-step-indicator">Step 2 of 2</p>
+      <p class="fl-step-hint" data-testid="register-step-indicator">
+        Step {{ currentStep }} of {{ totalSteps }}
+      </p>
 
       <p class="fl-step-summary">
         Joining as <strong data-testid="register-selected-role">{{ selectedRoleLabel }}</strong>
+        @if (isProviderRole) {
+          <span class="fl-step-summary-note" data-testid="register-selected-services">
+            &middot; {{ selectedCount() }} service{{ selectedCount() === 1 ? '' : 's' }} selected
+          </span>
+        }
       </p>
 
       @if (apiError()) {
         <div class="fl-alert fl-alert-error" role="alert" data-testid="register-error">
           {{ apiError() }}
         </div>
+      }
+
+      @if (servicesSaveError(); as message) {
+        <div class="fl-alert fl-alert-error" role="alert" data-testid="register-services-error">
+          {{ message }}
+        </div>
+      }
+
+      @if (isCustomer) {
+        <!-- customer_profiles.first_name / last_name are NOT NULL, so the
+             profile is created at signup. Optional here because the backend
+             falls back to deriving a name from the email. -->
+        <div class="fl-field-row">
+          <div class="fl-field">
+            <label class="fl-label" for="register-first-name">
+              First name <span class="fl-optional">(optional)</span>
+            </label>
+            <input id="register-first-name" class="fl-input" type="text" autocomplete="given-name"
+              placeholder="Naledi" formControlName="firstName" data-testid="register-first-name"
+              [attr.aria-invalid]="firstName.invalid && firstName.touched"
+              [attr.aria-describedby]="firstName.invalid && firstName.touched ? 'register-first-name-error' : null" />
+            @if (firstName.touched && firstName.hasError('maxlength')) {
+              <p id="register-first-name-error" class="fl-field-error" role="alert">
+                First name must be 128 characters or fewer.
+              </p>
+            }
+          </div>
+          <div class="fl-field">
+            <label class="fl-label" for="register-last-name">
+              Last name <span class="fl-optional">(optional)</span>
+            </label>
+            <input id="register-last-name" class="fl-input" type="text" autocomplete="family-name"
+              placeholder="Dlamini" formControlName="lastName" data-testid="register-last-name"
+              [attr.aria-invalid]="lastName.invalid && lastName.touched"
+              [attr.aria-describedby]="lastName.invalid && lastName.touched ? 'register-last-name-error' : null" />
+            @if (lastName.touched && lastName.hasError('maxlength')) {
+              <p id="register-last-name-error" class="fl-field-error" role="alert">
+                Last name must be 128 characters or fewer.
+              </p>
+            }
+          </div>
+        </div>
+        <p class="fl-form-note">
+          Used on quotes and invoices. Leave blank and we will use your email address instead.
+        </p>
       }
 
       @if (isProfessional) {
@@ -135,18 +192,99 @@
 
       <button type="submit" class="fl-btn fl-btn-primary fl-btn-block"
         [disabled]="isSubmitting()" [attr.aria-busy]="isSubmitting()" data-testid="register-submit">
-        {{ isSubmitting() ? 'Creating account…' : 'Create account' }}
+        {{ submitLabel }}
       </button>
 
-      <button type="button" class="fl-btn fl-btn-secondary fl-btn-block"
-        [disabled]="isSubmitting()" (click)="back()" data-testid="register-back">
-        Back
-      </button>
+      @if (accountCreated() === null) {
+        <button type="button" class="fl-btn fl-btn-secondary fl-btn-block"
+          [disabled]="isSubmitting()" (click)="back()" data-testid="register-back">
+          Back
+        </button>
+      }
 
       <p class="fl-form-note">
         By creating an account you agree to use Fixlynk for requesting and quoting home services.
         Payment is arranged directly with your professional.
       </p>
     </form>
+  } @else {
+  <!-- STEP 2: services offered (PROFESSIONAL / BUSINESS_OWNER only).
+       A customer never sees this: they go from step 1 to their details.
+       It comes BEFORE the account details so a provider picks what they do
+       before they create the account. -->
+  <div class="fl-form">
+    <p class="fl-step-hint" data-testid="register-step-indicator">Step 2 of 3</p>
+
+    <p class="fl-step-summary" data-testid="register-services-summary">
+      Tick the services you offer as <strong>{{ selectedRoleLabel }}</strong>.
+    </p>
+
+    @if (servicesStatus() === 'loading') {
+      <div class="fl-state" role="status">
+        <p>Loading services…</p>
+      </div>
+    } @else if (servicesStatus() === 'error') {
+      <div class="fl-state fl-state-error" role="alert">
+        <p class="fl-state-text">{{ servicesError() }}</p>
+        <button type="button" class="fl-btn fl-btn-secondary" (click)="retryServices()"
+          data-testid="register-services-retry">
+          Try again
+        </button>
+      </div>
+      <button type="button" class="fl-btn fl-btn-primary fl-btn-block"
+        (click)="continueFromServices()" data-testid="register-services-continue">
+        Continue
+      </button>
+    } @else {
+      <p class="fl-hint" data-testid="register-services-count">
+        @if (selectedCount() === 0) {
+          No services selected yet. You can continue and add them later.
+        } @else {
+          {{ selectedCount() }} service{{ selectedCount() === 1 ? '' : 's' }} selected.
+        }
+      </p>
+
+      @for (group of servicesByCategory(); track group.name) {
+        <fieldset class="fl-sv-group">
+          <legend class="fl-sv-legend">
+            <label class="fl-sv-category">
+              <input type="checkbox" [checked]="isCategorySelected(group.services[0]!.categoryId)"
+                (change)="toggleCategory(group.services[0]!.categoryId)"
+                [attr.data-testid]="'register-category-' + group.services[0]!.categoryId" />
+              <span>{{ group.name }}</span>
+            </label>
+          </legend>
+          <div class="fl-sv-options">
+            @for (service of group.services; track service.id) {
+              <label class="fl-sv-option" [class.fl-sv-option-selected]="isServiceSelected(service.id)">
+                <input type="checkbox" [checked]="isServiceSelected(service.id)"
+                  (change)="toggleService(service.id)"
+                  [attr.data-testid]="'register-service-' + service.id" />
+                <span class="fl-sv-option-name">{{ service.name }}</span>
+                @if (service.description) {
+                  <span class="fl-sv-option-description">{{ service.description }}</span>
+                }
+              </label>
+            }
+          </div>
+        </fieldset>
+      }
+
+      <p class="fl-form-note">
+        Prices are not set here. Add a starting call-out price for each service from My Services
+        once you are signed in.
+      </p>
+
+      <button type="button" class="fl-btn fl-btn-primary fl-btn-block"
+        data-testid="register-services-continue" (click)="continueFromServices()">
+        {{ selectedCount() === 0 ? 'Skip for now' : 'Continue' }}
+      </button>
+
+      <button type="button" class="fl-btn fl-btn-secondary fl-btn-block"
+        (click)="back()" data-testid="register-back">
+        Back
+      </button>
+    }
+    </div>
   }
 </app-auth-shell>

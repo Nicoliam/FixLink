@@ -1,0 +1,27 @@
+/*
+ * One area is three text inputs plus a remove button. A fieldset/legend gives
+ * assistive technology a per-area group, and a grid keeps them on one row on a
+ * desktop without a fixed width — the inputs share the space rather than
+ * reserving fixed columns, so the longest value never gets clipped.
+ */
+.fl-areas-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border: 1px solid var(--fl-border);
+  border-radius: var(--fl-radius-control);
+}
+
+.fl-areas-row .fl-field {
+  margin-bottom: 0;
+}
+
+/* Mobile: stack. Three side-by-side inputs on a phone are unusable. */
+@media (max-width: 640px) {
+  .fl-areas-row {
+    grid-template-columns: 1fr;
+  }
+}

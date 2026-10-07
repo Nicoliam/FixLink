@@ -16,6 +16,30 @@ interface AccountStats {
   totalSpent: number;
 }
 
+/**
+ * The visual identity of one overview card: a Material Symbols icon, a colour
+ * modifier, and a short action label.
+ *
+ * The icon and label exist so the card is identifiable WITHOUT its colour.
+ * Colour alone would fail WCAG 1.4.1 (use of colour) and would leave the four
+ * cards indistinguishable to a screen-reader user, who hears neither.
+ */
+interface StatCard {
+  /** Extra class on the anchor, e.g. `fl-stat--blue`, which sets the accent. */
+  tone: string;
+  icon: string;
+  label: string;
+  value: string;
+  /** Appended to the accessible name, e.g. "Total jobs, 3. View your requests." */
+  action: string;
+  /**
+   * Where the card goes. Always set: a card that goes nowhere should not be
+   * rendered as a link at all, and defaulting to `[]` would silently send the
+   * user home.
+   */
+  href: string[];
+}
+
 interface CompletedJobDisplay {
   id: string;
   reference: string;
@@ -52,6 +76,70 @@ export class AccountComponent {
   protected readonly isTechnician = computed(() => this.hasRole('TECHNICIAN'));
   protected readonly isAdmin = computed(() => this.hasRole('ADMIN'));
 
+  /**
+   * Where the job cards link, by role.
+   *
+   * Each role reads a different job list, so "click the card" has to mean a
+   * different destination per role. Resolved here rather than in the template
+   * so the routing decision is one readable table instead of conditionals
+   * scattered through markup.
+   *
+   * Deliberately UNFILTERED. `/my-jobs` and `/requests` ignore query
+   * parameters entirely, so `?status=COMPLETED` would silently do nothing and
+   * look like a broken filter. Wiring real filtering is separate work — see the
+   * report on the "Completed" card being permanently 0 for professionals.
+   */
+  private readonly jobListRoute = computed<string[]>(() => {
+    if (this.isBusiness()) return ['/business/jobs'];
+    if (this.isTechnician()) return ['/technician/jobs'];
+    if (this.isProvider()) return ['/requests'];
+    return ['/my-jobs'];
+  });
+
+  /**
+   * The overview cards, rebuilt from the loaded stats.
+   *
+   * "Total spent" is only offered to a CUSTOMER. It was previously shown to
+   * professionals too, where it is always R0 and reads backwards: a
+   * professional earns money, they do not spend it through Fixlynk. An
+   * always-zero card is worse than no card.
+   */
+  protected readonly statCards = computed<StatCard[]>(() => {
+    const s = this.stats();
+    if (!s) return [];
+    const href = this.jobListRoute();
+    const cards: StatCard[] = [
+      { tone: 'blue', icon: 'work', label: 'Total jobs', value: String(s.totalJobs), action: 'View all jobs', href },
+      {
+        tone: 'green',
+        icon: 'task_alt',
+        label: 'Completed',
+        value: String(s.completedJobs),
+        action: 'View all jobs',
+        href,
+      },
+      {
+        tone: 'amber',
+        icon: 'pending_actions',
+        label: 'In progress',
+        value: String(s.inProgressJobs),
+        action: 'View all jobs',
+        href,
+      },
+    ];
+    if (this.isCustomer()) {
+      cards.push({
+        tone: 'teal',
+        icon: 'payments',
+        label: 'Total spent',
+        value: this.formatZar(s.totalSpent),
+        action: 'View your jobs',
+        href,
+      });
+    }
+    return cards;
+  });
+
   protected readonly memberSince = computed(() => {
     const created = this.currentUser()?.createdAt;
     if (!created) return '';
@@ -59,6 +147,11 @@ export class AccountComponent {
   });
 
   constructor() {
+    void this.loadAccountData();
+  }
+
+  /** Re-run the role-specific load after a failure (see the error state's "Try again"). */
+  retry(): void {
     void this.loadAccountData();
   }
 
@@ -89,7 +182,7 @@ export class AccountComponent {
   }
 
   private async loadCustomerData(): Promise<void> {
-    const list = await this.jobsApi.listMyJobs(1, 100).toPromise();
+    const list = await this.jobsApi.listMyJobs(1, 50).toPromise();
     const jobs = list?.items ?? [];
     const completed = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CONFIRMED' || j.status === 'CLOSED');
     const inProgress = jobs.filter((j) => ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS', 'AWAITING_PARTS'].includes(j.status));
@@ -108,7 +201,7 @@ export class AccountComponent {
   }
 
   private async loadProviderData(): Promise<void> {
-    const list = await this.jobsApi.listProviderRequests(1, 100).toPromise();
+    const list = await this.jobsApi.listProviderRequests(1, 50).toPromise();
     const jobs = list?.items ?? [];
     const completed = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CONFIRMED' || j.status === 'CLOSED');
     const inProgress = jobs.filter((j) => ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS', 'AWAITING_PARTS'].includes(j.status));
@@ -134,7 +227,7 @@ export class AccountComponent {
   }
 
   private async loadBusinessData(): Promise<void> {
-    const list = await this.businessApi.listBusinessJobs({ page: 1, pageSize: 100 }).toPromise();
+    const list = await this.businessApi.listBusinessJobs({ page: 1, pageSize: 50 }).toPromise();
     const jobs = list?.items ?? [];
     const completed = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CONFIRMED' || j.status === 'CLOSED');
     const inProgress = jobs.filter((j) => ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS', 'AWAITING_PARTS'].includes(j.status));
@@ -152,7 +245,7 @@ export class AccountComponent {
   }
 
   private async loadTechnicianData(): Promise<void> {
-    const list = await this.technicianApi.listMyJobs({ page: 1, pageSize: 100 }).toPromise();
+    const list = await this.technicianApi.listMyJobs({ page: 1, pageSize: 50 }).toPromise();
     const jobs = list?.items ?? [];
     const completed = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CONFIRMED' || j.status === 'CLOSED');
     const inProgress = jobs.filter((j) => ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS', 'AWAITING_PARTS'].includes(j.status));
@@ -194,11 +287,11 @@ export class AccountComponent {
   }
 
   protected formatZar(amount: number | null): string {
-    return amount ? formatZar(amount) : '—';
+    return amount ? formatZar(amount) : '-';
   }
 
   protected formatDate(iso: string | null): string {
-    if (!iso) return '—';
+    if (!iso) return '-';
     return new Date(iso).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 

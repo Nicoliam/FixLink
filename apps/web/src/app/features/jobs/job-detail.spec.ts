@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { JobDetailComponent } from './job-detail';
@@ -20,8 +20,14 @@ const job: Job = {
   source: 'MARKETPLACE',
   status: 'REQUESTED',
   customerId: '1',
-  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
-  service: { id: '1', name: 'Leak Repair & Pipe Fixes', slug: 'leak-repair' },
+  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu - ProPlumb' },
+  service: {
+    id: '1',
+    name: 'Leak Repair & Pipe Fixes',
+    slug: 'leak-repair',
+    categoryId: '1',
+    categoryName: 'Plumbing',
+  },
   description: 'Kitchen mixer tap leaking at the base and the cupboard floor is damp.',
   location: 'Fourways, Johannesburg',
   city: null,
@@ -35,7 +41,7 @@ const job: Job = {
 const submittedQuote: Quote = {
   id: '11',
   jobId: '7',
-  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
+  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu - ProPlumb' },
   total: 1250,
   currency: 'ZAR',
   message: 'Supply and install replacement kitchen mixer tap.',
@@ -77,7 +83,12 @@ describe('JobDetailComponent', () => {
     fixture.detectChanges();
   }
 
-  function apiWith(current: Job, accept: ReturnType<typeof vi.fn> = vi.fn()): Record<string, ReturnType<typeof vi.fn>> {
+  function apiWith(
+    current: Job,
+    accept: ReturnType<typeof vi.fn> = vi.fn(),
+    updateJob: ReturnType<typeof vi.fn> = vi.fn(),
+    cancelJob: ReturnType<typeof vi.fn> = vi.fn(),
+  ): Record<string, ReturnType<typeof vi.fn>> {
     return {
       getJob: vi.fn().mockReturnValue(of(current)),
       acceptQuote: accept,
@@ -85,11 +96,152 @@ describe('JobDetailComponent', () => {
       listJobUpdates: vi.fn().mockReturnValue(of([])),
       getJobTimeline: vi.fn().mockReturnValue(of({ job: current, events: [] })),
       confirmJob: vi.fn(),
+      // Step 15 - customer controls. Default to "not called" so a test that
+      // forgets to stub one fails loudly rather than throwing on undefined.
+      updateJob,
+      cancelJob,
+      deleteJob: vi.fn(),
       // Blob loading fails by default so jsdom never needs createObjectURL
       // unless a test opts into photo rendering explicitly.
       fetchImageBlob: vi.fn().mockReturnValue(throwError(() => new Error('no blob'))),
     };
   }
+
+  describe('Step 15 - customer edit, cancel and delete', () => {
+    async function setupMutable(api: Record<string, ReturnType<typeof vi.fn>>): Promise<HTMLButtonElement[]> {
+      await setup('7', api);
+      return [...(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)];
+    }
+
+    function text(): string {
+      return (fixture.nativeElement as HTMLElement).textContent ?? '';
+    }
+
+    function input(selector: string): HTMLInputElement | HTMLTextAreaElement {
+      return fixture.nativeElement.querySelector(selector) as HTMLInputElement;
+    }
+
+    it('offers edit, cancel and remove on a REQUESTED job', async () => {
+      await setupMutable(apiWith(job));
+      expect(text()).toContain('Edit request');
+      expect(text()).toContain('Cancel request');
+      expect(text()).toContain('Remove request');
+    });
+
+    it('hides all three once a quote has been accepted, because the work is now agreed', async () => {
+      await setupMutable(apiWith(acceptedJob));
+      expect(text()).not.toContain('Edit request');
+      expect(text()).not.toContain('Cancel request');
+      expect(text()).not.toContain('Remove request');
+    });
+
+    it('prefills the edit form with the current values', async () => {
+      await setupMutable(apiWith(job));
+      buttonWithText('Edit request')?.click();
+      fixture.detectChanges();
+      expect((input('#edit-description') as HTMLTextAreaElement).value).toBe(job.description);
+      expect(input('#edit-location').value).toBe(job.location);
+      expect(input('#edit-date').value).toBe(job.preferredDate);
+    });
+
+    it('sends only the editable fields, and never a preferredTime it cannot show', async () => {
+      const updateJob = vi.fn().mockReturnValue(of({ job, quotedRequestsChanged: false }));
+      await setupMutable(apiWith(job, vi.fn(), updateJob));
+      buttonWithText('Edit request')?.click();
+      fixture.detectChanges();
+
+      input('#edit-description').value = 'Kitchen mixer tap replaced and the cupboard floor dried.';
+      input('#edit-location').value = 'Randburg';
+      input('#edit-date').value = '';
+      input('#edit-description').dispatchEvent(new Event('input'));
+      input('#edit-location').dispatchEvent(new Event('input'));
+      input('#edit-date').dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
+      buttonWithText('Save changes')?.click();
+      fixture.detectChanges();
+
+      expect(updateJob).toHaveBeenCalledTimes(1);
+      const payload = updateJob.mock.calls[0][1] as Record<string, unknown>;
+      expect(payload['location']).toBe('Randburg');
+      // Blank date is sent as null so the preference is actually cleared.
+      expect(payload['preferredDate']).toBeNull();
+      // The trap this guards: the API never returns preferredTime, so sending
+      // it would erase a preference the customer cannot see.
+      expect('preferredTime' in payload).toBe(false);
+    });
+
+    it('warns the customer when an edit leaves live quotes priced on the old details', async () => {
+      const stale = { ...job, description: 'Kitchen mixer tap replaced and the cupboard floor dried.' };
+      const updateJob = vi.fn().mockReturnValue(of({ job: stale, quotedRequestsChanged: true }));
+      await setupMutable(apiWith(job, vi.fn(), updateJob));
+      buttonWithText('Edit request')?.click();
+      fixture.detectChanges();
+      buttonWithText('Save changes')?.click();
+      fixture.detectChanges();
+      expect(text()).toContain('were priced on');
+    });
+
+    it('cancels only after an explicit confirmation, and shows the CANCELLED job', async () => {
+      const cancelled: Job = { ...job, status: 'CANCELLED' };
+      const cancelJob = vi.fn().mockReturnValue(of(cancelled));
+      await setupMutable(apiWith(job, vi.fn(), vi.fn(), cancelJob));
+
+      buttonWithText('Cancel request')?.click();
+      fixture.detectChanges();
+      // The first click only asks; nothing has been sent yet.
+      expect(cancelJob).not.toHaveBeenCalled();
+      expect(text()).toContain('Cancel this request?');
+
+      buttonWithText('Yes, cancel it')?.click();
+      fixture.detectChanges();
+      expect(cancelJob).toHaveBeenCalledWith('7');
+      expect(text()).toContain('Cancelled');
+    });
+
+    it('lets the customer back out of the cancel confirmation', async () => {
+      const cancelJob = vi.fn();
+      await setupMutable(apiWith(job, vi.fn(), vi.fn(), cancelJob));
+      buttonWithText('Cancel request')?.click();
+      fixture.detectChanges();
+      buttonWithText('Keep the request')?.click();
+      fixture.detectChanges();
+      expect(cancelJob).not.toHaveBeenCalled();
+      expect(text()).not.toContain('Cancel this request?');
+    });
+
+    it('deletes only after confirmation and returns to the job list', async () => {
+      const deleteJob = vi.fn().mockReturnValue(of({ deleted: true }));
+      const api = apiWith(job, vi.fn(), vi.fn(), vi.fn());
+      api['deleteJob'] = deleteJob;
+      await setupMutable(api);
+      // Spy rather than read Router.url: navigation resolves asynchronously, so
+      // asserting the URL right after click() would be a race.
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+      buttonWithText('Remove request')?.click();
+      fixture.detectChanges();
+      expect(deleteJob).not.toHaveBeenCalled();
+
+      buttonWithText('Yes, remove it')?.click();
+      fixture.detectChanges();
+      expect(deleteJob).toHaveBeenCalledWith('7');
+      // A deleted job must not leave the user staring at a 404.
+      expect(navigate).toHaveBeenCalledWith(['/my-jobs']);
+    });
+
+    it('surfaces an API failure instead of pretending the change worked', async () => {
+      const cancelJob = vi.fn().mockReturnValue(
+        throwError(() => ({ error: { error: { code: 'CONFLICT', message: 'This job is no longer cancellable.' } } })),
+      );
+      await setupMutable(apiWith(job, vi.fn(), vi.fn(), cancelJob));
+      buttonWithText('Cancel request')?.click();
+      fixture.detectChanges();
+      buttonWithText('Yes, cancel it')?.click();
+      fixture.detectChanges();
+      expect(text()).toContain('This job is no longer cancellable.');
+    });
+  });
 
   function buttonWithText(text: string): HTMLButtonElement | null {
     const buttons = [...(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)];
@@ -105,7 +257,7 @@ describe('JobDetailComponent', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('FL-2026-000007');
     expect(text).toContain('Leak Repair & Pipe Fixes');
-    expect(text).toContain('Sipho Ndlovu — ProPlumb');
+    expect(text).toContain('Sipho Ndlovu - ProPlumb');
     expect(text).toContain('Requested');
     expect(text).toContain('Fourways, Johannesburg');
   });
@@ -154,7 +306,7 @@ describe('JobDetailComponent', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Quote accepted');
     expect(text).toContain('Accepted');
-    expect(text).toContain('Sipho Ndlovu — ProPlumb');
+    expect(text).toContain('Sipho Ndlovu - ProPlumb');
     expect(text).toContain('Agreed price: R1,250');
     expect(text).toContain('Payment is arranged directly with the professional.');
     expect(buttonWithText('Accept Quote')).toBeNull();
@@ -233,7 +385,7 @@ describe('JobDetailComponent', () => {
     expect((fixture.nativeElement.textContent as string)).toContain('Something went wrong');
   });
 
-  describe('Stage 6E — scheduled and in-progress states (read-only)', () => {
+  describe('Stage 6E - scheduled and in-progress states (read-only)', () => {
     const scheduledJob: Job = {
       ...acceptedJob,
       status: 'SCHEDULED',
@@ -257,7 +409,7 @@ describe('JobDetailComponent', () => {
       expect(text).toContain('Scheduled');
       // The stored instant renders as the SAST wall time the provider picked.
       expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
-      expect(text).toContain('Sipho Ndlovu — ProPlumb');
+      expect(text).toContain('Sipho Ndlovu - ProPlumb');
       expect(text).toContain('Agreed price: R1,250');
       expect(text).toContain('Payment is arranged directly with the professional.');
     });
@@ -268,7 +420,7 @@ describe('JobDetailComponent', () => {
       expect(text).toContain('In progress');
       expect(text).toContain('has started the job');
       expect(text).toContain('Scheduled: 5 October 2026 at 10:00');
-      expect(text).toContain('Sipho Ndlovu — ProPlumb');
+      expect(text).toContain('Sipho Ndlovu - ProPlumb');
       expect(text).toContain('Agreed price: R1,250');
     });
 
@@ -283,7 +435,7 @@ describe('JobDetailComponent', () => {
     });
   });
 
-  describe('Stage 6F — work documentation, confirmation and closure (read-only)', () => {
+  describe('Stage 6F - work documentation, confirmation and closure (read-only)', () => {
     const inProgressJob: Job = {
       ...acceptedJob,
       status: 'IN_PROGRESS',
@@ -332,6 +484,7 @@ describe('JobDetailComponent', () => {
       jobId: '7',
       uploadedBy: '2',
       phase: 'BEFORE',
+      context: 'WORK',
       originalFilename: 'before.png',
       mimeType: 'image/png',
       size: 1234,

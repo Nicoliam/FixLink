@@ -70,7 +70,7 @@ const summary: BusinessJobsSummary = {
   cancelled: 1,
 };
 
-describe('BusinessService — Stage 7B customers and internal jobs', () => {
+describe('BusinessService - Stage 7B customers and internal jobs', () => {
   let service: BusinessService;
   let httpMock: HttpTestingController;
 

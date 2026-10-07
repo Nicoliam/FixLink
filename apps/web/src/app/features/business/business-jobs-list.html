@@ -132,7 +132,7 @@
           <p class="fl-card-text">Scheduled: {{ scheduledLabel(job) }}</p>
           <p class="fl-card-text">Created {{ job.createdAt }}</p>
           @if (job.status === 'AWAITING_PARTS') {
-            <p class="fl-card-text"><strong>Awaiting parts — {{ partsLabel(job) }}</strong></p>
+            <p class="fl-card-text"><strong>Awaiting parts - {{ partsLabel(job) }}</strong></p>
           } @else if (job.partsOutstanding > 0) {
             <p class="fl-card-text">{{ partsLabel(job) }}</p>
           }

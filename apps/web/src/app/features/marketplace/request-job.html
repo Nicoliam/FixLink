@@ -1,133 +1,531 @@
 <div class="fl-page fl-page-narrow">
   <nav aria-label="Breadcrumb">
-    <a class="fl-link" routerLink="/marketplace">← Back to marketplace</a>
+    <a class="fl-link" routerLink="/my-jobs">← Back to My Jobs</a>
   </nav>
 
   <p class="fl-eyebrow">Request a job</p>
-  <h1 class="fl-page-title">Tell us what needs fixing</h1>
-  <p class="fl-page-subtitle">Payment is arranged directly with your professional — Fixlynk never charges you here.</p>
+  <h1 class="fl-page-title">
+    @if (createdJob(); as job) {
+      Request sent
+    } @else {
+      Tell us what you need
+    }
+  </h1>
+  <p class="fl-page-subtitle">
+    Four transparent steps, with no surprises. You can go back and change anything before sending.
+  </p>
 
-  @if (createdJob(); as job) {
-    <div class="fl-success" role="status">
-      <span class="fl-success-badge" aria-hidden="true">✓</span>
-      <p class="fl-success-title">Job request submitted</p>
-      <p class="fl-success-text">
-        Your request has been sent to {{ job.provider.name }}.
-        Reference {{ job.reference }} · {{ serviceName(job.service.id) }} · Status: Requested.
-        @if (job.preferredDate) {
-          Preferred date: {{ job.preferredDate }}.
-        }
-      </p>
-      <p>
-        <a class="fl-link" [routerLink]="['/my-jobs', job.id]">View this request</a>
-        ·
-        <a class="fl-link" routerLink="/my-jobs">Go to My Jobs</a>
-      </p>
-    </div>
-  } @else {
-    @if (providerLoading()) {
-      <div class="fl-card" role="status"><p class="fl-card-text">Loading provider…</p></div>
-    } @else if (provider(); as selected) {
-      <div class="fl-card fl-provider-summary">
-        <div>
-          <p class="fl-card-label">Requesting</p>
-          <p class="fl-card-title">
-            <a class="fl-link" [routerLink]="['/marketplace/providers', selected.id]">{{ selected.name }}</a>
-          </p>
-          @if (selected.isVerified) {
-            <span class="fl-pill fl-pill-verified">✓ Verified</span>
+  <!-- STEP INDICATOR -->
+  <ol class="fl-wizard-steps" aria-label="Request progress">
+    @for (item of steps; track item.number; let index = $index) {
+      <li
+        class="fl-wizard-step"
+        [class.is-current]="step() === index + 1"
+        [class.is-done]="step() > index + 1"
+        [attr.aria-current]="step() === index + 1 ? 'step' : null"
+      >
+        <span class="fl-wizard-step-number" aria-hidden="true">
+          @if (step() > index + 1) {
+            <span class="material-symbols-outlined">check</span>
+          } @else {
+            {{ item.number }}
           }
+        </span>
+        <span class="fl-wizard-step-label">
+          <span class="material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+          {{ item.title }}
+        </span>
+      </li>
+    }
+  </ol>
+
+  @if (submitError()) {
+    <p class="fl-alert fl-alert-error" role="alert">{{ submitError() }}</p>
+  }
+
+  <!-- STEP 01 - TELL US WHAT YOU NEED -->
+  @if (step() === 1) {
+    <form class="fl-card fl-form" [formGroup]="form" (ngSubmit)="goToProviderStep()">
+      <div class="fl-step-intro">
+        <div class="fl-step-intro-icon" aria-hidden="true">
+          <span class="material-symbols-outlined">edit_note</span>
+        </div>
+        <div>
+          <h2 class="fl-card-title">Tell us what you need</h2>
+          <p class="fl-card-text">
+            Describe your job and upload photos so the professional can assess the scope accurately.
+          </p>
         </div>
       </div>
-    } @else if (providerMissing()) {
-      <div class="fl-card" role="status">
-        <p class="fl-card-text">
-          No provider selected yet. <a class="fl-link" routerLink="/marketplace">Browse the marketplace</a>
-          and choose “Request a job” on a profile.
-        </p>
-      </div>
-    } @else {
-      <div class="fl-card" role="status">
-        <p class="fl-card-text">
-          We could not load that provider.
-          <a class="fl-link" routerLink="/marketplace">Choose a different provider</a>
-        </p>
-      </div>
-    }
 
-    <form class="fl-card fl-form" [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Request a job">
       <div class="fl-field">
-        <label class="fl-label" for="rj-service">Service</label>
-        <select id="rj-service" class="fl-input" formControlName="serviceId" [attr.aria-invalid]="fieldInvalid('serviceId')">
-          <option value="">Select a service…</option>
-          @for (option of services(); track option.id) {
-            <option [value]="option.id">{{ option.name }} ({{ option.categoryName }})</option>
+        <label class="fl-label" for="fl-service">Service <span aria-hidden="true">*</span></label>
+        <select
+          class="fl-input"
+          id="fl-service"
+          formControlName="serviceId"
+          [attr.aria-invalid]="fieldInvalid('serviceId')"
+          [attr.aria-describedby]="fieldInvalid('serviceId') ? 'fl-service-error' : null"
+        >
+          <option value="">Choose a service</option>
+          @for (service of services(); track service.id) {
+            <option [value]="service.id">{{ service.name }}</option>
           }
         </select>
         @if (fieldInvalid('serviceId')) {
-          <p class="fl-field-error" role="alert">Please choose a service.</p>
+          <p class="fl-field-error" id="fl-service-error">Choose the service you need.</p>
         }
       </div>
 
       <div class="fl-field">
-        <label class="fl-label" for="rj-description">Describe the work</label>
+        <label class="fl-label" for="fl-description">
+          Describe the work <span aria-hidden="true">*</span>
+        </label>
         <textarea
-          id="rj-description"
           class="fl-input"
-          rows="4"
+          id="fl-description"
+          rows="5"
           formControlName="description"
-          placeholder="What needs fixing, where is it, and anything the professional should know…"
+          placeholder="What needs doing, where, and anything the professional should know."
           [attr.aria-invalid]="fieldInvalid('description')"
+          [attr.aria-describedby]="fieldInvalid('description') ? 'fl-description-error' : null"
         ></textarea>
+        <p class="fl-optional">At least 20 characters.</p>
         @if (fieldInvalid('description')) {
-          <p class="fl-field-error" role="alert">Please describe the work (at least 20 characters).</p>
+          <p class="fl-field-error" id="fl-description-error">
+            Describe the work in at least 20 characters.
+          </p>
         }
       </div>
 
       <div class="fl-field">
-        <label class="fl-label" for="rj-location">Suburb / Location</label>
+        <label class="fl-label" for="fl-photos">
+          Photos of the problem <span class="fl-optional">(optional)</span>
+        </label>
         <input
-          id="rj-location"
           class="fl-input"
+          id="fl-photos"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          [disabled]="!canAddPhotos()"
+          (change)="onPhotosSelected($event)"
+          aria-describedby="fl-photos-hint"
+          data-testid="request-photos"
+        />
+        <p class="fl-optional" id="fl-photos-hint">
+          Up to {{ maxRequestPhotos }} photos, 5MB each. JPEG, PNG or WebP. Photos are sent with your request so the
+          professional can quote accurately.
+        </p>
+        @if (photoError()) {
+          <p class="fl-field-error" role="alert">{{ photoError() }}</p>
+        }
+        @if (photoCount() > 0) {
+          <ul class="fl-wizard-photos" aria-label="Photos you will send">
+            @for (photo of photos(); track photo.url; let i = $index) {
+              <li class="fl-wizard-photo">
+                <img [src]="photo.url" [alt]="'Selected photo ' + (i + 1)" />
+                <button
+                  type="button"
+                  class="fl-wizard-photo-remove"
+                  (click)="removePhoto(i)"
+                  [attr.aria-label]="'Remove photo ' + (i + 1)"
+                >
+                  <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <div class="fl-field">
+        <label class="fl-label" for="fl-location">Location <span aria-hidden="true">*</span></label>
+        <input
+          class="fl-input"
+          id="fl-location"
           type="text"
           formControlName="location"
-          placeholder="Fourways, Johannesburg"
-          autocomplete="off"
+          placeholder="Suburb and street address"
           [attr.aria-invalid]="fieldInvalid('location')"
+          [attr.aria-describedby]="fieldInvalid('location') ? 'fl-location-error' : null"
         />
         @if (fieldInvalid('location')) {
-          <p class="fl-field-error" role="alert">Please add the job location.</p>
+          <p class="fl-field-error" id="fl-location-error">Tell us where the work is needed.</p>
         }
       </div>
 
-      <div class="fl-field">
-        <label class="fl-label" for="rj-date">Preferred date <span class="fl-optional">(optional)</span></label>
-        <input id="rj-date" class="fl-input" type="date" formControlName="preferredDate" />
+      <div class="fl-field-row">
+        <div class="fl-field">
+          <label class="fl-label" for="fl-date">Preferred date</label>
+          <input class="fl-input" id="fl-date" type="date" formControlName="preferredDate" />
+        </div>
+        <div class="fl-field">
+          <label class="fl-label" for="fl-time">Preferred time</label>
+          <input class="fl-input" id="fl-time" type="time" formControlName="preferredTime" />
+        </div>
       </div>
 
-      <div class="fl-field">
-        <label class="fl-label" for="rj-time">Preferred time <span class="fl-optional">(optional)</span></label>
-        <input id="rj-time" class="fl-input" type="time" formControlName="preferredTime" />
+      <div class="fl-form-actions">
+        <button type="submit" class="fl-btn fl-btn-primary">
+          Find a professional
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+        </button>
+      </div>
+    </form>
+  }
+
+  <!-- STEP 02 - FIND THE RIGHT PROFESSIONAL -->
+  @if (step() === 2) {
+    <section class="fl-card" aria-labelledby="fl-step-two-heading">
+      <div class="fl-step-intro">
+        <div class="fl-step-intro-icon" aria-hidden="true">
+          <span class="material-symbols-outlined">badge</span>
+        </div>
+        <div>
+          <h2 id="fl-step-two-heading" class="fl-card-title">Find the right professional</h2>
+          <p class="fl-card-text">
+            Choose one and your request goes straight to them - or skip this step and let professionals
+            working in your area come to you.
+          </p>
+          <p class="fl-optional">This step is optional.</p>
+        </div>
       </div>
 
-      <div class="fl-field">
-        <label class="fl-label" for="rj-photo">Photos <span class="fl-optional">(optional)</span></label>
-        <input id="rj-photo" class="fl-input" type="file" accept="image/*" multiple disabled aria-describedby="rj-photo-help" />
-        <p id="rj-photo-help" class="fl-form-note">Photo uploads arrive in a later stage — describe anything visual above for now.</p>
-      </div>
-
-      @if (submitError()) {
-        <p class="fl-field-error" role="alert">{{ submitError() }}</p>
+      <!-- The current choice is always visible, whichever route got us here. -->
+      @if (selected(); as chosen) {
+        <div class="fl-wizard-chosen">
+          <div>
+            <p class="fl-card-label">Selected professional</p>
+            <p class="fl-wizard-chosen-name">{{ chosen.name }}</p>
+          </div>
+          <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="goToReview()">
+            Continue
+          </button>
+        </div>
+      } @else {
+        <!--
+          The skip path is offered up front, not as an afterthought after a long
+          list of professionals. A customer with no saved pro and no strong
+          preference should be able to finish the wizard in a minute.
+        -->
+        <div class="fl-wizard-chosen is-open">
+          <div>
+            <p class="fl-card-label">No professional chosen</p>
+            <p class="fl-wizard-chosen-name">Let matching professionals come to you</p>
+          </div>
+          <button type="button" class="fl-btn fl-btn-primary fl-btn-sm" (click)="chooseForMe()">
+            Skip this step
+          </button>
+        </div>
       }
 
-      <button class="fl-btn fl-btn-primary fl-btn-block" type="submit" [disabled]="submitting()">
-        @if (submitting()) {
-          Submitting…
-        } @else {
-          Submit request
+      <!-- Saved professionals, only when the customer has any -->
+      @if (hasSaved()) {
+        <div class="fl-wizard-saved">
+          <h3 class="fl-card-label">Your saved professionals</h3>
+          <ul class="fl-wizard-saved-list">
+            @for (provider of savedProviders(); track provider.id) {
+              <li>
+                <button
+                  type="button"
+                  class="fl-wizard-saved-item"
+                  [class.is-selected]="selected()?.id === provider.id"
+                  [attr.aria-pressed]="selected()?.id === provider.id"
+                  (click)="choose(provider)"
+                >
+                  <span class="fl-provider-avatar" aria-hidden="true">{{ provider.name.charAt(0).toUpperCase() }}</span>
+                  <span class="fl-wizard-saved-body">
+                    <span class="fl-wizard-saved-name">{{ provider.name }}</span>
+                    <span class="fl-wizard-saved-meta">
+                      @if (provider.ratingCount > 0) {
+                        ★ {{ provider.ratingAvg.toFixed(1) }} ({{ provider.ratingCount }})
+                      } @else {
+                        New on Fixlynk
+                      }
+                      @if (provider.approvedCertificateCount > 0) {
+                        · {{ provider.approvedCertificateCount }} certified
+                      }
+                    </span>
+                  </span>
+                  <span class="material-symbols-outlined" aria-hidden="true">
+                    {{ selected()?.id === provider.id ? 'check_circle' : 'chevron_right' }}
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
+      } @else if (savedStatus() === 'error') {
+        <p class="fl-card-text" role="status">
+          Your saved professionals could not be loaded. Search below instead.
+        </p>
+      }
+
+      <!-- Search. A div rather than a form: there are no form controls here,
+           only a single query box, so a button + Enter handler is enough. -->
+      <div class="fl-wizard-search">
+        <div class="fl-field">
+          <label class="fl-label" for="fl-provider-search">Search professionals</label>
+          <div class="fl-wizard-search-row">
+            <input
+              class="fl-input"
+              id="fl-provider-search"
+              type="search"
+              [value]="providerSearch()"
+              (input)="providerSearch.set($any($event.target).value)"
+              (keyup.enter)="searchProviders()"
+              placeholder="Service, trade or name"
+            />
+            <button type="button" class="fl-btn fl-btn-secondary" (click)="searchProviders()">
+              <span class="material-symbols-outlined" aria-hidden="true">search</span>
+              Search
+            </button>
+          </div>
+          @if (serviceName()) {
+            <p class="fl-optional">Showing professionals offering {{ serviceName() }}.</p>
+          }
+        </div>
+      </div>
+
+      @if (providerStatus() === 'loading') {
+        <div class="fl-state" role="status">
+          <p>Loading professionals…</p>
+        </div>
+      } @else if (providerStatus() === 'error') {
+        <div class="fl-state fl-state-error" role="alert">
+          <p class="fl-state-text">{{ providerError() }}</p>
+          <button type="button" class="fl-btn fl-btn-secondary" (click)="retrySearch()">Try again</button>
+        </div>
+      } @else if (providerStatus() === 'empty') {
+        <div class="fl-state" role="status">
+          <h3 class="fl-state-title">No professionals found</h3>
+          <p class="fl-state-text">Try a different search term, or go back and change the service.</p>
+          <a class="fl-btn fl-btn-secondary" routerLink="/marketplace">Browse the marketplace</a>
+        </div>
+      } @else {
+        <ul class="fl-provider-grid" aria-label="Search results">
+          @for (provider of results(); track provider.id) {
+            <li>
+              <article class="fl-provider-card" [class.is-selected]="selected()?.id === provider.id">
+                <div class="fl-provider-top">
+                  <span class="fl-provider-avatar" aria-hidden="true">{{ provider.name.charAt(0).toUpperCase() }}</span>
+                  <div class="fl-provider-heading">
+                    <h3 class="fl-provider-name">
+                      <a [routerLink]="['/marketplace/providers', provider.id]">{{ provider.name }}</a>
+                    </h3>
+                    <p class="fl-provider-meta">
+                      {{ provider.providerType === 'business' ? 'Service business' : 'Professional' }}
+                      @if (provider.city) {
+                        · {{ provider.city }}
+                      }
+                    </p>
+                  </div>
+                </div>
+                <div class="fl-provider-badges">
+                  @if (provider.isVerified) {
+                    <span class="fl-pill fl-pill-verified">✓ Verified</span>
+                  }
+                  @if (provider.ratingCount > 0) {
+                    <span class="fl-provider-rating">
+                      ★ {{ provider.ratingAvg.toFixed(1) }} ({{ provider.ratingCount }})
+                    </span>
+                  }
+                </div>
+                <div class="fl-provider-foot">
+                  <a class="fl-btn fl-btn-secondary fl-btn-sm" [routerLink]="['/marketplace/providers', provider.id]">
+                    View profile
+                  </a>
+                  <button
+                    type="button"
+                    class="fl-btn fl-btn-sm"
+                    [class.fl-btn-primary]="selected()?.id !== provider.id"
+                    [class.fl-btn-secondary]="selected()?.id === provider.id"
+                    (click)="choose(provider)"
+                  >
+                    {{ selected()?.id === provider.id ? 'Selected' : 'Select' }}
+                  </button>
+                </div>
+              </article>
+            </li>
+          }
+        </ul>
+      }
+
+      <!--
+        Two forward actions, because they are two genuinely different choices:
+        review a specific professional, or post an open request. Collapsing them
+        into one disabled-until-valid button (the previous design) made the
+        skip path feel like an oversight.
+      -->
+      <div class="fl-form-actions">
+        <button type="button" class="fl-btn fl-btn-secondary" (click)="backToDetails()">Back</button>
+        @if (!hasChosen()) {
+          <button type="button" class="fl-btn fl-btn-secondary" (click)="chooseForMe()">
+            Skip and let a professional come to you
+          </button>
         }
-      </button>
-      <p class="fl-form-note">Your request is sent to the professional as soon as you submit.</p>
-    </form>
+        <button type="button" class="fl-btn fl-btn-primary" (click)="goToReview()">
+          Review request
+          <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+        </button>
+      </div>
+      @if (!hasChosen()) {
+        <p class="fl-optional">
+          Skipping is fine. We will alert professionals who do {{ serviceName() || 'this kind of work' }}
+          in your area, and up to 3 quotes will reach you.
+        </p>
+      }
+    </section>
+  }
+
+  <!-- STEP 03 - REVIEW AND SEND -->
+  @if (step() === 3) {
+    <section class="fl-card" aria-labelledby="fl-step-three-heading">
+      <div class="fl-step-intro">
+        <div class="fl-step-intro-icon" aria-hidden="true">
+          <span class="material-symbols-outlined">receipt_long</span>
+        </div>
+        <div>
+          <h2 id="fl-step-three-heading" class="fl-card-title">Review and send</h2>
+          <p class="fl-card-text">
+            @if (hasChosen()) {
+              Check the details below, then send your request to the professional.
+            } @else {
+              Check the details below, then send your request to matching professionals.
+            }
+          </p>
+        </div>
+      </div>
+
+      <dl class="fl-review">
+        <div class="fl-review-row">
+          <dt>Service</dt>
+          <dd>
+            {{ serviceName() }}
+            <button type="button" class="fl-link-button" (click)="edit(1)">Change</button>
+          </dd>
+        </div>
+        <div class="fl-review-row">
+          <dt>Professional</dt>
+          <dd>
+            @if (selected(); as provider) {
+              <a class="fl-link" [routerLink]="['/marketplace/providers', provider.id]">{{ provider.name }}</a>
+            } @else {
+              <span class="fl-review-open">Any professional matching your area</span>
+            }
+            <button type="button" class="fl-link-button" (click)="changeProfessional()">Change</button>
+          </dd>
+        </div>
+        <div class="fl-review-row">
+          <dt>Work</dt>
+          <dd>
+            {{ value('description') }}
+            <button type="button" class="fl-link-button" (click)="edit(1)">Change</button>
+          </dd>
+        </div>
+        <div class="fl-review-row">
+          <dt>Location</dt>
+          <dd>
+            {{ value('location') }}
+            <button type="button" class="fl-link-button" (click)="edit(1)">Change</button>
+          </dd>
+        </div>
+        <div class="fl-review-row">
+          <dt>Preferred slot</dt>
+          <dd>{{ preferredSlot() }}</dd>
+        </div>
+      </dl>
+
+      <p class="fl-optional">
+        Sending a request is free and does not commit you to anything.
+        @if (hasChosen()) {
+          The professional sends a quote in South African Rand (ZAR) and you decide whether to accept it.
+        } @else {
+          We will alert professionals who do this work in your area. Up to 3 quotes will reach you, and
+          you decide which - if any - to accept. Quotes are in South African Rand (ZAR).
+        }
+      </p>
+
+      <div class="fl-form-actions">
+        <button type="button" class="fl-btn fl-btn-secondary" (click)="backToProviderStep()">Back</button>
+        <button type="button" class="fl-btn fl-btn-primary" [disabled]="submitting()" (click)="onSubmit()">
+          {{ submitting() ? 'Sending…' : 'Send request' }}
+        </button>
+      </div>
+    </section>
+  }
+
+  <!-- STEP 04 - WHAT HAPPENS NEXT -->
+  @if (step() === 4 && createdJob(); as job) {
+    <div class="fl-success">
+      <span class="fl-success-badge">
+        <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+      </span>
+      <!-- Step 14: an open request has no addressee, so the confirmation says who
+           was actually alerted instead of naming a professional nobody chose. -->
+      <h2 class="fl-success-title">
+        @if (job.provider; as addressee) {
+          Request sent to {{ addressee.name }}
+        } @else {
+          Request sent to matching professionals
+        }
+      </h2>
+      <p class="fl-success-text">
+        Your request {{ job.reference }} is now {{ statusLabel(job.status).toLowerCase() }}.
+        @if (job.provider) {
+          You will be notified when {{ job.provider.name }} sends a quote.
+        } @else {
+          We have alerted professionals who do {{ job.service.name }} in your area. Up to 3 quotes will
+          reach you, and you choose which - if any - to accept.
+        }
+      </p>
+
+      @if (uploadProgress(); as progress) {
+        <p class="fl-optional" role="status">
+          Sending {{ progress.done }} of {{ progress.total }} photos…
+        </p>
+      }
+
+      @for (warning of uploadWarnings(); track warning) {
+        <p class="fl-alert fl-alert-error" role="alert">{{ warning }}</p>
+      }
+
+      <ol class="fl-wizard-next">
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">receipt_long</span>
+          <div>
+            <h3 class="fl-card-title">
+              @if (job.provider) {
+                Get a quote
+              } @else {
+                Compare up to 3 quotes
+              }
+            </h3>
+            <p class="fl-card-text">
+              @if (job.provider) {
+                Review the quote in South African Rand (ZAR) and choose whether to go ahead. No hidden fees.
+              } @else {
+                Every quote is in South African Rand (ZAR) with no hidden fees. You pick one, or walk away.
+              }
+            </p>
+          </div>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+          <div>
+            <h3 class="fl-card-title">Get the job done</h3>
+            <p class="fl-card-text">
+              Communicate, complete the job safely and pay the professional directly, then leave a review.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="fl-success-actions">
+        <a class="fl-btn fl-btn-primary" [routerLink]="['/my-jobs', job.id]">View this request</a>
+        <a class="fl-btn fl-btn-secondary" routerLink="/my-jobs">Go to My Jobs</a>
+      </div>
+    </div>
   }
 </div>

@@ -11,8 +11,14 @@ const detail: ProviderRequest = {
   reference: 'FL-2026-000003',
   source: 'MARKETPLACE',
   status: 'REQUESTED',
-  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
-  service: { id: '1', name: 'Leak Repair & Pipe Fixes', slug: 'leak-repair' },
+  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu - ProPlumb' },
+  service: {
+    id: '1',
+    name: 'Leak Repair & Pipe Fixes',
+    slug: 'leak-repair',
+    categoryId: '1',
+    categoryName: 'Plumbing',
+  },
   description: 'Kitchen mixer tap leaking at the base and the cupboard floor is damp.',
   location: 'Fourways, Johannesburg',
   city: null,
@@ -27,7 +33,7 @@ const detail: ProviderRequest = {
 const submittedQuote: Quote = {
   id: '11',
   jobId: '3',
-  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
+  provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu - ProPlumb' },
   total: 1250,
   currency: 'ZAR',
   message: 'Supply and install replacement kitchen mixer tap.',
@@ -171,7 +177,7 @@ describe('RequestDetailComponent', () => {
     expect(component.submitError()).toContain('A quote has already been submitted.');
   });
 
-  describe('Stage 6E — scheduling and start', () => {
+  describe('Stage 6E - scheduling and start', () => {
     const accepted: Quote = { ...submittedQuote, status: 'ACCEPTED' };
     const acceptedDetail: ProviderRequest = { ...detail, status: 'ACCEPTED', quotes: [accepted] };
     const scheduledDetail: ProviderRequest = {
@@ -187,8 +193,14 @@ describe('RequestDetailComponent', () => {
       source: 'MARKETPLACE',
       status: 'SCHEDULED',
       customerId: '1',
-      provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu — ProPlumb' },
-      service: { id: '1', name: 'Leak Repair & Pipe Fixes', slug: 'leak-repair' },
+      provider: { id: 'professional-1', providerType: 'professional', name: 'Sipho Ndlovu - ProPlumb' },
+      service: {
+        id: '1',
+        name: 'Leak Repair & Pipe Fixes',
+        slug: 'leak-repair',
+        categoryId: '1',
+        categoryName: 'Plumbing',
+      },
       description: 'Kitchen mixer tap leaking at the base and the cupboard floor is damp.',
       location: 'Fourways, Johannesburg',
       city: null,
@@ -379,7 +391,7 @@ describe('RequestDetailComponent', () => {
     });
   });
 
-  describe('Stage 6F — work documentation and completion', () => {
+  describe('Stage 6F - work documentation and completion', () => {
     const accepted: Quote = { ...submittedQuote, status: 'ACCEPTED' };
     const activeDetail: ProviderRequest = {
       ...detail,
@@ -415,6 +427,7 @@ describe('RequestDetailComponent', () => {
       createdAt: '2026-10-06T08:00:00.000Z',
     };
     const beforeImage: JobImage = {
+      context: 'WORK',
       id: 'img-1',
       jobId: '3',
       uploadedBy: '9',
