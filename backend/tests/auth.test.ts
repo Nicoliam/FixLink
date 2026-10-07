@@ -46,7 +46,7 @@ async function registerLogin(app: Express, email = 'naledi.dlamini@example.co.za
   await request(app).post('/api/v1/auth/register').send({
     email,
     password: 'Str0ngPassw0rd!',
-    phone: '+27825550101',
+    phone: '0825550101',
   });
   const login = await request(app).post('/api/v1/auth/login').send({
     email,
@@ -67,7 +67,7 @@ describe('POST /api/v1/auth/register', () => {
     const res = await request(app).post('/api/v1/auth/register').send({
       email: 'Thandi.Mokoena@Example.co.za',
       password: 'Str0ngPassw0rd!',
-      phone: '+27825550102',
+      phone: '0825550102',
     });
     assert.equal(res.status, 201);
     assert.equal(res.body.success, true);
@@ -119,7 +119,7 @@ describe('POST /api/v1/auth/register', () => {
     const res = await request(app).post('/api/v1/auth/register').send({
       email: 'owner@example.co.za',
       password: 'Str0ngPassw0rd!',
-      phone: '+27825550199',
+      phone: '0825550199',
       role: 'BUSINESS_OWNER',
       businessName: 'Mokoena Plumbing',
     });
@@ -131,7 +131,7 @@ describe('POST /api/v1/auth/register', () => {
       businessName: 'Mokoena Plumbing',
       slug: 'mokoena-plumbing-owner',
       email: 'owner@example.co.za',
-      phone: '+27825550199',
+      phone: '0825550199',
     });
   });
 
@@ -390,11 +390,11 @@ describe('POST /api/v1/auth/register - unique constraint classification', () => 
   }
 
   it('reports a duplicate PHONE as 409 CONFLICT, not a duplicate email', async () => {
-    const app = appWith(repoFailingWith(dupEntryError('uq_users_phone', '+27825550101')));
+    const app = appWith(repoFailingWith(dupEntryError('uq_users_phone', '0825550101')));
     const res = await request(app).post('/api/v1/auth/register').send({
       email: 'fresh.email@example.co.za',
       password: 'Str0ngPassw0rd!',
-      phone: '+27825550101',
+      phone: '0825550101',
     });
     assert.equal(res.status, 409);
     assert.equal(res.body.success, false);
@@ -427,7 +427,7 @@ describe('POST /api/v1/auth/register - unique constraint classification', () => 
   });
 
   it('classifies duplicate keys correctly and ignores other errors', () => {
-    assert.equal(duplicateKeyKind(dupEntryError('uq_users_phone', '+27')), 'phone');
+    assert.equal(duplicateKeyKind(dupEntryError('uq_users_phone', '0')), 'phone');
     assert.equal(duplicateKeyKind(dupEntryError('uq_users_email', 'a@b.co.za')), 'email');
     assert.equal(duplicateKeyKind(Object.assign(new Error('x'), { code: 'ER_DUP_ENTRY' })), null);
     assert.equal(duplicateKeyKind(new Error('connection lost')), null);

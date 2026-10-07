@@ -76,6 +76,11 @@ describe('AccountComponent overview cards', () => {
     fixture = TestBed.createComponent(AccountComponent);
     fixture.detectChanges();
     await fixture.whenStable();
+    // The component loads in its constructor with `void this.loadAccountData()`,
+    // so the promise it awaits is not tracked as a pending task. `whenStable()`
+    // alone can therefore resolve before the data has landed, leaving the
+    // overview empty. One macrotask turn is enough for it to settle.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();
   }
 

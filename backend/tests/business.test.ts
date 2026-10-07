@@ -60,7 +60,7 @@ function validTechnician(overrides: Record<string, unknown> = {}): Record<string
   return {
     displayName: 'Bongani Zulu',
     email: 'bongani.zulu@example.co.za',
-    phone: '+27825550109',
+    phone: '0825550109',
     password: 'TechPass123!',
     ...overrides,
   };
@@ -241,7 +241,7 @@ describe('Stage 7A - business profile', () => {
       .send({
         businessName: 'Ubuntu Plumbing Co. (Pty) Ltd',
         description: 'Family-run plumbing team serving Joburg North.',
-        phone: '+27115550101',
+        phone: '0115550101',
         city: 'Johannesburg',
         business_id: '999',
         owner_id: '999',
@@ -302,7 +302,7 @@ describe('Stage 7A - technician management', () => {
     assert.equal(tech['businessId'], setup.businessId);
     assert.equal(tech['displayName'], 'Bongani Zulu');
     assert.equal(tech['email'], 'bongani.zulu@example.co.za');
-    assert.equal(tech['phone'], '+27825550109');
+    assert.equal(tech['phone'], '0825550109');
     assert.equal(tech['isActive'], true);
     assertNoPrivateFields(tech);
 

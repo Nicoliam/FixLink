@@ -103,7 +103,7 @@ async function createCustomer(
       firstName: 'Naledi',
       lastName: 'Dlamini',
       email: uniqueEmail('naledi.board'),
-      phone: '+27825550111',
+      phone: '0825550111',
       ...overrides,
     });
   assert.equal(res.status, 201, `customer creation failed: ${JSON.stringify(res.body)}`);
@@ -508,14 +508,14 @@ describe('Stage 7G - filtering, search, pagination and sorting', () => {
     const customer = await createCustomer(ctx, setup.ownerToken, {
       firstName: 'Naledi',
       lastName: 'Dlamini',
-      phone: '+27825550111',
+      phone: '0825550111',
     });
     await createInternalJob(ctx, setup.ownerToken, customer['id'] as string, { priority: 'URGENT' });
     const other = await createCustomer(ctx, setup.ownerToken, {
       firstName: 'Thandi',
       lastName: 'Mahlangu',
       email: uniqueEmail('thandi.board'),
-      phone: '+27825550222',
+      phone: '0825550222',
     });
     const second = await createInternalJob(ctx, setup.ownerToken, other['id'] as string, { priority: 'LOW' });
     const tech = await inviteTechnician(ctx, setup.ownerToken, 'Bongani Zulu');

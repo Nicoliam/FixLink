@@ -31,8 +31,14 @@ const ROLE_PRIORITY: readonly UserRole[] = [
   'CUSTOMER',
 ];
 
-/** Fallback when the session has no recognised role (e.g. a seeded test user). */
-export const DEFAULT_LANDING = '/';
+/**
+ * Fallback when the session has no recognised role (e.g. a seeded test user).
+ *
+ * The account page, not the marketing home page: a signed-in user with no
+ * recognised role still has an account, and /account is where they can see and
+ * fix it. Matches docs/USER-FLOWS.md section 2.2.
+ */
+export const DEFAULT_LANDING = '/account';
 
 /** The highest-priority landing route for the given roles. */
 export function roleLandingRoute(roles: readonly UserRole[] | null | undefined): string {

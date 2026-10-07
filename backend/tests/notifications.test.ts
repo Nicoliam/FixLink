@@ -214,7 +214,7 @@ async function createBusinessCustomer(ctx: TestContext, token: string): Promise<
   const res = await request(ctx.app)
     .post('/api/v1/business/customers')
     .set('Authorization', `Bearer ${token}`)
-    .send({ firstName: 'Naledi', lastName: 'Dlamini', email: uniqueEmail('naledi.notif'), phone: '+27825550111' });
+    .send({ firstName: 'Naledi', lastName: 'Dlamini', email: uniqueEmail('naledi.notif'), phone: '0825550111' });
   assert.equal(res.status, 201, `customer creation failed: ${JSON.stringify(res.body)}`);
   return res.body.data as Record<string, unknown>;
 }

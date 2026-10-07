@@ -101,7 +101,7 @@ function validCustomer(overrides: Record<string, unknown> = {}): Record<string, 
     firstName: 'Naledi',
     lastName: 'Dlamini',
     email: `naledi.assign.${customerSeq}@example.co.za`,
-    phone: '+27825550111',
+    phone: '0825550111',
     ...overrides,
   };
 }

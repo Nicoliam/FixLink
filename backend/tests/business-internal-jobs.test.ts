@@ -106,7 +106,7 @@ function validCustomer(overrides: Record<string, unknown> = {}): Record<string, 
     firstName: 'Naledi',
     lastName: 'Dlamini',
     email: `naledi.dlamini.${customerSeq}@example.co.za`,
-    phone: '+27825550111',
+    phone: '0825550111',
     ...overrides,
   };
 }
@@ -351,10 +351,10 @@ describe('Stage 7B - business customers', () => {
     const res = await request(ctx.app)
       .patch(`/api/v1/business/customers/${id}`)
       .set('Authorization', `Bearer ${setup.ownerToken}`)
-      .send({ phone: '+27825550222', business_id: '999', businessId: '999' });
+      .send({ phone: '0825550222', business_id: '999', businessId: '999' });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assertSuccessEnvelope(res);
-    assert.equal((res.body.data as Record<string, unknown>)['phone'], '+27825550222');
+    assert.equal((res.body.data as Record<string, unknown>)['phone'], '0825550222');
     assert.equal((res.body.data as Record<string, unknown>)['businessId'], setup.businessId);
   });
 
@@ -396,7 +396,7 @@ describe('Stage 7B - business customers', () => {
       const patch = await request(ctx.app)
         .patch(`/api/v1/business/customers/${idB}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ phone: '+27825550333' });
+        .send({ phone: '0825550333' });
       assert.equal(patch.status, 404);
       assertErrorEnvelope(patch, 'NOT_FOUND');
     }
