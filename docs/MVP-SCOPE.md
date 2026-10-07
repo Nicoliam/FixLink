@@ -597,6 +597,10 @@ Required areas include:
 - Customer confirmation
 - Reviews
 - Admin permissions
+- Optional professional selection at request time
+- Open-request matching on category plus service area
+- Publishing professional/business service areas
+- A maximum of 3 quotes per open request
 
 
 ## 19. Out of Scope
@@ -610,6 +614,11 @@ The following are outside the current MVP:
 - Live GPS
 - Route optimization
 - AI provider matching
+- Distance-based (radius) provider matching. Provider match candidates are
+  resolved on service **category** plus a **service-area** name/city/province
+  comparison. No coordinates, no radius, no travel-time or nearest-provider
+  ranking. "AI provider matching" stays out of scope: the matching that does
+  ship is deterministic rules, not a model.
 - AI voice transcription
 - WhatsApp integration
 - SMS infrastructure

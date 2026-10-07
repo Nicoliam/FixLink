@@ -9,6 +9,9 @@ Workflows not marked as implemented there are not treated as current UI
 capabilities, including review submission, quote decline, messaging,
 profile/certificate/portfolio management and admin settings.
 
+Provider service offerings (section 2A) are implemented in the backend and the
+web app.
+
 ## 1. Purpose
 
 This document defines the main Fixlynk user journeys.
@@ -20,9 +23,60 @@ frontend, backend, database and testing implementation.
 # 2. CUSTOMER FLOWS
 
 
-## 2.1 Customer Registration
+## 2.1 Registration
 
-Registration is a two-step process at `/register`.
+Registration is a two-step process for a customer and a three-step process for
+a professional or business owner at `/register`.
+
+Step 2 — services offered (PROFESSIONAL / BUSINESS_OWNER only)
+
+The provider picks what they offer BEFORE the account is created, so
+"Create account" is the last thing they do.
+
+Step 2: "Tick the services you offer"
+↓
+The public service catalogue loads (GET /api/v1/services), grouped by category
+↓
+Tick services, or tick a category heading to select all of them
+↓
+Continue | Skip for now
+↓
+Step 3 — account details, with the ticked services shown as a count
+↓
+Create account
+↓
+Account created and signed in
+↓
+Each ticked service is saved as a service offering
+↓
+Land on the provider dashboard
+
+A customer skips the services step entirely and goes from step 1 to their
+details, because they consume services rather than offer them.
+
+**No price is asked for at this step.** A provider who has just registered has
+not decided what to charge, and Fixlynk does not invent a figure (AGENTS.md
+section 12). Each offering is therefore created without a price, which the
+backend stores as `NULL` — meaning "offered, price not set yet" (migration
+019, `docs/DATABASE.md` section 40.9a). Prices are entered afterwards on My
+Services.
+
+**How the services are saved.** Registration is unchanged as an API contract:
+the account is created first and returns a live session, then each ticked
+service is created with a plain authenticated `POST /api/v1/provider/offerings`.
+Offerings cannot be written inside the account transaction, because the
+offerings store resolves provider identity itself and the provider profile row
+does not exist until the account is committed.
+
+**Failure handling.** The account is never discarded because a service failed
+to save. Services are saved independently, so a partial success reports
+"Saved N of M services" and stays on step 3 with the session intact; the
+submit button becomes "Finish setup", which retries only the services that
+failed and never re-registers (the email is taken from that point on). The
+provider can also finish from My Services. Losing the services is recoverable,
+making a professional re-register is not.
+
+### 2.1a Customer Registration (steps 1-2 only)
 
 Step 1 — account type
 
@@ -61,11 +115,14 @@ Create account
 ↓
 Account created and signed in
 ↓
-Role dashboard (no verification step)
+For a provider: the ticked services are saved, then the role dashboard
+(no verification step)
 
 The selected account type is retained when moving between the steps, so Back
-returns to step 1 with the chosen type still highlighted and allows it to be
-changed. Step 2 values entered before pressing Back are also retained.
+returns to the previous step with the chosen type still highlighted and allows
+it to be changed. For a provider, Back from the details step returns to the
+ticked services rather than to step 1, so the selection is never lost.
+Step 2 values entered before pressing Back are also retained.
 
 Professional and business owner accounts are asked for the name customers will
 see, because the backend creates `professional_profiles` / `business_profiles`
@@ -137,29 +194,83 @@ Decide whether to request service
 
 ## 2.5 Customer Creates Job Request
 
-Customer
-↓
-Select provider
-↓
-Request service
-↓
-Select service
-↓
-Describe work
-↓
-Add location
-↓
-Select preferred date/time
-↓
-Upload photos if needed
-↓
-Submit request
-↓
-REQUESTED
+A job can be created **with or without** a professional. `POST /api/v1/jobs`
+treats `providerId` as optional: when it is supplied the request is addressed
+to that provider exactly as before, and when it is omitted the request becomes
+an **open request** (`jobs.professional_id` and `jobs.business_id` both NULL)
+that matching professionals find on their own portal.
 
+The request is captured by a four-step wizard at `/request-job`, matching the
+"four transparent steps" the marketing site promises. The order is
+deliberate and is the reverse of the earlier single-page form: the customer
+**describes the job before choosing a professional**, so the search in step 02
+can be scoped to the service they just picked.
+
+`/my-jobs` launches the wizard ("Start a request") and additionally lists the
+professionals the customer has saved, each linking straight into the flow with
+that professional already chosen. That saved-professional shortcut is not
+rendered at all when the customer has no saved professionals — it is never
+shown as an empty option.
+
+```
+01 Tell us what you need          service, description, photos of the
+                                   problem (optional), location,
+                                   preferred date and time
+        ↓  (blocked until valid)
+02 Find the right professional    saved professionals first (when any),
+                                   then an inline search scoped to the
+                                   chosen service; open a profile to check
+                                   work, certificates and reviews
+        ↓  (optional — "Skip and let a professional come to you")
+03 Review and send                every answer shown, each editable
+        ↓
+04 What happens next              request reference and status, then:
+                                   get a quote (ZAR, no hidden fees) and
+                                   get the job done (pay the professional
+                                   directly, then review)
+REQUESTED
+```
+
+Notes:
+
+- **Step 02 is optional.** A customer who has no saved professional, or who
+  wants the first quote that arrives, skips it with "Skip and let a
+  professional come to you". The wizard then sends `POST /api/v1/jobs` with no
+  `providerId` and the request is posted as an open request. The customer is
+  told, in step 04, that matching professionals in the area have been alerted
+  and that up to 3 quotes will be accepted.
+- Only filters the providers endpoint supports are sent (`q`, `service`,
+  `page`, `pageSize`). `GET /providers` rejects unknown parameters with 422.
+- A failed saved-professional load never blocks the flow: step 02 falls back
+  to search, which is always available.
+- Arriving with `?provider=<id>` — from a marketplace card or a profile CTA —
+  pre-selects that professional and opens on step 02, so those links stay a
+  single tap. An unknown or deactivated provider falls back to searching
+  rather than stranding the customer.
+- **Photos of the problem** are optional in step 01: up to 6, 5MB each, JPEG /
+  PNG / WebP. They are validated in the browser for an instant answer, then
+  uploaded to `POST /api/v1/jobs/:jobId/request-images` immediately after the
+  job is created, because a photo cannot be stored before its job exists. The
+  customer keeps picking them from `/my-jobs`, searching the marketplace or
+  opening a profile — a photo never replaces choosing a professional.
+- A photo that fails to upload never loses the request: the job is already
+  created, and the customer is told which photos did not attach so they can add
+  them again from the job page.
+- Request photos are the customer's evidence, kept separate from the
+  professional's Before/During/After work record. They can still be added while
+  the request is `REQUESTED` or `QUOTED`, so a missing photo can be supplied
+  before a quote is accepted.
+- A voice note is not offered at request time. It needs its own discriminator
+  in `job_voice_notes` so it is not confused with a technician's work voice
+  note.
 
 ## 2.6 Professional Receives Request
 
+A request reaches a professional in one of two ways: it was **addressed** to
+them by the customer in step 02, or it is an **open request** that matches the
+categories and service areas they publish.
+
+```
 Professional
 ↓
 New request
@@ -179,7 +290,177 @@ Prepare quote
 Submit quote
 ↓
 Customer notified
+```
 
+## 2.6.1 Professional Publishes Service Areas
+
+Before a professional can receive open requests, they must publish the areas
+they service. Areas are managed on their own screen at `/my-areas`, written
+through `PATCH /api/v1/provider/me/service-areas`. The call replaces the whole
+list, so the screen is a single editable list with one Save rather than an
+add/remove pair — there is no state in which some areas are new and some are
+old.
+
+```
+Professional
+↓
+/my-areas
+↓
+Add area (name, city, province)   1–10 areas
+↓
+Save areas                        replaces the whole list
+```
+
+Rules:
+
+- Only `PROFESSIONAL`, `BUSINESS_OWNER` and `BUSINESS_MANAGER` may call the
+  endpoint; any other role is `403 FORBIDDEN_ROLE`.
+- Each area needs `areaName` (1–128 chars). `city` and `province` are
+  optional and each at most 128 chars.
+- A profile with **no** areas receives **no** open requests. Matching is area
+  AND category, so an empty area list means an empty board — this is not an
+  error state, it is the answer to "why am I seeing nothing".
+- Service areas stay free-text. The MVP deliberately holds no latitude,
+  longitude or radius: see `docs/DATABASE.md` section 10.
+
+## 2.6.2 Open Request Matching
+
+When a customer posts an open request, the backend resolves the set of
+professionals and businesses that may quote it. A provider matches when
+**both** conditions hold:
+
+1. **Category** — the provider has an active `service_offerings` row in the
+   same platform `service_categories` bucket as the job's service, or a
+   `professional_services` / `business_services` link to a service in that
+   category. A job for "Leak Repair & Pipe Fixes" reaches every plumber, not
+   only the one provider who happens to list that exact leaf service.
+2. **Area** — at least one of the provider's service areas matches the job's
+   customer-supplied location.
+
+Matching is computed by the backend at the moment the request is posted, and
+every matched recipient receives a `JOB_REQUEST_OPEN` notification. A request
+that matches nobody still succeeds: it simply waits for the customer to choose
+a professional from the marketplace instead.
+
+Matching is **not** a radius calculation. `service_areas` has no coordinates
+and `jobs` has no geocoded columns written by this flow, so the area test is a
+case-insensitive whole-word comparison of the location tokens against each
+area's `area_name`, `city` and `province`. "Fourways, Johannesburg" therefore
+matches an area named "Fourways & surrounds" and an area in city
+"Johannesburg". This is stated as a known limitation, not a claim of distance
+routing.
+
+## 2.6.3 Professional Quotes an Open Request
+
+```
+Professional
+↓
+GET /provider/open-requests          matching open requests, newest first
+↓
+Open a request
+↓
+Submit quote  (or ask a question in the quote message)
+    ↓
+First quote moves the job REQUESTED → QUOTED
+    ↓
+Quotes 2 and 3 are accepted while the job stays QUOTED
+    ↓
+A 4th quote is rejected: 409 CONFLICT
+```
+
+- **At most 3 quotes per open request.** The limit is counted and enforced
+  inside the same locked transaction that writes the quote, so two
+  simultaneous submissions cannot both slip past it. The fourth submitter
+  receives `409 CONFLICT` with a message telling them the customer already has
+  three quotes. They are **not** notified, because they did not quote.
+- A provider's own second quote on the same request is still
+  `409 CONFLICT` — the existing one-quote-per-provider rule is unchanged.
+- A professional who has already quoted keeps access to that request from
+  `/requests` for the rest of its life, even though the job is not addressed
+  to them. Quoting is the access grant.
+- An **addressed** request is unchanged by this flow: only the one chosen
+  provider may quote it, and the 3-quote cap does not apply because there is
+  only one eligible provider.
+
+## 2.6.4 What Acceptance Does to an Open Request
+
+Acceptance is the moment the customer picks a professional, so the backend
+writes the winner onto the job:
+
+```
+Customer
+↓
+Open request with up to 3 quotes
+↓
+Accept one quote
+↓
+Backend writes the winning professional onto the job
+(jobs.professional_id / business_id + the job_assignments row
+ an open request has no row for)
+↓
+Job becomes ACCEPTED — an ordinary addressed request
+↓
+That professional schedules and starts it as usual
+```
+
+This is why schedule, start, photos, progress notes and completion need no
+open-request special case anywhere else in the system: from `ACCEPTED` onward
+the job looks exactly like one that was addressed from the start. The two
+competing quotes become `DECLINED`, never deleted.
+
+## 2.6.5 Screens
+
+| Screen | Route | Shows |
+|---|---|---|
+| Request wizard | `/request-job` | the customer choosing, or skipping, a professional |
+| Open-request board | `/open-requests` | unaddressed requests matching the professional |
+| Open-request detail | `/open-requests/:id` | one such request, with the quote form |
+| Inbox | `/requests` | requests addressed to the professional, plus any they quoted |
+| Inbox detail | `/requests/:id` | one of those |
+| Service areas | `/my-areas` | the areas matching keys on |
+
+`/open-requests/:id` and `/requests/:id` render the SAME detail component; only
+the source endpoint and the "back" destination differ, and both are read from
+the route.
+
+## 2.6.6 Customer Corrects or Withdraws a Request
+
+While a request has not been accepted, the customer can fix a mistake or call
+the whole thing off. This is deliberately narrow: once a quote is accepted,
+work has been agreed and the request is a record, not a draft.
+
+```
+Customer
+↓  job is REQUESTED or QUOTED (nothing accepted yet)
+↓
+/my-jobs/:id
+├─ Edit      change description, location, preferred date or time
+├─ Cancel    keep the record, close the request as CANCELLED
+└─ Delete    remove it from view entirely (soft delete)
+```
+
+Rules the customer sees in the UI, enforced server-side:
+
+- All three disappear once the status is `ACCEPTED` or later, and the page
+  explains why rather than showing a dead button.
+- **Editing a request that already has quotes is allowed, but warned.** The
+  quotes are the professional's to withdraw, not the customer's to retract, so
+  they stay exactly as they were - priced on what the professional read. The
+  customer is told this plainly before saving. Anyone who quoted is not
+  re-notified; they already have the request in their inbox.
+- **Editing the location of an open request can reach new professionals.** An
+  open request has no chosen professional, so who it matches is decided by
+  category plus area. Move it and the backend re-runs that match, alerting
+  professionals newly in range. That is the point of moving it.
+- **Cancel and delete are different.** Cancel closes the request and leaves it
+  visible with its history - the right choice for "I found someone cheaper".
+  Delete takes it out of the customer's list entirely - the right choice for
+  "that was a mistake". Both notify the professional, so nobody is left
+  believing live work still exists.
+- The **service and the professional are not editable.** Picking the wrong
+  trade or the wrong person is fixed by cancelling and reposting, because
+  both are decisions about who does the work rather than corrections to it.
+  Reposting is now cheap: step 02 can be skipped entirely.
 
 ## 2.7 Customer Receives Quote
 
@@ -190,7 +471,7 @@ Notification
 Open job
 ↓
 View quote
-↓
+↓Up to 3 quotes on an open request, 1 on an addressed request
 Review price/items/details
 ↓
 Accept or decline
@@ -228,7 +509,77 @@ Quote becomes declined
 Provider notified
 
 
+# 2A. PROVIDER SERVICE OFFERINGS
+
+A provider describes the services they offer. Available to PROFESSIONAL,
+BUSINESS_OWNER and BUSINESS_MANAGER at `/my-services`. No administrator
+approval step.
+
+
+## 2A.1 Provider Adds a Service
+
+Provider
+↓
+My services
+↓
+Add a service
+↓
+Enter name, pick a platform service category, add an optional description
+↓
+Enter an indicative starting price in ZAR
+↓
+Save
+↓
+Service appears on the provider's public marketplace profile
+
+The price is a "from R850" guide only. Fixlynk does not process payments:
+the customer and provider agree the final amount directly, and Fixlynk
+records the agreed quote on the job.
+
+
+## 2A.2 Provider Edits a Service
+
+Provider
+↓
+My services
+↓
+Edit
+↓
+Change name, category, description or price
+↓
+Save
+↓
+
+A service can never be moved to a different professional profile or
+business once created.
+
+
+## 2A.3 Provider Removes a Service
+
+Provider
+↓
+My services
+↓
+Remove
+↓
+Confirm
+↓
+Service removed from the public profile
+
+Removal is refused while any non-terminal job still references the service
+(REQUESTED, QUOTED, ACCEPTED, SCHEDULED, IN_PROGRESS, AWAITING_PARTS or
+DISPUTED). The provider must finish or cancel that work first, so a live job
+never points at a service the provider no longer offers.
+
+Removal is a soft delete, so completed job history keeps showing the service
+the job was booked against.
+
+The same flow applies to a business owner or manager managing their
+business's offerings.
+
+
 # 3. PROFESSIONAL JOB FLOW
+
 
 
 ## 3.1 Professional Starts Job

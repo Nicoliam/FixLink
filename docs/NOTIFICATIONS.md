@@ -188,6 +188,57 @@ Email is best-effort in the same way in-app delivery is:
   the manual resend path (future scope) so a broken mail relay can
   never stall a job request.
 
+## Operations alerts (platform signup and new job request)
+
+A second, separate email channel tells the operations inbox that something
+happened on the platform: a new account registered, or a new job request was
+posted.
+
+### Why it is not part of the notification system
+
+- It does not create an in-app row. That system persists one row per
+  recipient *user*; `OPS_ALERT_EMAIL` is an address, not an account, and
+  must not be given one just to receive mail.
+- It does not reuse `renderNotificationEmail`. That renderer is written for a
+  professional and deliberately withholds contact details to protect the
+  customer. An operations alert inverts that: the contact details *are* the
+  payload, because the point is for a human to know who got on the platform
+  and what they are asking for.
+
+### Where it lives
+
+`backend/src/services/ops-alert.ts` renders and sends; the same `Mailer`
+transport used by Stage 13 carries it, so there is still one mail seam in the
+backend. It is invoked from `AuthService.register` and
+`JobsService.createMarketplaceJob`, after the account or job is committed.
+
+### What the alerts contain
+
+- **Registration** — email, phone, role, the name on the profile, account id.
+- **Job posted** — reference, service, request type (chosen professional vs
+  open request), provider, location, preferred date, the customer's email and
+  the full description.
+
+### Rules enforced by the module, not by convention
+
+- **No credential is ever rendered.** The input types do not accept a
+  password, hash or token, so no call site can leak one by passing the wrong
+  object. `tests/ops-alerts.test.ts` asserts the plaintext password, any
+  bcrypt hash and any JWT are absent from both the text and HTML parts.
+- **Customer-supplied text is escaped and header-safe.** Descriptions and
+  locations are free text; they cannot inject markup into the HTML body or
+  add a header via a newline in the subject.
+- **Delivery is best-effort and never throws.** A mail relay outage must not
+  stop someone registering or posting a job; the sender resolves `false`
+  instead. Tests assert a rejected mailer still yields `201`.
+- **Alerts are off unless configured twice.** `OPS_ALERT_EMAIL` must be set
+  *and* `MAIL_ENABLED=true`. With mail disabled the sender is a no-op, so a
+  deployment cannot accumulate send failures by setting the address alone.
+
+Because an operations alert contains personal data, `OPS_ALERT_EMAIL` must be
+an address the business controls. It is an internal operational signal, not a
+marketing send, and there is no unsubscribe.
+
 ## What remains after Stage 13
 
 1. Admin/platform notification contexts were not added by the current

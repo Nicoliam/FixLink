@@ -10,11 +10,17 @@ The permission sections contain both current implemented boundaries and
 broader product-direction capabilities. For UAT and handover, the
 authoritative current summary is `docs/HANDOVER.md` and the exact API
 route/role enforcement. In particular, the current frontend does not
-implement customer review submission, quote decline, messaging, saved
-providers, provider profile/certificate/portfolio management, or admin
-settings. Frontend visibility is not security.
+implement customer review submission, quote decline, messaging, provider
+profile/certificate/portfolio management, or admin settings. Frontend
+visibility is not security.
+
+Customer saved professionals ("Save a professional") are now implemented in
+`backend/src/modules/saved-providers/`; see the section below.
 
 All permissions must be enforced by the backend.
+
+Provider service offerings ("Manage own services") are now implemented in
+`backend/src/modules/offerings/`; see the section below.
 
 
 ## 2. Roles
@@ -228,6 +234,42 @@ admin roles.
 - Access business-scoped customer or job workflows as a business user
 - See private document references, storage keys, filesystem paths or
   unrelated credentials in admin JSON responses
+
+## Provider service offerings
+
+A PROFESSIONAL, BUSINESS_OWNER or BUSINESS_MANAGER may create, edit and
+remove their own service offerings at `/api/v1/provider/offerings`, with no
+administrator approval step.
+
+### Can
+
+- Create an offering with a name, description, platform category and
+  indicative price
+- Edit their own offering's name, description, category or price
+- Remove their own offering, once no non-terminal job references it
+- Read their own offerings
+
+### Cannot
+
+- Read, edit or remove another provider's offering (returns 404, not 403,
+  so offering ids cannot be probed across providers)
+- Move an offering to a different provider, including their own other
+  professional or business profile
+- Create a platform catalogue entry; the admin-owned `services` table is
+  unchanged and still managed only through `/admin/services`
+- Set server-owned fields such as `professionalId`, `businessId`,
+  `isActive` or `currency` (rejected with 422)
+- Remove an offering while a non-terminal job references it (409 CONFLICT)
+
+### Enforcement
+
+Roles are read from the authoritative user repository, not from JWT claims.
+Ownership is derived from the session — the caller's `professional_profiles`
+row and the businesses they own or manage — and is never accepted from a
+request body or path. CUSTOMER, TECHNICIAN and ADMIN accounts are refused
+with 403 `FORBIDDEN_ROLE`; technicians are employees, not marketplace
+providers, and administrators manage the catalogue through the admin
+surface rather than this one.
 
 ## Multi-role behavior
 
@@ -623,19 +665,90 @@ Implemented 2026-09-23 (`backend/src/modules/quotes/`).
   endpoints.
 - A provider sees only marketplace jobs addressed to their own
   professional profile or business (`GET /api/v1/provider/requests`,
-  `GET /api/v1/provider/requests/:id`). Another provider's request —
-  or quoting an unaddressed job — reads as `404 NOT_FOUND`, never
-  `403`, so request/job ids cannot be probed across providers.
+  `GET /api/v1/provider/requests/:id`). Another provider's request
+  reads as `404 NOT_FOUND`, never `403`, so request/job ids cannot
+  be probed across providers.
 - Quote submission is restricted to the addressed provider while the
   job is `REQUESTED`; the backend performs the `REQUESTED → QUOTED`
   transition. A second active quote from the same provider is rejected
   with `409 CONFLICT` — quotes are never silently overwritten.
-- Customer quote visibility is limited to the owning customer
+- **Step 14 — open requests.** `POST /api/v1/jobs` no longer requires
+  `providerId`. An unaddressed job is visible to a provider on
+  `GET /api/v1/provider/open-requests` **only** when that provider
+  matches the request on both category and service area, and only
+  while it is `REQUESTED` or `QUOTED` with fewer than 3 active quotes.
+  Matching is computed server-side from `service_offerings` /
+  `professional_services` / `business_services` plus `service_areas`;
+  it is never taken from the client. A non-matching open request, or one
+  the provider cannot otherwise act on, reads as `404 NOT_FOUND`, never
+  `403` — the same no-probing rule as above. A provider cannot widen
+  their own match set, and a client-supplied category, area or radius
+  is ignored because no such parameter is accepted.
+- **Step 14 — quoting an open request** grants access. Once a provider
+  has a quote on an unaddressed job, that job appears in their inbox
+  and its detail resolves for them — without the job being addressed to
+  them. Up to 3 providers can hold a live quote on one open request; the
+  fourth submission gets `409 CONFLICT` and no notification. A provider
+  sees only their OWN quote on it: competing quotes and their amounts are
+  never exposed to another provider.
+- **Step 14 — acceptance ends the open state.** When the customer
+  accepts a quote on an open request, the backend writes the winner onto
+  `jobs.professional_id` / `jobs.business_id` and inserts the provider
+  `job_assignments` row the open request never had, in the same
+  transaction as the acceptance. From `ACCEPTED` the job is an ordinary
+  addressed request, so schedule/start/execution authorize against the
+  job's provider exactly as before and carry no open-request branch. The
+  acceptance endpoint itself is unchanged: it is still the owning
+  customer, on their own `MARKETPLACE` job, accepting a `SUBMITTED`
+  quote on a `QUOTED` job.
+- **Step 14 — service areas.** `GET`/`PATCH
+  /api/v1/provider/me/service-areas` act only on the caller's own
+  provider profile(s), resolved server-side exactly as above. The
+  `PATCH` replaces the caller's whole list in one transaction and
+  accepts only `PROFESSIONAL`, `BUSINESS_OWNER` and
+  `BUSINESS_MANAGER`; `CUSTOMER`, `TECHNICIAN`, `ADMIN` and role-less
+  accounts get `403 FORBIDDEN_ROLE`. A provider can never address
+  another provider's areas, because the owner is never a parameter.
+- **Step 15 - customer edit / cancel / delete.** The owning customer of a
+  `MARKETPLACE` job may edit, cancel or delete it while the job is
+  `REQUESTED` or `QUOTED` - that is, until a quote has been **accepted**.
+  `ACCEPTED` and every later state return `409 CONFLICT`. Ownership comes
+  from the session, so another customer's job reads as `404 NOT_FOUND` and
+  cannot be probed; non-customer roles get `403 FORBIDDEN_ROLE`. Only
+  `description`, `location`, `preferredDate` and `preferredTime` are
+  editable: `serviceId` and `providerId` are fixed at creation because they
+  decide matching and assignment respectively, and a wrong choice there is
+  corrected by cancelling and reposting.
+- **Step 15 - delete is a soft delete.** `DELETE /api/v1/jobs/:id` sets
+  `jobs.deleted_at` and nothing else. Quotes, `job_status_history`,
+  `job_assignments` and job images are preserved, because a withdrawn request
+  that a professional already quoted must stay auditable. All customer and
+  provider reads filter on `deleted_at IS NULL`, so the job stops appearing
+  anywhere it can be acted on while the underlying record survives.
+- **Step 15 - cancelling is a state transition, deleting is not.** Cancel
+  moves the job to `CANCELLED` and writes a `job_status_history` entry.
+  Delete leaves `status` untouched and writes no history row, because that
+  table records status transitions only. A professional holding an open quote
+  is notified `JOB_CANCELLED` on either operation, so nobody is left believing
+  live work still exists.
+- **Step 15 - quotes survive an edit.** An edit on a `QUOTED` request keeps
+  the existing quotes; the customer is warned that those quotes were priced on
+  the earlier description (`data.quotedRequestsChanged`). The customer does not
+  get to retract a professional's offer, and a professional is not re-notified
+  about a request they have already quoted.
+- Customer quote visibility is unchanged and still limited to the
+  owning customer
   (`GET /api/v1/jobs/:id` embeds `quotes`; `GET
   /api/v1/jobs/:id/quotes`, `GET /api/v1/quotes/:id`). Provider
   request detail exposes only a privacy-limited customer display name
   (first name + last initial); no email, phone, ID documents or
   admin-only information.
+- **Step 14 — privacy limit is unchanged for open requests.** A
+  matching professional sees the same projection as an addressed one:
+  service, description, request photos, the customer-supplied location
+  and preferred schedule. They do **not** see the customer's name, and
+  they never see the other quotes on the job. Competing quotes stay
+  invisible to each other; only the customer compares them.
   - Admin platform quote management is not part of Stage 9; the admin
     surface exposes read-only job projections and does not provide a
     quote-management operation. ADMIN is not a quoting provider.
@@ -1262,3 +1375,134 @@ No migration was created because the existing tables already supported
 the Stage 9 reads and mutations. No settings, review moderation, job
 intervention, role management or technician assignment capability was
 added.
+
+
+# 26. Saved Professionals — Implementation Notes
+
+Implemented in `backend/src/modules/saved-providers/`, the
+`/api/v1/customer/saved-providers` routes, migration
+`016_saved_professionals_uniqueness`, and the lazy Angular customer area
+(`/my-jobs`, the marketplace and the public provider profile).
+
+A bookmark is customer-owned reference data. It is **not** a capability: it
+grants no access to a provider's data and confers no permission beyond the
+owner's own list.
+
+CUSTOMER:
+- list their own saved professionals
+- save a professional or business from its public profile
+- remove their own bookmark
+- read only their own bookmarks
+
+PROFESSIONAL / BUSINESS_OWNER / BUSINESS_MANAGER:
+- `403 FORBIDDEN_ROLE` on every saved-professional route. A provider has no
+  customer journey here.
+
+TECHNICIAN:
+- `403 FORBIDDEN_ROLE`. Technicians are never marketplace customers.
+
+ADMIN:
+- `403 FORBIDDEN_ROLE`. An administrator manages the platform rather than
+  acting as a customer, and has no need to borrow a customer's list.
+
+Unauthenticated:
+- `401`.
+
+- **Ownership is derived from the session, never the request.** The service
+  resolves the caller's `customer_profiles` row from the session user id and
+  passes only that id to the store; the client never supplies a customer or
+  user id. `POST` rejects unknown fields, so an owner value cannot be
+  smuggled into the write.
+- **Cross-customer access is impossible.** Every query is scoped to the
+  session customer's profile. One customer can neither read nor delete
+  another's bookmarks; a delete of someone else's row reports `404`, not
+  `403`, so bookmark existence cannot be probed across customers.
+- **Duplicates are refused with `409`.** Uniqueness is enforced by
+  `uq_saved_professionals_unique` in the database, not only by a service
+  check, so two concurrent saves cannot both insert.
+- **A `CUSTOMER` role without a `customer_profiles` row reads as `404`.** A
+  bookmark belongs to the customer profile, so there is nothing to own.
+- **The saved list exposes no private data.** Items are hydrated through the
+  same public `MarketplaceStore.getProviderById` projection the profile page
+  uses, then projected down to a card: no `bio`, no `offerings`, no
+  `document_reference`, no certificates documents, no customer contact
+  details. A provider deactivated after being saved is omitted rather than
+  surfaced, because it is no longer requestable.
+- **Frontend gating is UX only.** The save control renders only for a
+  signed-in `CUSTOMER`, and the marketplace/profile routes are public. A
+  tampered client gains nothing: the backend re-checks the role and derives
+  the owner.
+
+Permission tests added (`backend/tests/saved-providers.test.ts`): missing
+authentication, forged token, professional/business-owner rejection,
+save/list/state/remove, duplicate `409`, malformed and SQL-shaped
+`providerId`, missing field, unknown-field rejection, unknown provider `404`,
+removal of something never saved, re-saving after removal, and full
+cross-customer isolation.
+
+No new capability beyond bookmarking was added: there is still no messaging,
+no customer review submission, no quote decline and no admin settings.
+
+
+# 27. Request Photos — Implementation Notes
+
+Implemented in `backend/src/modules/jobs/jobs.service.ts`
+(`uploadRequestImage`), the store method `createRequestImage`, migration
+`017_job_image_request_context`, and the lazy job-request wizard step 01.
+
+A photo of the problem attached to a request is the customer's evidence, not
+the professional's work record.
+
+CUSTOMER:
+- attach photos to a job they own, while it is `REQUESTED` or `QUOTED`
+- read them back through `GET /jobs/:jobId/images`
+
+PROFESSIONAL / BUSINESS_OWNER / BUSINESS_MANAGER:
+- `403 FORBIDDEN_ROLE`. The provider documents work through
+  `POST /jobs/:jobId/images` during `IN_PROGRESS`, which is a different route
+  with a different state gate.
+
+TECHNICIAN:
+- `403 FORBIDDEN_ROLE` on this route. Technician execution evidence uses
+  `POST /technician/jobs/:jobId/images`.
+
+ADMIN:
+- `403 FORBIDDEN_ROLE`. An administrator does not act as a customer.
+
+Unauthenticated:
+- `401`.
+
+- **Ownership is derived from the session, never the request.** The service
+  resolves the caller's `customer_profiles` row from the session user id and
+  compares `job.customer_id` server-side. Another customer's job is
+  `404 NOT_FOUND`, never `403`, so job ids cannot be probed across accounts.
+- **The role is checked before any job lookup**, so a non-customer's answer
+  never depends on which job id they guessed.
+- **A customer may not write into the professional's work record.** From
+  `ACCEPTED` onward the upload is `409`. Request photos are rows with
+  `context = 'REQUEST'`; the professional's record is `context = 'WORK'`. The
+  two are never merged, so a customer's photo can never appear in the
+  Before/During/After history as though the professional had taken it.
+- **Both the state gate and the 6-photo cap are enforced inside the insert
+  transaction** with `SELECT ... FOR UPDATE`. A check-then-insert in the service
+  would let two concurrent uploads both pass and both insert.
+- **The file is validated by content, not by name.** 5MB cap, JPEG/PNG/WebP
+  allowlist, and a magic-byte check that rejects a renamed file whose bytes are
+  something else. The client also pre-checks, but that is convenience, never a
+  control.
+- **A refused insert rolls the stored file back**, so a failed upload leaves no
+  orphan in the storage directory.
+- **No bytes reach MySQL.** Only metadata is stored; retrieval goes through the
+  authorized `GET /jobs/:jobId/images/:imageId/file` route, which never returns
+  a path or storage key.
+
+Permission tests added (`backend/tests/job-request-images.test.ts`):
+authentication, `403` for a provider, cross-customer `404`, the state gate at
+`REQUESTED`/`QUOTED`/`ACCEPTED`/`IN_PROGRESS`, the 6-photo cap, MIME/size/
+magic-byte rejection, unexpected file field, filename traversal sanitisation,
+storage rollback, and that the response exposes neither binary, path nor key.
+
+No voice note is accepted at request time. `job_voice_notes` has no context
+column, so a customer voice note would be indistinguishable from a technician's
+work voice note; adding it requires its own discriminator and is deliberately
+out of scope here.

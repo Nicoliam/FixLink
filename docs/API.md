@@ -125,8 +125,13 @@ Rules:
 - The account, its role and its provider profile are created in one
   transaction, so a failed registration never leaves a half-provisioned
   account or consumes the email address.
-  - `CUSTOMER`: `users` + `user_roles` only. `customer_profiles` is still
-    provisioned lazily on the first job request.
+  - `CUSTOMER`: also creates `customer_profiles`, which every customer-scoped
+    feature resolves ownership through (saved professionals, quotes, job
+    detail, job history). Optional `firstName` / `lastName` may be supplied;
+    both are required together or not at all. When absent the name is derived
+    from the email local part (`naledi.dlamini@…` -> `Naledi` / `Dlamini`),
+    which is a guess the customer can correct later. The names stay optional on
+    the wire so an existing client is not broken.
   - `PROFESSIONAL`: also creates `professional_profiles` using the required
     `displayName` (`verification_status` `UNVERIFIED`).
   - `BUSINESS_OWNER`: also creates `business_profiles` using the required
@@ -308,6 +313,31 @@ sorted by rating then review count. Unknown query parameters and
 out-of-range values return `422 VALIDATION_ERROR`. LIKE wildcards in
 input are escaped so they match literally.
 
+### Indicative call-out price on a card
+
+Every `ProviderCard` — search results and saved professionals alike —
+carries the provider's own lowest stated starting price:
+
+- `fromPrice` — the lowest `price_amount` across the provider's **live**
+  (`is_active = 1`, not soft-deleted) offerings, or `null`.
+- `fromPriceCurrency` — the currency of that figure (`ZAR` for the MVP),
+  or `null` when there is no price.
+
+Both are informational only. The MVP does not charge them, and they are
+never an agreed amount — the quote is what binds (see §12 of `AGENTS.md`).
+
+`null` means the provider has stated no price yet, which is a real state:
+a professional picks their services during registration, before login, and
+sets the figure later. An unpriced offering is **ignored**, not treated as
+R0, so a provider who set one real price still shows that price. A client
+receiving `fromPrice: null` must omit the figure entirely — rendering R0,
+or a guess, would advertise a call-out the provider never agreed to. This is
+why `service_offerings.price_amount` is nullable
+(`database/migrations/019_offering_price_optional.sql`).
+
+Retired offerings never contribute: only rows a profile would show can
+produce the card's figure.
+
 ### Profiles and sub-resources
 
 - `GET /api/v1/providers/:id` → `200` public profile (trust info,
@@ -325,6 +355,53 @@ input are escaped so they match literally.
 Only active, non-deleted providers are ever returned. No passwords,
 tokens, ID documents, verification files, customer contact details,
 internal notes or audit data are exposed by any marketplace endpoint.
+
+
+## 7.2 Customer saved professionals
+
+Customer-owned bookmarks. A bookmark lets a customer request a job later
+without searching again. It is **not** a capability: it grants no access to
+a provider's data, and the saved list is rendered from the same public
+marketplace projection as `GET /providers`, so verification badges and
+private verification documents follow exactly the same rules there and here.
+
+Requires an authenticated **CUSTOMER**. The owning customer is resolved from
+the session, so the client never sends a customer or user id.
+
+```
+GET    /api/v1/customer/saved-providers
+POST   /api/v1/customer/saved-providers
+GET    /api/v1/customer/saved-providers/:providerId
+DELETE /api/v1/customer/saved-providers/:providerId
+```
+
+- `GET /customer/saved-providers` → `200 { items, total }` — the caller's
+  bookmarks, newest first. Each item is a provider card plus `savedAt`
+  (no `bio`, no `offerings`; those are profile-only).
+  A provider deactivated or deleted after being saved is omitted rather than
+  surfaced, because it is no longer requestable.
+- `POST /customer/saved-providers` with `{ "providerId": "professional-1" }`
+  → `201` the saved provider card plus `savedAt`.
+  - `422` `VALIDATION_ERROR` — missing/malformed `providerId`, or any
+    unknown field. `providerId` must be the public marketplace form
+    (`professional-<n>` / `business-<n>`); the provider type is derived from
+    it rather than accepted separately.
+  - `404` `NOT_FOUND` — unknown, deactivated or deleted provider.
+  - `409` `CONFLICT` — already saved by this customer.
+- `GET /customer/saved-providers/:providerId` → `200 { providerId, saved }`.
+  Drives the save toggle on the public profile page.
+- `DELETE /customer/saved-providers/:providerId` → `200` on success,
+  `404` `NOT_FOUND` when it was not saved.
+
+Authorization:
+
+- `401` when unauthenticated.
+- `403` `FORBIDDEN_ROLE` for PROFESSIONAL, BUSINESS_OWNER,
+  BUSINESS_MANAGER, TECHNICIAN and ADMIN. A bookmark is part of the customer
+  journey only.
+- `404` `NOT_FOUND` when a CUSTOMER account has no `customer_profiles` row.
+- One customer can never read or remove another customer's bookmarks; every
+  query is scoped to the session customer's profile.
 
 
 # 8. Businesses
@@ -828,6 +905,8 @@ PATCH /api/v1/jobs/:id
 
 POST /api/v1/jobs/:id/cancel
 
+DELETE /api/v1/jobs/:id
+
 POST /api/v1/jobs/:id/confirm
 
 PATCH /api/v1/jobs/:id/status
@@ -835,6 +914,8 @@ PATCH /api/v1/jobs/:id/status
 POST /api/v1/jobs/:id/updates
 
 POST /api/v1/jobs/:id/complete
+
+POST /api/v1/jobs/:id/request-images
 
 
 ## 10.1 Jobs — Stage 6B Implementation Notes
@@ -846,20 +927,34 @@ execution, messaging, reviews and payment belong to later stages.
 - `POST /api/v1/jobs` (requires `Authorization: Bearer <accessToken>`,
   `CUSTOMER` role) creates a job in the ONE shared `jobs` table with
   `source = MARKETPLACE` and `status = REQUESTED` → `201` with the job.
-  Request: `{ providerId, serviceId, description, location,
+  Request: `{ providerId?, serviceId, description, location,
   preferredDate? (YYYY-MM-DD), preferredTime? (HH:MM 24h), notes? }`.
+  `providerId` is **optional**. When present the request is *addressed*: the
+  job is created with `jobs.professional_id` / `jobs.business_id` set and a
+  provider `job_assignments` row is written in the same operation. When
+  absent the request is an **open request**: both provider columns stay
+  `NULL`, no assignment row is written, and `data.provider` is `null`.
   The customer is derived from the session — any `customer_id`,
   `status`, `source` or timestamp in the body is ignored. The initial
-  `job_status_history` entry (`NULL → REQUESTED`) and the provider
-  `job_assignments` row are written in the same operation. The free-text
-  `location` is stored in `jobs.address_line1` (no separate suburb
-  column exists); `preferredDate`/`preferredTime` combine into
+  `job_status_history` entry (`NULL → REQUESTED`) is always written. The
+  free-text `location` is stored in `jobs.address_line1` (no separate
+  suburb column exists); `preferredDate`/`preferredTime` combine into
   `jobs.scheduled_at` (09:00 default when no time is given). Optional
   `notes` are validated but not persisted — file/photo infrastructure
   arrives in a later stage.
 - Customer profiles are auto-provisioned on first request (Stage 5A
   registration creates `users` + `user_roles` only).
-- Stage 13: after the job commits, the selected provider is notified
+- **Open-request matching (Step 14).** After an open request commits, the
+  backend resolves every provider that matches it on **both** category and
+  service area, and sends each a `JOB_REQUEST_OPEN` notification linking to
+  `GET /api/v1/provider/open-requests/:id`. Matching is described in
+  `docs/USER-FLOWS.md` §2.6.2 and is deliberately **not** a radius
+  calculation: `service_areas` carries no coordinates and this flow writes
+  none, so the area test is a case-insensitive whole-word comparison of the
+  request's location tokens against each area's `area_name`, `city` and
+  `province`. A request that matches nobody still returns `201`. Matching and
+  notification are best-effort and never change the `201`.
+- Stage 13: after an addressed job commits, the selected provider is notified
   in-app (`JOB_REQUEST`) and — when the provider's account is an
   `ACTIVE` provider-side account with an email address — by email
   carrying the service, reference, location, preferred date/time, the
@@ -867,15 +962,110 @@ execution, messaging, reviews and payment belong to later stages.
   No customer contact details are included. The email is best-effort: a
   mail failure never changes the `201` response or the created job
   (see §22).
-- Validation: malformed provider/service ids → `400 VALIDATION_ERROR`;
-  unknown provider or service → `404 NOT_FOUND`; provider does not offer
-  the service → `422 VALIDATION_ERROR`; description/location/date/time
+- Validation: malformed provider/service ids → `400 VALIDATION_ERROR`; an
+  **omitted** `providerId` is not malformed and is accepted; an unknown
+  provider or service → `404 NOT_FOUND`; an addressed provider that does not
+  offer the service → `422 VALIDATION_ERROR`; description/location/date/time
   problems → `422 VALIDATION_ERROR`. Non-customer roles → `403
   FORBIDDEN_ROLE`; missing/invalid tokens → `401 UNAUTHORIZED`.
 - `GET /api/v1/jobs?page=&pageSize=` → `200` paginated owned jobs
   (newest first). `GET /api/v1/jobs/:id` → `200` owned job, `400` for a
   malformed id. Another customer's job reads as `404 NOT_FOUND` (no
   cross-account probing). Non-customer roles → `403`.
+- `data.provider` is `null` on an open request. Consumers must handle it —
+  the customer job list and job detail render "Matching professionals" in
+  place of a professional name while `provider` is `null`.
+
+### 10.1.1 Step 15 — Customer Edit, Cancel and Delete
+
+A customer can correct or withdraw their own marketplace request. All three are
+gated on the request **not yet being accepted**, which is exactly
+`status IN ('REQUESTED','QUOTED')`:
+
+| State | Edit | Cancel | Delete |
+|---|---|---|---|
+| `REQUESTED` (no quote yet) | yes | yes | yes |
+| `QUOTED` (quotes received, none accepted) | yes | yes | yes |
+| `ACCEPTED` and later | `409` | `409` | `409` |
+
+`ACCEPTED` is the cut-off and not an arbitrary one: from that moment work has
+been agreed, `jobs.agreed_amount` is recorded, and a `job_assignments` row
+exists. The business internal-job equivalents (`PATCH /business/jobs/:jobId`,
+`POST /business/jobs/:jobId/cancel`) are gated on `REQUESTED` only, because a
+business owns its jobs directly with no quote round-trip in between.
+
+Ownership is derived from the session, never from the body. Another
+customer's job reads as `404 NOT_FOUND`, never `403`, so job ids cannot be
+probed across accounts. Non-customer roles get `403 FORBIDDEN_ROLE`.
+
+**Editable fields** are the ones the customer supplied as free text or a
+preference: `description`, `location`, `preferredDate`, `preferredTime`.
+Each is optional; omitted keys are left untouched, so a partial edit is safe.
+
+Two things are deliberately **not** editable after creation:
+
+- `serviceId` — it decides the platform category, and on an open request that
+  decides which professionals the request matches. Changing it would silently
+  repoint the request at a different trade.
+- `providerId` — choosing or changing the professional is assignment, not
+  correction.
+
+For either mistake the customer cancels and reposts. Since Step 14 made
+`providerId` optional that costs one extra step, not a dead end.
+
+- `PATCH /api/v1/jobs/:id` → `200` with the updated job. Each supplied field
+  is validated exactly as on create: `description` 20–2000 characters,
+  `location` 1–255, `preferredDate` a real `YYYY-MM-DD` calendar date,
+  `preferredTime` `HH:MM` 24-hour. A blank `preferredDate`/`preferredTime`
+  clears the preference (sent as `null`), which is the only way to remove one.
+  An empty body → `422 VALIDATION_ERROR`.
+- **Known gap: `preferredTime` cannot be edited from the UI.** The write path
+  accepts it, but `JobDto` returns only `preferredDate` and the derived
+  `scheduledAt` — not `preferredTime`. A time input therefore cannot be
+  prefilled with the current value, and submitting a blank would erase a
+  preference the customer cannot see. The customer edit form omits the field
+  entirely rather than risk silent data loss; omitting the key leaves the
+  stored time untouched. Exposing `preferredTime` on `JobDto` is the fix, and
+  is deliberately NOT bundled into this change because it widens the response
+  contract for every job consumer.
+- **Quoted requests warn, they do not block.** When the request already holds
+  active quotes, the response carries
+  `data.quotedRequestsChanged: true`. The existing quotes are **kept** — they
+  were submitted against the earlier description and are not the customer's to
+  retract — but the customer is told, in the UI and in that flag, that those
+  quotes were priced on what they read before. A professional who quoted is
+  NOT re-notified: they have already quoted, and re-opening their request in
+  their inbox would be noise. A professional whose **quote was declined** is
+  likewise left alone.
+- Editing an **open** request whose `location` changed re-runs category and
+  area matching, because the move may bring new professionals into range. Every
+  newly matched professional receives a fresh `JOB_REQUEST_OPEN`, capped by the
+  same `MAX_OPEN_REQUEST_MATCHES` fan-out as creation. An edit that leaves the
+  location untouched sends nothing.
+- `POST /api/v1/jobs/:id/cancel` → `200` with the job at `status = CANCELLED`.
+  Written to `job_status_history` as `REQUESTED|QUOTED → CANCELLED`, reason
+  `Customer cancelled request`, so the state change is never silent
+  (AGENTS.md §37). The provider is notified (`JOB_REQUEST` is not reused; a
+  cancellation uses `JOB_CANCELLED`).
+- `DELETE /api/v1/jobs/:id` → `200` with `{ deleted: true }`, matching the
+  shape `DELETE /api/v1/jobs/:id/images/:imageId` already uses in this API.
+  This is a **soft delete**:
+  it sets `jobs.deleted_at` and nothing else. Quotes, `job_status_history`,
+  `job_assignments` and job images are all left in place, because a withdrawn
+  request that a professional already quoted must remain auditable. Every
+  customer read filters on `deleted_at IS NULL`, so the job disappears from
+  `/my-jobs`, `GET /jobs/:id` returns `404`, and the provider's inbox and
+  open-request board stop listing it. It does **not** write a
+  `job_status_history` row: the job's status is unchanged, and that table
+  records status transitions only. Cancel and delete are different operations
+  and the distinction is deliberate.
+- A provider whose request was cancelled or deleted is notified once
+  (`JOB_CANCELLED`), so nobody is left believing live work still exists.
+- Errors: malformed id → `400 VALIDATION_ERROR`; unknown job, another
+  customer's job, or an internal (`INTERNAL`) job → `404 NOT_FOUND`; an
+  accepted-or-later job → `409 CONFLICT`; invalid field values → `422
+  VALIDATION_ERROR`; non-customer role → `403 FORBIDDEN_ROLE`; unauthenticated
+  → `401 UNAUTHORIZED`.
 
 
 ## 10.2 Jobs — Stage 6C Implementation Notes
@@ -1032,6 +1222,62 @@ charge the customer; the agreed quote remains the recorded price the
 customer pays the professional directly outside the platform.
 
 
+## 10.6 Jobs — Request Photos (Customer Evidence)
+
+Implemented in `backend/src/modules/jobs/jobs.service.ts`
+(`uploadRequestImage`), the store methods `createRequestImage`, migration
+`017_job_image_request_context`, and the lazy job-request wizard step 01.
+
+`POST /api/v1/jobs/:jobId/request-images` attaches a photo of the problem to
+a request, so a professional can assess scope before quoting. This is the
+customer's evidence, NOT the professional's work record.
+
+- `multipart/form-data` with a single `image` field. Bytes are held in memory
+  (5MB cap) and written to the MVP storage dir; MySQL stores metadata only.
+  The response is the image record, never a storage key or path.
+- Requires an authenticated `CUSTOMER` who owns the job. Ownership comes from
+  the session: another customer's job is `404 NOT_FOUND`, never `403`, so job
+  ids cannot be probed.
+- **State gate: `REQUESTED` or `QUOTED` only.** The customer may add a missing
+  photo before deciding on the quote. From `ACCEPTED` onward the professional
+  owns the Before/During/After record and the customer may not write into it →
+  `409`.
+- **Cap: 6 photos per job** → `422`. Both the gate and the cap are enforced
+  inside the insert transaction (`SELECT ... FOR UPDATE`), so concurrent
+  uploads cannot slip past either check.
+- Validation: 5MB max; JPEG, PNG or WebP only, verified against the file's magic
+  bytes rather than the client-declared MIME. A renamed `.png` that is not a
+  PNG is rejected.
+- A refused insert deletes the just-written file, so a failed upload leaves no
+  orphan in storage.
+- The upload is a **second** request after `POST /jobs`, because
+  `job_images.job_id` is NOT NULL and a photo cannot exist before its job does.
+
+`context` (migration 017) discriminates the two populations sharing
+`job_images`:
+
+| context  | uploader | when | meaning |
+| --- | --- | --- | --- |
+| `REQUEST` | the owning customer | `REQUESTED`/`QUOTED` | evidence of the problem |
+| `WORK` | addressed provider / assigned technician | `IN_PROGRESS` | the Before/During/After record |
+
+Reusing `phase = 'BEFORE'` was rejected: `phase` describes where the
+professional was in the work, so merging the two would let a customer write
+into the provider's work record and make the timeline claim work that was never
+done. Read visibility is unchanged — `GET /jobs/:jobId/images` already admits
+the owning customer and the addressed provider, which is exactly the audience
+for request photos.
+
+No voice note is accepted at request time: `job_voice_notes` has no
+context column, so a customer voice note would be indistinguishable from a
+technician's work voice note. Adding it needs its own discriminator.
+
+Tests: `backend/tests/job-request-images.test.ts` (18) cover authentication,
+role gating, cross-customer `404`, the state gate at each status, the cap,
+MIME/size/magic-byte rejection, filename sanitisation, storage rollback, and
+that the row is `context: 'REQUEST'` with no key or path exposed.
+
+
 # 11. Job Requests
 
 GET /api/v1/jobs/requests
@@ -1098,12 +1344,51 @@ Provider requests (inbox):
   e.g. `Thandi K.` — no email/phone) plus its quotes. Another
   provider's request reads as `404 NOT_FOUND` (no cross-provider
   probing); malformed ids → `400`.
+- **Step 14 addition.** The inbox also returns an open request once the
+  authenticated provider has **quoted** it, even though the job is not
+  addressed to them. So the inbox contains two things: requests addressed to
+  this provider, and open requests this provider has a live quote on. Every
+  request the provider can see — either kind — is one they may act on. An
+  open request that matches them but that they have not quoted is **not** in
+  the inbox; it is on `/provider/open-requests` (§13.4).
 - Provider identity is derived server-side: the professional profile
   owned via `professional_profiles.user_id`, or businesses owned via
   `business_profiles.owner_user_id` / active `business_members` rows
   (`BUSINESS_OWNER`/`BUSINESS_MANAGER`; `TECHNICIAN` members are never
   marketplace providers). A provider-role user with no linked profile
   sees an empty inbox (`200`, not an error).
+
+Open requests (matching board):
+
+- `GET /api/v1/provider/open-requests?page=&pageSize=` (same provider
+  roles as the inbox) returns `MARKETPLACE` jobs that are **unaddressed**
+  (`professional_id IS NULL AND business_id IS NULL`), are still `REQUESTED`
+  or `QUOTED`, have **fewer than 3** active quotes, and match the caller on
+  **both** category and service area. Newest first. Requests the caller has
+  already quoted are excluded — they live in the inbox instead.
+  `CUSTOMER`, `TECHNICIAN` and role-less accounts → `403 FORBIDDEN_ROLE`. A
+  provider with no service areas or no offerings in a category sees `200`
+  with an empty list, which is a normal answer and not an error.
+- `GET /api/v1/provider/open-requests/:id` returns one such request with the
+  same projection and privacy limits as the inbox detail. An open request the
+  caller does not match reads as `404 NOT_FOUND` — matching is the access
+  grant, and non-matching ids cannot be probed. Malformed ids → `400`.
+
+Service areas (Step 14):
+
+- `GET /api/v1/provider/me/service-areas` → `200 { items }` for the
+  authenticated `PROFESSIONAL` / `BUSINESS_OWNER` / `BUSINESS_MANAGER`. A
+  provider with no linked profile gets `200 { items: [] }`.
+- `PATCH /api/v1/provider/me/service-areas` with
+  `{ areas: [{ areaName (1–128), city? (≤128), province? (≤128) }] }`
+  **replaces** the caller's whole list in one transaction: at least 1 and at
+  most 10 areas. There is no add/remove endpoint, so the client can never put
+  the list into a half-updated state. `{"areas": []}` → `422`; a profile with
+  no areas is represented by never calling the endpoint. Other roles → `403
+  FORBIDDEN_ROLE`.
+- Ownership is the existing exactly-one-owner rule on `service_areas`
+  (nullable `professional_id` / `business_id`), so a business owner's list
+  and a professional's list are always separate.
 
 Quote submission:
 
@@ -1116,10 +1401,27 @@ Quote submission:
   transitions `REQUESTED → QUOTED` with a `job_status_history` entry,
   atomically (single transaction; the status update is guarded so a
   failed creation can never leave the job `QUOTED`).
-- Errors: malformed job id → `400`; unknown/unaddressed job → `404`;
-  invalid amounts/items/message → `422`; second active quote from the
-  same provider → `409 CONFLICT` (existing quotes are never silently
-  overwritten); wrong role → `403`.
+- **Step 14 — open requests.** An unaddressed job may be quoted by any
+  provider that matches it on category and service area. The **first** quote
+  performs the `REQUESTED → QUOTED` transition; the second and third are
+  accepted while the job is already `QUOTED` and leave the status alone, so
+  they write no further `job_status_history` entry. Once 3 active
+  (`DRAFT`/`SUBMITTED`) quotes exist, further quotes on that job are rejected
+  with `409 CONFLICT` and a message telling the submitter the customer already
+  has three quotes. The count is taken while the job row is locked
+  (`SELECT … FOR UPDATE`), so concurrent submissions cannot both pass the
+  check. A provider who has already quoted still gets `409` on their own
+  second attempt, unchanged.
+- **Step 14 — answered questions.** A professional who is unsure of scope
+  sends a normal quote whose `message` is a question. It is stored as a
+  `SUBMITTED` quote and counts toward the 3-quote cap; there is no separate
+  message thread for marketplace requests in the MVP (see
+  `docs/MVP-SCOPE.md`).
+- Errors: malformed job id → `400`; unknown job, or a job the caller neither
+  is addressed to nor matches → `404`; invalid amounts/items/message → `422`;
+  second active quote from the same provider → `409 CONFLICT` (existing
+  quotes are never silently overwritten); an open request that already has 3
+  active quotes → `409 CONFLICT`; wrong role → `403`.
 - Success → `201` with the quote. The frontend must never send
   `status = QUOTED` — the backend performs the transition.
 
@@ -1160,6 +1462,16 @@ sends `status = ACCEPTED`.
   accepted provider needs no extra row: the job's `professional_id` /
   `business_id` and the creation-time `job_assignments` entry already
   identify it. No technician is assigned (later business workflow).
+- **Step 14 — open requests.** On an open request there is no
+  `professional_id` / `business_id` and no `job_assignments` row, so acceptance
+  WRITES the winner: the same `UPDATE` that moves the job to `ACCEPTED` also
+  sets `professional_id` / `business_id` from the accepted quote, and a
+  provider `job_assignments` row is inserted in the same transaction.
+  Acceptance is the moment the customer chooses a professional, so from that
+  point the job is an ordinary addressed request and `POST
+  /jobs/:id/schedule`, `POST /jobs/:id/start` and the execution endpoints all
+  work with no open-request branch. The customer sees up to 3 quotes side by
+  side and picks one; the losers are retired to `DECLINED` exactly as before.
 - Errors: malformed job/quote ids → `400 VALIDATION_ERROR`; unknown
   job, another customer's job, internal (`INTERNAL`) job, unknown
   quote or quote↔job mismatch → `404 NOT_FOUND` (no cross-account
@@ -1326,8 +1638,9 @@ POST /api/v1/notifications/read-all
 Marks every owned notification read. Resolves
 `{ "markedRead": number }` (0 when already clear).
 
-Notification types: `JOB_REQUEST`, `QUOTE_RECEIVED`,
-`QUOTE_ACCEPTED`, `JOB_SCHEDULED`, `JOB_STARTED`, `JOB_COMPLETED`,
+Notification types: `JOB_REQUEST`, `JOB_REQUEST_OPEN`,
+`QUOTE_RECEIVED`, `QUOTE_ACCEPTED`,
+`JOB_SCHEDULED`, `JOB_STARTED`, `JOB_COMPLETED`,
 `JOB_CONFIRMED`, `TECHNICIAN_ASSIGNED`, `TECHNICIAN_REASSIGNED`,
 `JOB_UPDATE`, `WORK_DOCUMENTED`, `PARTS_REQUESTED`,
 `PARTS_APPROVED`, `PARTS_REJECTED`, `PARTS_MORE_INFO`,
@@ -1336,6 +1649,13 @@ directory, customer-profile owner, business owner + active
 owner/manager members, assigned technician); the actor is
 excluded. Delivery is best-effort — a notification failure never
 rolls back the committed job/quote/assignment operation.
+
+`JOB_REQUEST` means "this request was addressed to you". Step 14 adds
+`JOB_REQUEST_OPEN` for "an unaddressed request matches your categories
+and service areas" — it links to
+`GET /api/v1/provider/open-requests/:id`, not the inbox. A provider who
+later quotes that request also receives `QUOTE_RECEIVED` as usual when the
+customer accepts, and sees the job in their inbox from then on.
 
 
 # 23. Admin — Stage 9 implementation
@@ -1892,3 +2212,123 @@ The API is the security and business-rule boundary.
 The frontend is a client.
 
 The backend is authoritative.
+
+
+# 35. Provider Service Offerings
+
+A provider describes their own services, with an indicative price, without
+administrator approval. These routes are self-service and always scoped to
+the caller's own provider identity.
+
+    GET    /api/v1/provider/offerings
+    GET    /api/v1/provider/offerings/:id
+    POST   /api/v1/provider/offerings
+    PATCH  /api/v1/provider/offerings/:id
+    DELETE /api/v1/provider/offerings/:id
+
+Implemented in `backend/src/modules/offerings/`.
+
+## 35.1 Authorization
+
+Requires `PROFESSIONAL`, `BUSINESS_OWNER` or `BUSINESS_MANAGER`.
+
+- `CUSTOMER`, `TECHNICIAN` and `ADMIN` receive 403 `FORBIDDEN_ROLE`.
+  Technicians are employees, never marketplace providers. Administrators
+  manage the platform catalogue through `/admin/services`, not this surface.
+- A provider role with no professional profile and no business membership
+  receives 404 `NOT_FOUND`.
+- Ownership is derived from the session, never from the request: the caller's
+  `professional_profiles.user_id` row and the businesses they own or manage.
+- An offering belonging to another provider reads as 404, so offering ids
+  cannot be probed across providers.
+
+## 35.2 Request bodies
+
+`POST /api/v1/provider/offerings`:
+
+    {
+      "categoryId": "1",
+      "name": "Burst Pipe Emergency Call-Out",
+      "description": "Same-day call-out for burst pipes.",
+      "priceAmount": 850.00,
+      "providerType": "PROFESSIONAL"
+    }
+
+`PATCH /api/v1/provider/offerings/:id` accepts any subset of `categoryId`,
+`name`, `description` and `priceAmount`.
+
+Rules:
+
+- `categoryId` must be an active platform `service_categories` row.
+- `name` is required, at most 128 characters, unique per provider
+  (409 `CONFLICT` on a duplicate).
+- `description` is optional, at most 500 characters.
+- `priceAmount` is **optional**, must be non-negative when supplied, and must
+  have at most 2 decimal places so the DECIMAL(10,2) column cannot silently
+  round it. Omitting it (or sending `null`) stores `NULL`: the provider offers
+  the service but has not stated a starting price yet, which is what
+  registration produces. Consumers must render `null` as "not set" and must
+  NOT substitute a figure — see `docs/DATABASE.md` section 40.9a.
+- `providerType` is create-only and optional. It is required only when the
+  caller manages more than one provider, so the backend never guesses which
+  identity to write under. Sending it on `PATCH` is rejected with 422.
+- Unknown fields are rejected with 422, so a client cannot set
+  server-owned values such as `professionalId`, `businessId`, `isActive` or
+  `currency`.
+
+## 35.3 Responses
+
+`GET /api/v1/provider/offerings` returns the standard list envelope:
+
+    {
+      "success": true,
+      "data": {
+        "items": [ { "id": "1", "providerType": "PROFESSIONAL", "providerId": "1",
+                     "categoryId": "1", "categoryName": "Plumbing",
+                     "categorySlug": "plumbing", "name": "...",
+                     "description": null, "priceAmount": 850,
+                     "currency": "ZAR", "isActive": true,
+                     "createdAt": "...", "updatedAt": "..." } ],
+        "total": 1
+      },
+      "message": "Services retrieved."
+    }
+
+## 35.4 Removal
+
+`DELETE` is refused with 409 `CONFLICT` while any non-terminal job still
+references the offering:
+
+    REQUESTED, QUOTED, ACCEPTED, SCHEDULED, IN_PROGRESS, AWAITING_PARTS, DISPUTED
+
+Once only terminal jobs reference it (`COMPLETED`, `CONFIRMED`, `CLOSED`,
+`CANCELLED`) removal succeeds and is idempotent. Removal is a soft delete, so
+closed job history keeps resolving the service it was booked against.
+
+## 35.5 Indicative pricing
+
+`priceAmount` is an indicative starting price in ZAR. The MVP does not
+process payments: the customer and provider arrange payment directly and the
+platform records the agreed quote. This figure is displayed as a
+starting-from price and is never charged, never enforced against a submitted
+quote, and never treated as an agreed amount.
+
+`priceAmount` is **nullable**. `null` means the provider has not stated a
+price yet — services are chosen at registration, before login, so the figure
+is filled in later on My Services. `null` must be rendered as "no price
+stated", never as R0. A provider card's `fromPrice` is the lowest stated
+price across live offerings (§7.1), skipping unpriced ones rather than
+counting them as free.
+
+## 35.6 Public visibility
+
+A live offering appears on the provider's public marketplace profile at
+`GET /api/v1/providers/:id` under `offerings`, alongside the platform
+catalogue services in `services`. Removed offerings are never returned
+publicly.
+
+Provider-authored services are stored in `service_offerings`
+(migration 015), not as rows in the admin-owned `services` table, because
+`services` enforces `UNIQUE(slug)` and `UNIQUE(category_id, name)` globally
+and therefore cannot hold two providers offering the same service name. See
+docs/DATABASE.md section 9.

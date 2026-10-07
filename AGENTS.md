@@ -226,6 +226,45 @@ API versioning:
 /api/v1
 
 
+## 4.1 NODE.JS RUNTIME — MANDATORY
+
+Node.js 22.12.0 is the pinned and required runtime.
+
+Source of truth:
+
+- .nvmrc
+- engines.node in apps/web/package.json
+
+Rules:
+
+- ALWAYS run `nvm use` before `npm install`, `npm start` or `npm test`
+- NEVER run Fixlynk tooling on Node.js 24 or later
+- If a machine defaults to another version, set it explicitly
+  with `nvm alias default 22.12.0`
+- Verify the active version with `node -v` when Angular tooling behaves
+  unexpectedly
+
+Known failure mode on Node.js 24+:
+
+The Angular build cache loads a native addon (lmdb) that hangs
+indefinitely on Node.js 24. The symptom is silent and misleading:
+
+- `ng serve` starts but prints NO output
+- Nothing binds the expected dev-server port
+- `ng version`, `npm ls` and even `npm install` hang with no output
+- An already-open browser tab keeps working, so the app looks alive
+  while no server is actually running
+- Browser API calls then fail and the UI reports a network/connection
+  error instead of the real cause
+
+TRIAGE RULE:
+
+A Node.js command that produces no output, never exits and never
+opens a port is a Node.js version mismatch until proven otherwise.
+Check `node -v` FIRST, before investigating application code, CORS,
+configuration or the network.
+
+
 ## 5. HIGH-LEVEL ARCHITECTURE
 
 The frontend must NEVER communicate directly with MySQL.
@@ -1238,6 +1277,10 @@ AI agents working on Fixlynk must:
 - Explain significant architectural decisions.
 - Prefer simple maintainable solutions.
 - Preserve backwards compatibility where practical.
+- Verify the active Node.js version is 22.12.0 before running any
+  build, serve or test command. See section 4.1.
+- Diagnose silent, hanging Node.js commands as a Node.js version
+  mismatch first. See section 4.1.
 
 AI agents must NOT:
 

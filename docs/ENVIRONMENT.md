@@ -23,16 +23,30 @@ npm start      # ng serve -> http://localhost:4200/
 
 ## Troubleshooting: `ng` hangs with no output
 
-Symptom (seen 2026-09-23): `ng version` / `ng serve` hangs for 50s+
-with zero output, stuck requiring `@angular-devkit/core`
-(`src/logger` -> `rxjs`, `src/utils`, `src/virtual-fs`) and slow
-`ajv` loads.
+Symptom: `ng version` / `ng serve` / `npm ls` hangs with zero output,
+never exits and never opens a port. An already-open browser tab keeps
+working, so the app looks healthy while no dev server is running; the
+UI then reports a connection/network error rather than the real cause.
 
-Cause: corrupt / partial `node_modules` in `apps/web`
-(installed Sep 22), not a code bug. Wrong Node major (e.g. system
-Node 24.16.0) also triggers it.
+Cause: corrupt / partial `node_modules` in `apps/web`, or the wrong
+Node major (e.g. system Node 24.16.0). On Node 24 the native addon
+loaded by the Angular build cache (`lmdb`) hangs indefinitely, so the
+CLI stalls before printing anything.
 
-Fix (verified):
+### Step 1 — check the Node version FIRST
+
+```sh
+node -v        # must print v22.12.0
+nvm use        # picks up .nvmrc -> 22.12.0
+```
+
+A silent, hanging, port-less command is a Node version mismatch until
+proven otherwise. Check this before investigating application code,
+CORS, configuration or the network.
+
+If the version was already correct, continue to Step 2.
+
+### Step 2 — reinstall dependencies
 
 ```sh
 nvm use 22.12.0
@@ -42,6 +56,16 @@ npm install
 node ./node_modules/@angular/cli/bin/ng.js version  # should print CLI table
 npm start
 ```
+
+To stop recurring, pin the shell default:
+
+```sh
+nvm alias default 22.12.0
+```
+
+Note: `./node_modules/@angular/cli/lib/cli/index.js` is a library
+module, not the executable. Invoking it exits 0 with no output. Always
+use `./node_modules/@angular/cli/bin/ng.js`.
 
 Do not run `npm cache clean --force` unless cache corruption is
 suspected; it was not needed for this fix. If `~/.npm` permission
@@ -56,7 +80,7 @@ The backend reads the exact variables documented in `docs/DEPLOYMENT.md`:
 `JWT_ACCESS_TTL_SECONDS`, `REFRESH_TOKEN_TTL_SECONDS`, `BCRYPT_COST`,
 `CORS_ORIGIN`, `FILE_STORAGE_DIR`, `WEB_BASE_URL`, `MAIL_ENABLED`,
 `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`,
-`MAIL_PASSWORD`, `MAIL_FROM` and `MAIL_FROM_NAME`.
+`MAIL_PASSWORD`, `MAIL_FROM`, `MAIL_FROM_NAME` and `OPS_ALERT_EMAIL`.
 
 Provider notification email is off until it is configured: with
 `MAIL_ENABLED` unset or `false` the rendered message is only written to
@@ -66,6 +90,26 @@ mail server. Set `MAIL_ENABLED=true` with `MAIL_HOST` (plus
 (the Angular dev origin, `http://localhost:4200`, is the default) to
 send provider emails with working in-app links. Use a fictional sender
 such as `no-reply@example.co.za` locally; never a real address.
+
+### OPS_ALERT_EMAIL — platform alerts inbox
+
+`OPS_ALERT_EMAIL` is the single operations address that receives an email
+when a new account registers and when a new job request is posted. It is
+configurable rather than hard-coded, because the recipient is an operational
+decision per deployment; leaving it empty disables these alerts entirely, so no
+deployment starts sending them by accident.
+
+These alerts share the SMTP transport, so they are **also** subject to
+`MAIL_ENABLED`: with mail disabled — the default, and the state of a fresh
+`.env` — the sender resolves to a no-op and nothing is delivered. Setting
+`OPS_ALERT_EMAIL` alone is therefore not enough to start receiving them.
+
+Unlike provider notification email, an operations alert deliberately carries
+contact details (the registering email and phone, the requesting customer's
+email and the job description). That is the purpose of the alert, so
+`OPS_ALERT_EMAIL` must be an address controlled by the business. Credentials
+are never included: no password, hash or token is rendered, in either the
+subject or the body. See `docs/NOTIFICATIONS.md`.
 
 For local development, use the fictional values in `.env.example` and
 `backend/.env.example`. `AUTH_STORE=mysql` is the normal application
