@@ -19,8 +19,10 @@ import {
   JobNotQuoteableError,
   JobNotSchedulableError,
   JobNotStartableError,
+  MAX_QUOTES_PER_OPEN_JOB,
   QuoteAlreadyAcceptedError,
   QuoteConflictError,
+  QuoteLimitReachedError,
   QuoteNotEligibleError,
   type AcceptQuotePersistInput,
   type AcceptQuoteResult,
@@ -103,20 +105,41 @@ export class MemoryQuotesStore implements QuotesStore {
     return userIds;
   }
 
+  /**
+   * Step 14 — the inbox is addressed requests PLUS open requests this
+   * provider has quoted. Quoting is the access grant, so a professional keeps
+   * seeing a request they answered even though it was never theirs.
+   */
   async listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }> {
     const statuses =
       filter.statuses.length > 0
         ? filter.statuses
         : (['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS'] as ProviderRequestFilter['statuses']);
-    const owned = (await this.jobs.debugAllJobs()).filter(
-      (job) =>
-        job.source === 'MARKETPLACE' &&
-        (statuses as string[]).includes(job.status) &&
-        ((job.provider.providerType === 'professional' &&
-          filter.professionalIds.includes(job.provider.id.replace('professional-', ''))) ||
-          (job.provider.providerType === 'business' &&
-            filter.businessIds.includes(job.provider.id.replace('business-', '')))),
-    );
+    const isAddressed = (job: JobDto): boolean => {
+      const addressee = job.provider;
+      if (!addressee) return false;
+      return addressee.providerType === 'professional'
+        ? filter.professionalIds.includes(addressee.id.replace('professional-', ''))
+        : filter.businessIds.includes(addressee.id.replace('business-', ''));
+    };
+    const quotedJobIds = new Set<string>();
+    for (const numericId of filter.professionalIds) {
+      for (const jobId of await this.listJobIdsQuotedBy('professional', numericId)) quotedJobIds.add(jobId);
+    }
+    for (const numericId of filter.businessIds) {
+      for (const jobId of await this.listJobIdsQuotedBy('business', numericId)) quotedJobIds.add(jobId);
+    }
+    // Step 15: `debugAllJobs` includes soft-deleted rows, exactly as the MySQL
+    // inbox query's own `deleted_at IS NULL` excludes them. A request the
+    // customer withdrew must not keep appearing in a professional's inbox.
+    const owned = (await this.jobs.debugAllJobs())
+      .filter((job) => !this.jobs.debugIsDeleted(job.id))
+      .filter(
+        (job) =>
+          job.source === 'MARKETPLACE' &&
+          (statuses as string[]).includes(job.status) &&
+          (isAddressed(job) || (job.provider === null && quotedJobIds.has(job.id))),
+      );
     owned.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     const start = (filter.page - 1) * filter.pageSize;
     const items: ProviderRequestDto[] = [];
@@ -132,13 +155,48 @@ export class MemoryQuotesStore implements QuotesStore {
     return displayNameOf(names.firstName, names.lastName);
   }
 
+  async hasQuoteFromProvider(
+    jobId: string,
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<boolean> {
+    const wanted = `${providerType}-${providerNumericId}`;
+    return [...this.quotes.values()].some(
+      (quote) =>
+        quote.jobId === jobId &&
+        quote.provider.id === wanted &&
+        (quote.status === 'DRAFT' || quote.status === 'SUBMITTED'),
+    );
+  }
+
+  async listJobIdsQuotedBy(
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<string[]> {
+    const wanted = `${providerType}-${providerNumericId}`;
+    return [
+      ...new Set(
+        [...this.quotes.values()]
+          .filter(
+            (quote) =>
+              quote.provider.id === wanted &&
+              (quote.status === 'DRAFT' || quote.status === 'SUBMITTED'),
+          )
+          .map((quote) => quote.jobId),
+      ),
+    ];
+  }
+
   async createQuote(input: CreateQuotePersistInput): Promise<QuoteDto> {
     const live = await this.jobs.getJobById(input.job.id);
     if (!live || live.source !== 'MARKETPLACE') {
       throw new JobNotQuoteableError();
     }
     const expectedProviderId = `${input.providerType}-${input.providerNumericId}`;
-    if (live.provider.id !== expectedProviderId) {
+    // Step 14: an OPEN job (no provider) is quotable by any matching
+    // provider; an ADDRESSED one only by the provider it names.
+    const isOpenRequest = live.provider === null;
+    if (!isOpenRequest && live.provider?.id !== expectedProviderId) {
       throw new JobNotQuoteableError('This job is not addressed to your provider profile.');
     }
     // Duplicate check before the status check: a second submission from the
@@ -150,7 +208,22 @@ export class MemoryQuotesStore implements QuotesStore {
         (quote.status === 'DRAFT' || quote.status === 'SUBMITTED'),
     );
     if (duplicate) throw new QuoteConflictError();
-    if (live.status !== 'REQUESTED') {
+    if (isOpenRequest) {
+      // The third quote closes the request. Counted before the status check
+      // so a full request reports "full", not "no longer quoteable".
+      const active = [...this.quotes.values()].filter(
+        (quote) =>
+          quote.jobId === live.id && (quote.status === 'DRAFT' || quote.status === 'SUBMITTED'),
+      ).length;
+      if (active >= MAX_QUOTES_PER_OPEN_JOB) {
+        throw new QuoteLimitReachedError(
+          `This request already has ${MAX_QUOTES_PER_OPEN_JOB} quotes, so the customer is no longer accepting more.`,
+        );
+      }
+      if (live.status !== 'REQUESTED' && live.status !== 'QUOTED') {
+        throw new JobNotQuoteableError();
+      }
+    } else if (live.status !== 'REQUESTED') {
       throw new JobNotQuoteableError();
     }
     // All checks passed before any mutation: a failed creation cannot
@@ -181,8 +254,14 @@ export class MemoryQuotesStore implements QuotesStore {
       createdAt: now,
     };
     this.quotes.set(quote.id, quote);
-    this.jobs.debugSetJobStatus(live.id, 'QUOTED');
-    this.history.push({ jobId: live.id, previous: 'REQUESTED', next: 'QUOTED' });
+    // Step 14: only the FIRST quote on an open request performs the
+    // transition. Later quotes leave the already-QUOTED job alone, so no
+    // further `job_status_history` entry is written — the job did not change
+    // state, and history records state changes (AGENTS.md section 37).
+    if (live.status === 'REQUESTED') {
+      this.jobs.debugSetJobStatus(live.id, 'QUOTED');
+      this.history.push({ jobId: live.id, previous: 'REQUESTED', next: 'QUOTED' });
+    }
     return quote;
   }
 
@@ -211,6 +290,18 @@ export class MemoryQuotesStore implements QuotesStore {
         this.quotes.set(competing.id, { ...competing, status: 'DECLINED' });
         retiredQuoteIds.push(competing.id);
       }
+    }
+    // Step 14: accepting a quote on an OPEN job writes the winner onto the
+    // job, turning it into an addressed request with the `job_assignments`
+    // row an open request has no row for. Acceptance IS the customer choosing
+    // a professional, so from here every downstream module is unchanged.
+    if (live.provider === null) {
+      this.jobs.debugSetJobProvider(
+        live.id,
+        quote.provider.providerType,
+        quote.provider.id.split('-')[1] ?? '',
+        quote.provider.name,
+      );
     }
     this.jobs.debugSetJobAccepted(live.id, quote.total, quote.currency);
     this.history.push({ jobId: live.id, previous: 'QUOTED', next: 'ACCEPTED' });

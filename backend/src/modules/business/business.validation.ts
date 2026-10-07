@@ -79,7 +79,7 @@ export function validateBusinessPatch(body: unknown): ValidatedBusinessPatch {
     if (typeof rawName !== 'string') return invalid('Business name must be text.');
     const trimmed = rawName.trim();
     if (trimmed.length < 1 || trimmed.length > BUSINESS_NAME_MAX) {
-      return invalid(`Business name must be 1–${BUSINESS_NAME_MAX} characters.`);
+      return invalid(`Business name must be 1-${BUSINESS_NAME_MAX} characters.`);
     }
     input.businessName = trimmed;
   }

@@ -2211,7 +2211,7 @@ export class MysqlBusinessStore implements BusinessStore {
         if (moved.affectedRows !== 1) throw new PartsRequestNotActionableError('The job changed while reviewing.');
         await conn.query(
           'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
-          [jobId, 'IN_PROGRESS', 'AWAITING_PARTS', input.reviewerId, 'Parts request approved — awaiting parts'],
+          [jobId, 'IN_PROGRESS', 'AWAITING_PARTS', input.reviewerId, 'Parts request approved - awaiting parts'],
         );
       }
       await conn.commit();
@@ -2309,7 +2309,7 @@ export class MysqlBusinessStore implements BusinessStore {
           if (resumed.affectedRows !== 1) throw new PartsRequestNotActionableError('The job changed while recording availability.');
           await conn.query(
             'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
-            [jobId, 'AWAITING_PARTS', 'IN_PROGRESS', input.markedBy, 'Parts available — job ready to continue'],
+            [jobId, 'AWAITING_PARTS', 'IN_PROGRESS', input.markedBy, 'Parts available - job ready to continue'],
           );
           jobResumed = true;
         }
@@ -2439,7 +2439,7 @@ export class MysqlBusinessStore implements BusinessStore {
       if (resumed.affectedRows !== 1) throw new PartsRequestNotActionableError('The job changed while resuming.');
       await conn.query(
         'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
-        [jobId, 'AWAITING_PARTS', 'IN_PROGRESS', input.resumedBy, 'Technician resumed job — parts available'],
+        [jobId, 'AWAITING_PARTS', 'IN_PROGRESS', input.resumedBy, 'Technician resumed job - parts available'],
       );
       await conn.commit();
       const refreshed = await this.getTechnicianJob(technicianId, jobId);

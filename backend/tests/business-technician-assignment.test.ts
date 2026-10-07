@@ -169,7 +169,7 @@ function assertErrorEnvelope(res: { body: unknown }, code: string): void {
   assert.ok(typeof body.error.message === 'string' && body.error.message.length > 0);
 }
 
-describe('Stage 7C — assignment roles', () => {
+describe('Stage 7C - assignment roles', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -315,7 +315,7 @@ describe('Stage 7C — assignment roles', () => {
   });
 });
 
-describe('Stage 7C — persistence, reassignment, history', () => {
+describe('Stage 7C - persistence, reassignment, history', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -377,7 +377,7 @@ describe('Stage 7C — persistence, reassignment, history', () => {
   });
 });
 
-describe('Stage 7C — technician My Jobs', () => {
+describe('Stage 7C - technician My Jobs', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -489,7 +489,7 @@ describe('Stage 7C — technician My Jobs', () => {
   });
 });
 
-describe('Stage 7C — regressions', () => {
+describe('Stage 7C - regressions', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {

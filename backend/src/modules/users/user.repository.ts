@@ -42,15 +42,23 @@ export interface CreateUserInput {
  * resolvers (marketplace requests, business management) read these rows.
  * Provisioning at registration is what makes a self-registering provider
  * usable immediately without any verification step.
+ *
+ * A customer gets one for the same reason. `customer_profiles.first_name` and
+ * `last_name` are NOT NULL, and customer-scoped features read that row for
+ * ownership: saved professionals, quotes, job detail and job history all
+ * resolve the caller through it. Provisioning it lazily on the first job
+ * request meant a brand-new customer received 404 on those endpoints until
+ * they happened to post a job, which is both wrong and order-dependent.
  */
 export type ProfileProvision =
+  | { kind: 'CUSTOMER'; firstName: string; lastName: string; email: string; phone: string | null }
   | { kind: 'PROFESSIONAL'; displayName: string }
   | { kind: 'BUSINESS_OWNER'; businessName: string; slug: string; email: string; phone: string | null };
 
 export interface CreateAccountInput extends CreateUserInput {
   /** Single self-registered role, e.g. CUSTOMER / PROFESSIONAL / BUSINESS_OWNER. */
   role: string;
-  /** null for CUSTOMER (their profile is provisioned on first job request). */
+  /** The role profile created in the same transaction, or null when none applies. */
   profile: ProfileProvision | null;
 }
 

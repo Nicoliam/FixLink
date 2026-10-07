@@ -219,7 +219,7 @@ export class NotificationService {
       return fail(
         422,
         'VALIDATION_ERROR',
-        'Invalid pagination or filter. Use page 1–1000, pageSize 1–50, unreadOnly true/false.',
+        'Invalid pagination or filter. Use page 1-1000, pageSize 1-50, unreadOnly true/false.',
       );
     }
     const result = await this.notifications.listForUser({ userId: authUserId, unreadOnly, page, pageSize });

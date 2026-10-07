@@ -467,7 +467,7 @@ export class BusinessService {
     const page = readPage(query['page'], 1, 1000);
     const pageSize = readPage(query['pageSize'] ?? query['page_size'], 20, 50);
     if (page === null || pageSize === null) {
-      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1–1000 and pageSize 1–50.');
+      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1-1000 and pageSize 1-50.');
     }
     const rawSearch = query['search'] ?? query['q'];
     const search =
@@ -834,7 +834,7 @@ export class BusinessService {
     const page = readPage(query['page'], 1, 1000);
     const pageSize = readPage(query['pageSize'] ?? query['page_size'], 20, 50);
     if (page === null || pageSize === null) {
-      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1–1000 and pageSize 1–50.');
+      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1-1000 and pageSize 1-50.');
     }
     const rawStatus = query['status'];
     let status: InternalJobDto['status'] | null = null;

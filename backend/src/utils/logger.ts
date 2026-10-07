@@ -23,6 +23,13 @@ const SAFE_KEYS = new Set([
   'path',
   'errorCode',
   'errorName',
+  // Operations-alert facts: which event fired, and whether the channel is
+  // actually able to deliver. Non-sensitive, and needed to answer "why am I
+  // not receiving these emails?" without widening redaction any further.
+  'kind',
+  'configured',
+  'deliverable',
+  'active',
 ]);
 
 function redact(value: unknown, depth = 0): unknown {

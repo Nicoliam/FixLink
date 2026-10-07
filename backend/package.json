@@ -2,7 +2,7 @@
   "name": "fixlynk-backend",
   "version": "0.5.0",
   "private": true,
-  "description": "Fixlynk backend — modular monolith REST API (Stage 5A: authentication foundation)",
+  "description": "Fixlynk backend \u2014 modular monolith REST API (Stage 5A: authentication foundation)",
   "type": "commonjs",
   "engines": {
     "node": ">=18.0.0"
@@ -12,6 +12,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "JWT_ACCESS_SECRET=fixlynk-test-secret BCRYPT_COST=4 tsx --test tests/**/*.test.ts",
+    "test:mysql": "JWT_ACCESS_SECRET=fixlynk-test-secret BCRYPT_COST=4 FIXLYNK_REQUIRE_MYSQL=1 tsx --test tests/mysql-*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

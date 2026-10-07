@@ -25,7 +25,13 @@ import {
   type ExecutionStore,
   type StatusHistoryEntry,
 } from './execution.store';
-import type { JobImageDto, JobUpdateDto, TimelineEventDto, WorkPhase } from './execution.types';
+import type {
+  JobImageContext,
+  JobImageDto,
+  JobUpdateDto,
+  TimelineEventDto,
+  WorkPhase,
+} from './execution.types';
 
 function toIso(value: Date | string | null): string | null {
   if (value === null || value === undefined) return null;
@@ -45,6 +51,13 @@ function toPhase(value: string): WorkPhase {
   throw new Error(`Unknown work phase: ${value}`);
 }
 
+function toContext(value: string): JobImageContext {
+  // Migration 017 backfills every pre-existing row to WORK, so a value that is
+  // neither is a corrupt row rather than something to guess at.
+  if (value === 'REQUEST' || value === 'WORK') return value;
+  throw new Error(`Unknown job image context: ${value}`);
+}
+
 interface JobStateRow extends RowDataPacket {
   id: number;
   source: 'MARKETPLACE' | 'INTERNAL';
@@ -56,6 +69,7 @@ interface ImageRow extends RowDataPacket {
   job_id: number;
   uploader_id: number | null;
   phase: string;
+  context: string;
   file_reference: string;
   original_filename: string | null;
   mime_type: string | null;
@@ -86,6 +100,7 @@ function mapImageRow(row: ImageRow): JobImageDto & { storageKey: string } {
     jobId: toStringId(row.job_id),
     uploadedBy: row.uploader_id === null ? '' : toStringId(row.uploader_id),
     phase: toPhase(row.phase),
+    context: toContext(row.context),
     originalFilename: row.original_filename,
     mimeType: row.mime_type ?? 'application/octet-stream',
     size: row.file_size === null ? 0 : toNumber(row.file_size),
@@ -112,7 +127,7 @@ function mapUpdateRow(row: UpdateRow): JobUpdateDto {
 }
 
 const IMAGE_SELECT = `
-  SELECT \`id\`, \`job_id\`, \`uploader_id\`, \`phase\`, \`file_reference\`,
+  SELECT \`id\`, \`job_id\`, \`uploader_id\`, \`phase\`, \`context\`, \`file_reference\`,
          \`original_filename\`, \`mime_type\`, \`file_size\`, \`created_at\`
     FROM \`job_images\``;
 

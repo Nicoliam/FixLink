@@ -256,3 +256,45 @@ export function sanitizeOriginalFilename(name: string): string {
   const cleaned = base === '' || base === '.' || base === '..' ? fallback : base;
   return cleaned.length > 255 ? cleaned.slice(-255) : cleaned;
 }
+
+/** The multer file shape this validator needs, kept structural on purpose. */
+export interface UploadedImageFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+}
+
+export type ImageUploadCheck =
+  | { extension: 'jpg' | 'png' | 'webp'; mime: string }
+  | { error: string };
+
+/**
+ * Validate one uploaded job image.
+ *
+ * Shared by the execution module (professional Before/During/After photos) and
+ * the jobs module (customer request photos) so the two cannot drift: both must
+ * apply the same size cap, the same MIME allowlist, and — critically — the
+ * same magic-byte check. The client-declared type is never trusted, because a
+ * rename to `.jpg` is not evidence of anything.
+ *
+ * Lives here rather than in either module because the constants and the content
+ * sniffing already live in this file.
+ */
+export function validateJobImageUpload(
+  file: UploadedImageFile | null | undefined,
+): ImageUploadCheck {
+  if (!file || file.buffer.length === 0) return { error: 'An image file is required.' };
+  if (file.size > JOB_IMAGE_MAX_BYTES || file.buffer.length > JOB_IMAGE_MAX_BYTES) {
+    return { error: 'Image must be 5MB or smaller.' };
+  }
+  const claimed = file.mimetype.toLowerCase().trim();
+  if (!(JOB_IMAGE_ALLOWED_MIME as readonly string[]).includes(claimed)) {
+    return { error: 'Only JPEG, PNG or WebP images are allowed.' };
+  }
+  // The stored type comes from the actual file content, never from the client.
+  const detected = detectImageType(file.buffer);
+  if (!detected) return { error: 'Only JPEG, PNG or WebP images are allowed.' };
+  if (detected !== claimed) return { error: 'Only JPEG, PNG or WebP images are allowed.' };
+  return { extension: extensionForMime(detected), mime: detected };
+}

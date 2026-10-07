@@ -80,6 +80,9 @@ export class MemoryExecutionStore implements ExecutionStore {
       jobId: input.jobId,
       uploadedBy: input.uploadedBy,
       phase: input.phase,
+      // The memory store only ever holds provider execution photos; request
+      // photos live in the jobs module's own store.
+      context: 'WORK',
       originalFilename: input.originalFilename,
       mimeType: input.mimeType,
       size: input.size,
@@ -304,8 +307,11 @@ export function buildTimelineEvents(
     events.push({
       kind: 'image',
       createdAt: image.createdAt,
-      actor: 'provider',
+      // A REQUEST photo is the customer's evidence, so it is attributed to the
+      // customer rather than the provider.
+      actor: image.context === 'REQUEST' ? 'customer' : 'provider',
       phase: image.phase as WorkPhase,
+      context: image.context,
       imageId: image.id,
       mimeType: image.mimeType,
     });

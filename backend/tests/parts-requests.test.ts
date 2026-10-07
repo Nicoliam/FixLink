@@ -203,7 +203,7 @@ function pngBuffer(): Buffer {
   return Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01, 0x02, 0x03]);
 }
 
-describe('Stage 7E — technician parts requests', () => {
+describe('Stage 7E - technician parts requests', () => {
   let ctx: TestContext;
   let tokens: { ownerToken: string; managerToken: string; ownerBToken: string };
   beforeEach(async () => {

@@ -97,7 +97,7 @@ export function notificationDeepLink(
 }
 
 const CLOSING_NOTE =
-  'Customer contact details are not included in this email. Sign in to Fixlynk to reply with a quote or a question — everything stays on the platform.';
+  'Customer contact details are not included in this email. Sign in to Fixlynk to reply with a quote or a question - everything stays on the platform.';
 
 export function renderNotificationEmail(input: RenderNotificationEmailInput): RenderedEmail | null {
   const { notification, roles, webBaseUrl, details } = input;

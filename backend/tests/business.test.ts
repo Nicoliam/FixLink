@@ -135,7 +135,7 @@ async function inviteTechnician(
   return res.body.data as Record<string, unknown>;
 }
 
-describe('Stage 7A — authentication & role gating', () => {
+describe('Stage 7A - authentication & role gating', () => {
   let ctx: TestContext;
   beforeEach(() => {
     ctx = buildApp();
@@ -194,7 +194,7 @@ describe('Stage 7A — authentication & role gating', () => {
   });
 });
 
-describe('Stage 7A — business profile', () => {
+describe('Stage 7A - business profile', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -283,7 +283,7 @@ describe('Stage 7A — business profile', () => {
   });
 });
 
-describe('Stage 7A — technician management', () => {
+describe('Stage 7A - technician management', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {

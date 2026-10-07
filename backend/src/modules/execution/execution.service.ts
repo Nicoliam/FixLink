@@ -11,11 +11,9 @@
  */
 import type { FileStorage } from '../../services/file-storage';
 import {
-  JOB_IMAGE_ALLOWED_MIME,
   JOB_IMAGE_MAX_BYTES,
-  detectImageType,
-  extensionForMime,
   sanitizeOriginalFilename,
+  validateJobImageUpload,
 } from '../../services/file-storage';
 import type { JobsStore } from '../jobs/jobs.store';
 import type { JobDto } from '../jobs/jobs.types';
@@ -92,9 +90,15 @@ export class ExecutionService {
         const customer = await this.jobs.findUserIdByCustomerId(job.customerId).catch(() => null);
         if (customer) recipients.push(customer);
       }
-      const numeric = job.provider.id.split('-')[1] ?? '';
+      // Step 14: an OPEN request has no provider. Execution can only start
+      // after acceptance, and acceptance writes the winner onto the job — so
+      // `provider` is set for every job that reaches this point. The guard is
+      // defensive, not a new branch.
+      const addressee = job.provider;
+      if (!addressee) return;
+      const numeric = addressee.id.split('-')[1] ?? '';
       const providers = await this.quotes
-        .findUserIdsForProvider(job.provider.providerType, numeric)
+        .findUserIdsForProvider(addressee.providerType, numeric)
         .catch((): string[] => []);
       for (const id of providers) {
         if (id !== actorUserId) recipients.push(id);
@@ -135,9 +139,17 @@ export class ExecutionService {
     return { identity };
   }
 
+  /**
+   * Step 14: an OPEN request (`provider === null`) is nobody's to execute.
+   * Acceptance assigns the winner onto the job, so by the time any execution
+   * endpoint is reachable the provider is set — this check just refuses the
+   * impossible case rather than throwing on a null read.
+   */
   private isAddressedTo(job: JobDto, identity: ProviderIdentity): boolean {
-    const numeric = job.provider.id.split('-')[1] ?? '';
-    return job.provider.providerType === 'professional'
+    const addressee = job.provider;
+    if (!addressee) return false;
+    const numeric = addressee.id.split('-')[1] ?? '';
+    return addressee.providerType === 'professional'
       ? identity.professionalIds.includes(numeric)
       : identity.businessIds.includes(numeric);
   }
@@ -233,20 +245,9 @@ export class ExecutionService {
   }
 
   private validateUploadFile(file: UploadedFile | null | undefined): { extension: 'jpg' | 'png' | 'webp'; mime: string } | { error: string } {
-    if (!file || file.buffer.length === 0) return { error: 'An image file is required.' };
-    if (file.size > JOB_IMAGE_MAX_BYTES || file.buffer.length > JOB_IMAGE_MAX_BYTES) {
-      return { error: 'Image must be 5MB or smaller.' };
-    }
-    const claimed = file.mimetype.toLowerCase().trim();
-    if (!(JOB_IMAGE_ALLOWED_MIME as readonly string[]).includes(claimed)) {
-      return { error: 'Only JPEG, PNG or WebP images are allowed.' };
-    }
-    // Never trust the client-provided extension/MIME alone: the stored
-    // type comes from the actual file content (magic bytes).
-    const detected = detectImageType(file.buffer);
-    if (!detected) return { error: 'Only JPEG, PNG or WebP images are allowed.' };
-    if (detected !== claimed) return { error: 'Only JPEG, PNG or WebP images are allowed.' };
-    return { extension: extensionForMime(detected), mime: detected };
+    // Shared with the jobs module so customer request photos and professional
+    // work photos cannot drift apart on size, MIME or magic-byte checks.
+    return validateJobImageUpload(file);
   }
 
   async uploadImage(

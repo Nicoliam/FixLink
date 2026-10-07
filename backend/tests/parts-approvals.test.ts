@@ -220,7 +220,7 @@ async function jobStatus(ctx: TestContext, token: string, jobId: string, as: 'bu
   return (res.body.data.job as Record<string, unknown>)['status'] as string;
 }
 
-describe('Stage 7F — manager approvals + awaiting parts', () => {
+describe('Stage 7F - manager approvals + awaiting parts', () => {
   let ctx: TestContext;
   let tokens: { ownerToken: string; managerToken: string; ownerBToken: string };
   beforeEach(async () => {
@@ -234,13 +234,13 @@ describe('Stage 7F — manager approvals + awaiting parts', () => {
     const res = await request(ctx.app)
       .post(`/api/v1/business/jobs/${working.jobId}/parts/${created['id']}/approve`)
       .set('Authorization', `Bearer ${working.ownerToken}`)
-      .send({ comment: 'Genuine part required — approved.' });
+      .send({ comment: 'Genuine part required - approved.' });
     assert.equal(res.status, 200, `approve failed: ${JSON.stringify(res.body)}`);
     assert.equal(res.body.success, true);
     const payload = res.body.data as Record<string, unknown>;
     const approvedRequest = payload['request'] as Record<string, unknown>;
     assert.equal(approvedRequest['status'], 'APPROVED');
-    assert.equal(approvedRequest['reviewNotes'], 'Genuine part required — approved.');
+    assert.equal(approvedRequest['reviewNotes'], 'Genuine part required - approved.');
     assert.ok(approvedRequest['reviewedAt']);
     assert.equal(approvedRequest['reviewedBy'], (await ctx.users.findByEmail('thabo.approve@example.co.za'))?.id);
     const approval = payload['approval'] as Record<string, unknown>;
@@ -361,7 +361,7 @@ describe('Stage 7F — manager approvals + awaiting parts', () => {
     const approve = await request(ctx.app)
       .post(`/api/v1/business/jobs/${working.jobId}/parts/${created['id']}/approve`)
       .set('Authorization', `Bearer ${working.ownerToken}`)
-      .send({ comment: 'Confirmed — approved.' });
+      .send({ comment: 'Confirmed - approved.' });
     assert.equal(approve.status, 200);
     assert.equal(await jobStatus(ctx, working.ownerToken, working.jobId, 'business'), 'AWAITING_PARTS');
   });

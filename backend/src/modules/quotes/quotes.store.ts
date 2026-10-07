@@ -17,6 +17,23 @@
  * and `startJob` (SCHEDULED → IN_PROGRESS). Again no schema change: the
  * existing `jobs.status` ENUM, `jobs.scheduled_at` and
  * `job_status_history` columns already support both transitions.
+ *
+ * Step 14 adds open requests. A MARKETPLACE job may be created with NO
+ * provider (see the jobs module); such a job is offerable to every provider
+ * matching it on category and service area, and up to
+ * MAX_QUOTES_PER_OPEN_JOB of them may quote. Three rules follow, and they are
+ * the whole of this change:
+ *
+ *   1. `createQuote` accepts an unaddressed job from any matching provider,
+ *      not just the one it is addressed to. The first quote performs the
+ *      existing REQUESTED → QUOTED transition; later ones leave the already
+ *      QUOTED status alone.
+ *   2. The quote count is checked inside the same locked transaction that
+ *      writes the quote, so two simultaneous submissions cannot both pass.
+ *   3. Accepting a quote on an unaddressed job WRITES the winner onto the
+ *      job. Acceptance is the moment the customer picks a professional, and
+ *      it is what turns an open request back into an addressed one — so
+ *      schedule, start and execution need no open-request special case.
  */
 import type { JobDto } from '../jobs/jobs.types';
 import type {
@@ -67,6 +84,32 @@ export class QuoteAlreadyAcceptedError extends QuoteConflictError {
   }
 }
 
+/**
+ * Step 14 — the job already holds MAX_QUOTES_PER_OPEN_JOB active quotes.
+ *
+ * Distinct from QuoteConflictError on purpose: a conflict means *you* already
+ * quoted and your earlier quote is being protected, while this means the
+ * customer has three offers and is no longer accepting more. Both are 409,
+ * but only this one should tell the professional the request is closed to
+ * them, and neither should ever mention another provider's identity.
+ */
+export class QuoteLimitReachedError extends Error {
+  constructor(message = 'This request already has the maximum number of quotes.') {
+    super(message);
+    this.name = 'QuoteLimitReachedError';
+  }
+}
+
+/**
+ * Step 14 — how many professionals may quote one open request.
+ *
+ * Three is a product decision, not a technical one: enough for the customer
+ * to compare real options, few enough that the board stays competitive and
+ * nobody's quote is wasted. Once the third lands, the request is closed to
+ * further providers and the fourth submitter is told so.
+ */
+export const MAX_QUOTES_PER_OPEN_JOB = 3;
+
 /** The job is not in a state that allows scheduling (must be ACCEPTED with an accepted quote). */
 export class JobNotSchedulableError extends Error {
   constructor(message = 'This job cannot be scheduled in its current state.') {
@@ -96,7 +139,13 @@ export interface ProviderRequestFilter {
 
 export interface CreateQuotePersistInput {
   job: JobDto;
-  /** Resolved owner of the quote — must match the job's addressed provider. */
+  /**
+   * Resolved owner of the quote.
+   *
+   * Step 14: for an ADDRESSED job this must be the job's own provider. For an
+   * OPEN job (`job.provider === null`) it is the quoting provider themselves,
+   * and the store checks the open-request rules instead.
+   */
   providerType: 'professional' | 'business';
   providerNumericId: string;
   providerName: string;
@@ -149,15 +198,51 @@ export interface QuotesStore {
     providerType: 'professional' | 'business',
     providerNumericId: string,
   ): Promise<string[]>;
-  /** Marketplace requests addressed to the provider, newest first. */
+  /**
+   * Marketplace requests this provider can act on, newest first.
+   *
+   * Step 14: two populations. Requests ADDRESSED to the provider, plus OPEN
+   * requests they have already quoted — quoting is the access grant, so a
+   * provider keeps seeing a request after quoting it even though it was never
+   * theirs.
+   */
   listProviderRequests(filter: ProviderRequestFilter): Promise<{ items: ProviderRequestDto[]; total: number }>;
   /** Privacy-limited customer display name (first name + last initial). */
   findCustomerDisplayName(customerId: string): Promise<string>;
   /**
+   * Step 14 — does this provider hold a quote on this job?
+   *
+   * The access grant for open requests: matching gets you the board entry,
+   * quoting gets you the ongoing inbox entry and the request detail. Used
+   * instead of "is it addressed to me", which is meaningless while
+   * `professional_id` and `business_id` are both NULL.
+   */
+  hasQuoteFromProvider(
+    jobId: string,
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<boolean>;
+  /**
+   * Step 14 — every job this provider has an active quote on.
+   *
+   * Used to keep already-quoted requests OFF the open-request board: once a
+   * professional has quoted, the request belongs in their inbox where they
+   * can track the outcome, not on a board that invites a second submission
+   * which would only be refused as a conflict.
+   */
+  listJobIdsQuotedBy(
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<string[]>;
+  /**
    * Insert the SUBMITTED quote + items and transition the job
    * REQUESTED → QUOTED with a history entry, atomically. Throws
-   * JobNotQuoteableError / QuoteConflictError on rule violations; the
-   * job stays REQUESTED when creation fails.
+   * JobNotQuoteableError / QuoteConflictError / QuoteLimitReachedError on rule
+   * violations; the job stays REQUESTED when creation fails.
+   *
+   * Step 14: on an OPEN job the first quote performs the transition and later
+   * quotes leave the already-QUOTED status alone (no further history entry),
+   * and the 3-quote cap is enforced here under the job lock.
    */
   createQuote(input: CreateQuotePersistInput): Promise<QuoteDto>;
   /**
@@ -167,10 +252,17 @@ export interface QuotesStore {
    * `job_status_history` entry is written. Throws
    * JobNotAcceptableError / QuoteNotEligibleError /
    * QuoteAlreadyAcceptedError on rule violations; a failed acceptance
-   * leaves every row untouched. The accepted provider needs no extra
-   * row: the job's `professional_id`/`business_id` and the creation-time
-   * `job_assignments` entry already identify it, and technician
-   * assignment belongs to the later business workflow.
+   * leaves every row untouched. For an ADDRESSED job the accepted provider
+   * needs no extra row: the job's `professional_id`/`business_id` and the
+   * creation-time `job_assignments` entry already identify it, and
+   * technician assignment belongs to the later business workflow.
+   *
+   * Step 14: for an OPEN job the winner IS written onto the job —
+   * `professional_id`/`business_id` from the accepted quote, plus the
+   * `job_assignments` row that an open request has no row for. Acceptance is
+   * the customer choosing a professional, so from that moment the job is
+   * addressed like any other and every downstream module keeps working
+   * unchanged.
    */
   acceptQuote(input: AcceptQuotePersistInput): Promise<AcceptQuoteResult>;
   /**

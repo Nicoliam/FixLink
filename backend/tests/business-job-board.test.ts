@@ -221,7 +221,7 @@ function assertErrorEnvelope(res: { body: unknown }, code: string): void {
   assert.ok(typeof body.error.message === 'string' && body.error.message.length > 0);
 }
 
-describe('Stage 7G — authorization and isolation', () => {
+describe('Stage 7G - authorization and isolation', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -313,7 +313,7 @@ describe('Stage 7G — authorization and isolation', () => {
   });
 });
 
-describe('Stage 7G — board categories and derivation', () => {
+describe('Stage 7G - board categories and derivation', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   let ids: { fresh: string; assigned: string; scheduled: string; inProgress: string; awaiting: string; done: string; cancelled: string };
@@ -497,7 +497,7 @@ describe('Stage 7G — board categories and derivation', () => {
   });
 });
 
-describe('Stage 7G — filtering, search, pagination and sorting', () => {
+describe('Stage 7G - filtering, search, pagination and sorting', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   let techId: string;

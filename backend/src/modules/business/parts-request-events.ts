@@ -84,7 +84,7 @@ export function approvalEvent(
   } as const;
   const messages = {
     PARTS_REQUEST_APPROVED: `${partLabel(input.partName)} was approved. The job is awaiting parts.`,
-    PARTS_REQUEST_REJECTED: `${partLabel(input.partName)} was not approved. The job stays in progress — see the manager's reason.`,
+    PARTS_REQUEST_REJECTED: `${partLabel(input.partName)} was not approved. The job stays in progress - see the manager's reason.`,
     PARTS_REQUEST_NEEDS_INFO: `The manager needs more information about ${partLabel(input.partName).toLowerCase()}. Please respond to the request.`,
   } as const;
   return {

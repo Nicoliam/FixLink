@@ -22,6 +22,7 @@ import { join } from 'node:path';
 import request from 'supertest';
 import type { Express } from 'express';
 import { createApp } from '../src/app';
+import { env } from '../src/config/env';
 import { MemoryUserRepository } from '../src/modules/auth/memory-user.repository';
 import { MemoryRefreshStore } from '../src/modules/auth/refresh.store';
 import { MemoryMarketplaceStore } from '../src/modules/marketplace/memory-marketplace.store';
@@ -120,7 +121,22 @@ async function listNotifications(ctx: TestContext, token: string): Promise<{ tot
   return res.body.data as { total: number; items: NotificationDto[] };
 }
 
-describe('Stage 13 — the provider is emailed the job request', () => {
+/**
+ * Emails addressed to a platform user.
+ *
+ * A job request now also triggers an operations alert to the fixed
+ * `OPS_ALERT_EMAIL` inbox (see `tests/ops-alerts.test.ts`). That is a
+ * different channel with a different recipient, so counting "the emails this
+ * event produced" has to exclude it or every Stage 13 count is off by one.
+ */
+function userFacing(mails: Array<{ to: string }>): Array<{ to: string }> {
+  const opsInbox = env.opsAlertEmail;
+  if (opsInbox === null) return mails;
+  const needle = opsInbox.trim().toLowerCase();
+  return mails.filter((mail) => mail.to.trim().toLowerCase() !== needle);
+}
+
+describe('Stage 13 - the provider is emailed the job request', () => {
   let ctx: TestContext;
   beforeEach(() => {
     // `env` is read at import time, so the base URL is set per test rather
@@ -151,7 +167,7 @@ describe('Stage 13 — the provider is emailed the job request', () => {
     // ...and act on it in the app, where the reply is recorded.
     assert.match(sent.text, new RegExp(`${WEB_BASE_URL}/requests/${job['id']}`));
     assert.match(sent.html ?? '', new RegExp(`${WEB_BASE_URL}/requests/${job['id']}`));
-    assert.equal(ctx.mailer.sent.length, 1);
+    assert.equal(userFacing(ctx.mailer.sent).length, 1);
   });
 
   it('2. the email never exposes customer contact details', async () => {
@@ -199,7 +215,7 @@ describe('Stage 13 — the provider is emailed the job request', () => {
   });
 });
 
-describe('Stage 13 — who gets emailed', () => {
+describe('Stage 13 - who gets emailed', () => {
   let ctx: TestContext;
   beforeEach(() => {
     // `env` is read at import time, so the base URL is set per test rather
@@ -214,7 +230,7 @@ describe('Stage 13 — who gets emailed', () => {
     ctx.quotes.linkProfessionalProfile(pro.userId, '1');
     await requestJob(ctx, customer.token);
     assert.equal(ctx.mailer.sentTo(customer.email), undefined);
-    assert.equal(ctx.mailer.sent.length, 1);
+    assert.equal(userFacing(ctx.mailer.sent).length, 1);
   });
 
   it('5. the same event is in-app for one party and email for the other', async () => {
@@ -290,7 +306,7 @@ describe('Stage 13 — who gets emailed', () => {
   });
 });
 
-describe('Stage 13 — delivery safety and failure isolation', () => {
+describe('Stage 13 - delivery safety and failure isolation', () => {
   let ctx: TestContext;
   beforeEach(() => {
     // `env` is read at import time, so the base URL is set per test rather
@@ -372,7 +388,7 @@ describe('Stage 13 — delivery safety and failure isolation', () => {
   });
 });
 
-describe('Stage 13 — email content and links', () => {
+describe('Stage 13 - email content and links', () => {
   const base: NotificationDto = {
     id: '9',
     type: 'JOB_REQUEST',

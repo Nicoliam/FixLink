@@ -80,7 +80,25 @@ function buildApp(notifications?: NotificationStore): TestContext {
 }
 
 const PASSWORD = 'Str0ngPassw0rd!';
-const FUTURE_SLOT = '2026-10-05T10:00:00+02:00';
+
+/** ISO instant `days` from now, for fixtures that must be in the future. */
+function futureSlot(days: number): string {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** `YYYY-MM-DD` for the same instant, for `preferredDate` fields. */
+function futureDate(days: number): string {
+  return futureSlot(days).slice(0, 10);
+}
+/**
+ * A scheduled slot a few days from NOW, as an ISO instant.
+ *
+ * Derived from the clock rather than hard-coded. An absolute date labelled
+ * "future" is a time bomb: the schedule endpoint refuses a past slot, so the
+ * whole file starts failing the moment the wall clock passes it. These files
+ * did exactly that on 2026-10-05.
+ */
+const FUTURE_SLOT = futureSlot(3);
 
 async function provisionUser(
   ctx: TestContext,
@@ -297,7 +315,7 @@ function types(items: NotificationDto[]): string[] {
 // Inbox API: auth, shape, filtering, pagination, read behaviour
 // ==================================================================
 
-describe('Stage 8 — notification inbox API', () => {
+describe('Stage 8 - notification inbox API', () => {
   let ctx: TestContext;
   beforeEach(() => {
     ctx = buildApp();
@@ -456,7 +474,7 @@ describe('Stage 8 — notification inbox API', () => {
 // Marketplace events
 // ==================================================================
 
-describe('Stage 8 — marketplace notification events', () => {
+describe('Stage 8 - marketplace notification events', () => {
   let ctx: TestContext;
   beforeEach(() => {
     ctx = buildApp();
@@ -595,7 +613,7 @@ describe('Stage 8 — marketplace notification events', () => {
 // Business workflow events
 // ==================================================================
 
-describe('Stage 8 — business workflow notification events', () => {
+describe('Stage 8 - business workflow notification events', () => {
   let ctx: TestContext;
   beforeEach(() => {
     ctx = buildApp();
@@ -704,7 +722,7 @@ describe('Stage 8 — business workflow notification events', () => {
     const approved = await request(ctx.app)
       .post(`/api/v1/business/jobs/${working.jobId}/parts/${created.body.data.id}/approve`)
       .set('Authorization', `Bearer ${tokens.ownerToken}`)
-      .send({ comment: 'Genuine part required — approved.' });
+      .send({ comment: 'Genuine part required - approved.' });
     assert.equal(approved.status, 200);
     const techList = await listNotifications(ctx, working.techToken);
     assert.ok(types(techList.body.items).includes('PARTS_APPROVED'));

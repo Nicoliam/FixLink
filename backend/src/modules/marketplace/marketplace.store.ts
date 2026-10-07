@@ -4,13 +4,22 @@
  * The MySQL implementation serves production; the memory implementation
  * serves automated tests (no database required) and mirrors the seeder
  * fixtures. Controllers depend only on this interface.
+ *
+ * Step 14 adds the open-request matching members. They live on this store
+ * rather than the jobs module because matching reads provider data —
+ * `service_offerings`, the catalogue link tables and `service_areas` — which
+ * this store already owns.
  */
 import type {
   CertificateDto,
+  OpenRequestMatch,
   Paginated,
+  ProviderAreaTag,
   PortfolioProjectDto,
   ProviderCardDto,
+  ProviderMatchProfile,
   ProviderProfileDto,
+  ProviderRef,
   ProviderSearchFilters,
   ReviewDto,
   ServiceCategoryDto,
@@ -27,9 +36,58 @@ export interface MarketplaceStore {
   getProviderPortfolio(providerId: string): Promise<PortfolioProjectDto[]>;
   getProviderCertificates(providerId: string): Promise<CertificateDto[]>;
   getProviderReviews(providerId: string, page: number, pageSize: number): Promise<Paginated<ReviewDto>>;
+
+  /**
+   * Step 14 — providers that offer a service in `categoryId` and whose
+   * service areas match `location`, for both individual professionals and
+   * service businesses.
+   *
+   * The category test is a SQL EXISTS over `service_offerings` plus the
+   * catalogue link tables so it is index-backed. The area test runs in
+   * application code through the shared matcher, because `service_areas`
+   * holds free text and no SQL expression can tokenise "Fourways &
+   * surrounds" correctly.
+   *
+   * `limit` bounds the fan-out: one open request must not be able to notify
+   * every provider on the platform. Truncation is silent in the sense that
+   * the caller simply notifies fewer people, which is the correct degradation.
+   * Implementations clamp to MAX_OPEN_REQUEST_MATCHES.
+   */
+  findOpenRequestMatches(categoryId: string, location: string, limit: number): Promise<OpenRequestMatch[]>;
+
+  /**
+   * Step 14 — the categories a single provider offers in and the areas it
+   * services. Empty results are valid for a brand-new profile.
+   */
+  getProviderMatchProfile(provider: ProviderRef): Promise<ProviderMatchProfile>;
+  /**
+   * Step 14 — replace a provider's WHOLE `service_areas` list.
+   *
+   * It lives on this store rather than in a separate areas store on purpose:
+   * `getProviderMatchProfile` and `findOpenRequestMatches` already read
+   * `service_areas` from here, so a second writer would need a second reader to
+   * stay in step. One store, one read path, one write path.
+   *
+   * The replacement is a delete-then-insert in ONE transaction. That is safe
+   * for areas and would not be for `service_offerings`: nothing references an
+   * area row, so no history is lost, and doing it in one transaction closes
+   * the read-modify-write race two separate statements would leave open.
+   */
+  replaceServiceAreas(provider: ProviderRef, areas: ProviderAreaTag[]): Promise<void>;
 }
 
 const PROVIDER_ID_PATTERN = /^(professional|business)-([1-9][0-9]*)$/;
+
+/**
+ * Step 14 — how many providers one open request may reach.
+ *
+ * The cap exists because the notification fan-out is unconditional work per
+ * recipient. A single job must never be able to notify the whole platform,
+ * and a request that matches more people than this still succeeds: it simply
+ * reaches fewer of them, and the customer can always pick a professional from
+ * the marketplace instead.
+ */
+export const MAX_OPEN_REQUEST_MATCHES = 50;
 
 export interface ParsedProviderId {
   providerType: 'professional' | 'business';

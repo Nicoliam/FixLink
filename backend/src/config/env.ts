@@ -78,6 +78,23 @@ function mailSender(): string {
 }
 
 /**
+ * Operations inbox for platform-signup and new-job alerts.
+ *
+ * Configurable rather than hard-coded: the recipient is an operational
+ * decision per deployment, and baking an address into the source would make
+ * staging and production mail the same place. Unset (the default) disables
+ * these alerts entirely, so no deployment starts sending them by accident.
+ */
+function opsAlertEmail(): string | null {
+  const value = (process.env['OPS_ALERT_EMAIL'] ?? '').trim();
+  if (value === '') return null;
+  if (!/^[^\s@<>",]+@[^\s@<>",]+$/.test(value)) {
+    throw new Error(`Invalid OPS_ALERT_EMAIL: "${value}". Use a single email address.`);
+  }
+  return value;
+}
+
+/**
  * Public base URL of the Angular app. Notification emails link back into
  * the authenticated app, so the link is only correct when this matches the
  * deployed web origin.
@@ -145,6 +162,8 @@ export const env = {
   bcryptCost: numberOr('BCRYPT_COST', 12),
   webBaseUrl: webBaseUrl(),
   mail: mailConfig(),
+  /** Operations inbox for signup / new-job alerts; null disables them. */
+  opsAlertEmail: opsAlertEmail(),
 };
 
 export function isStrongProductionSecret(secret: string): boolean {

@@ -178,6 +178,40 @@ describe('GET /api/v1/providers (search)', () => {
     assert.ok(res.body.data.items.every((p: { isVerified: boolean }) => p.isVerified === true));
   });
 
+  it('exposes the provider\'s own lowest stated price, never a fabricated one', async () => {
+    const res = await request(app).get('/api/v1/providers');
+    assert.equal(res.status, 200);
+    for (const item of res.body.data.items as {
+      id: string;
+      fromPrice: number | null;
+      fromPriceCurrency: string | null;
+      offerings?: { priceAmount: number | null }[];
+    }[]) {
+      if (item.fromPrice === null) {
+        // No stated price: null currency too, and never a misleading zero.
+        assert.equal(item.fromPriceCurrency, null);
+        assert.notEqual(item.fromPrice, 0);
+        continue;
+      }
+      // A stated price must be one the provider actually set, and the
+      // lowest of them — never higher than something they advertised.
+      assert.ok(item.fromPrice > 0, `${item.id} exposed a non-positive fromPrice`);
+      assert.equal(item.fromPriceCurrency, 'ZAR');
+    }
+  });
+
+  it('reports the lowest LIVE stated offering price on the card', async () => {
+    const res = await request(app).get('/api/v1/providers');
+    assert.equal(res.status, 200);
+    // professional-1 states 850 and 2400 live, one unpriced and one retired
+    // at 150. "From" must be 850: not the higher figure, not 0 for the
+    // unpriced offering, and not the retired offering.
+    const pro = res.body.data.items.find((p: { id: string }) => p.id === 'professional-1');
+    assert.ok(pro, 'expected professional-1 in search results');
+    assert.equal(pro.fromPrice, 850);
+    assert.equal(pro.fromPriceCurrency, 'ZAR');
+  });
+
   it('supports free-text search across names and services', async () => {
     const res = await request(app).get('/api/v1/providers').query({ q: 'electrician' });
     assert.equal(res.status, 200);

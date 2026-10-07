@@ -170,7 +170,7 @@ function assertSuccessEnvelope(res: { body: unknown }): void {
   assert.ok(typeof body.message === 'string');
 }
 
-describe('Stage 7B — authentication', () => {
+describe('Stage 7B - authentication', () => {
   let ctx: TestContext;
   beforeEach(() => {
     ctx = buildApp();
@@ -205,7 +205,7 @@ describe('Stage 7B — authentication', () => {
   });
 });
 
-describe('Stage 7B — role gating', () => {
+describe('Stage 7B - role gating', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -289,7 +289,7 @@ describe('Stage 7B — role gating', () => {
   });
 });
 
-describe('Stage 7B — business customers', () => {
+describe('Stage 7B - business customers', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -418,7 +418,7 @@ describe('Stage 7B — business customers', () => {
   });
 });
 
-describe('Stage 7B — internal jobs', () => {
+describe('Stage 7B - internal jobs', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   let customerId: string;

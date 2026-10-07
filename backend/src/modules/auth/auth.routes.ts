@@ -5,10 +5,16 @@ import { AuthService } from './auth.service';
 import { makeAuthController } from './auth.controller';
 import { optionalAuth, requireAuth } from '../../middleware/auth';
 import type { RefreshStore } from './refresh.store';
+import type { OpsAlertSender } from '../../services/ops-alert';
 
-export function makeAuthRoutes(users: UserRepository, refreshStore: RefreshStore): Router {
+export function makeAuthRoutes(
+  users: UserRepository,
+  refreshStore: RefreshStore,
+  /** Optional: signup alerts are skipped when absent. */
+  opsAlert?: OpsAlertSender,
+): Router {
   const router = Router();
-  const service = new AuthService(users, refreshStore);
+  const service = new AuthService(users, refreshStore, opsAlert);
   const controller = makeAuthController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each

@@ -9,9 +9,19 @@
  *   ADMIN — granted explicitly by the backend/platform (never via public registration)
  *
  * Registration is not gated on verification: a new CUSTOMER, PROFESSIONAL or
- * BUSINESS_OWNER is immediately ACTIVE and receives a session. Provider roles
- * must supply the name their customers see (displayName / businessName) so the
- * matching profile row can be created in the same transaction.
+ * BUSINESS_OWNER is immediately ACTIVE and receives a session. Every role must
+ * supply the name that its profile row requires, so the profile is created in
+ * the same transaction:
+ *
+ *   CUSTOMER       firstName + lastName  -> customer_profiles
+ *   PROFESSIONAL   displayName           -> professional_profiles
+ *   BUSINESS_OWNER businessName          -> business_profiles
+ *
+ * The customer profile is created up front rather than lazily on the first job
+ * request, because customer-scoped features resolve ownership through that row
+ * and a new customer would otherwise get 404s until they posted a job. The
+ * customer names are optional on the wire (older clients send none) and fall
+ * back to derivation from the email; the registration form always sends them.
  */
 
 export const SELF_REGISTER_ROLES = ['CUSTOMER', 'PROFESSIONAL', 'BUSINESS_OWNER'] as const;
@@ -35,6 +45,9 @@ export const PASSWORD_MAX_LENGTH = 128;
 /** Matches `professional_profiles.display_name` / `business_profiles.business_name`. */
 export const PROFILE_NAME_MAX = 255;
 
+/** Matches `customer_profiles.first_name` / `customer_profiles.last_name`. */
+export const CUSTOMER_NAME_MAX = 128;
+
 /**
  * A self-registering provider needs the name their customers see. Registration
  * therefore collects it up front so the provider profile is complete and
@@ -45,6 +58,10 @@ export interface RegisterInput {
   password: string;
   phone: string | null;
   role: SelfRegisterRole;
+  /** CUSTOMER only — `customer_profiles.first_name`. */
+  firstName: string | null;
+  /** CUSTOMER only — `customer_profiles.last_name`. */
+  lastName: string | null;
   /** PROFESSIONAL only — the public display name on the provider profile. */
   displayName: string | null;
   /** BUSINESS_OWNER only — the business name on the business profile. */
@@ -69,7 +86,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readProfileName(
   raw: unknown,
   field: string,
-  { required }: { required: boolean },
+  { required, max = PROFILE_NAME_MAX }: { required: boolean; max?: number },
 ): { value: string | null } | { error: string } {
   if (raw === undefined || raw === null || raw === '') {
     return required ? { error: `${field} is required.` } : { value: null };
@@ -77,15 +94,15 @@ function readProfileName(
   if (typeof raw !== 'string') return { error: `${field} must be text.` };
   const trimmed = raw.trim();
   if (trimmed === '') return required ? { error: `${field} is required.` } : { value: null };
-  if (trimmed.length > PROFILE_NAME_MAX) {
-    return { error: `${field} must be at most ${PROFILE_NAME_MAX} characters.` };
+  if (trimmed.length > max) {
+    return { error: `${field} must be at most ${max} characters.` };
   }
   return { value: trimmed };
 }
 
 export function validateRegister(body: unknown): { input?: RegisterInput; error?: string } {
   if (!isRecord(body)) return { error: 'Request body must be a JSON object.' };
-  const { email, password, phone, role, displayName, businessName } = body;
+  const { email, password, phone, role, firstName, lastName, displayName, businessName } = body;
 
   if (typeof email !== 'string' || email.trim() === '') return { error: 'Email is required.' };
   const normalised = normalizeEmail(email);
@@ -121,8 +138,18 @@ export function validateRegister(body: unknown): { input?: RegisterInput; error?
     }
   }
 
-  // Provider/business names are role-scoped: a name sent for another role is
-  // ignored rather than rejected, so the same client form can post one body.
+  // Names are role-scoped: a name sent for another role is ignored rather than
+  // rejected, so the same client form can post one body for any role card.
+  // Optional on the wire so an existing client cannot be broken. A half-given
+  // name is still an error: silently dropping one half would leave the other
+  // applied, which is worse than asking for both.
+  const first = readProfileName(firstName, 'First name', { required: false, max: CUSTOMER_NAME_MAX });
+  if ('error' in first) return { error: first.error };
+  const last = readProfileName(lastName, 'Last name', { required: false, max: CUSTOMER_NAME_MAX });
+  if ('error' in last) return { error: last.error };
+  if ((first.value === null) !== (last.value === null)) {
+    return { error: 'Provide both a first name and a last name, or neither.' };
+  }
   const display = readProfileName(displayName, 'Display name', { required: requestedRole === 'PROFESSIONAL' });
   if ('error' in display) return { error: display.error };
   const business = readProfileName(businessName, 'Business name', { required: requestedRole === 'BUSINESS_OWNER' });
@@ -134,6 +161,8 @@ export function validateRegister(body: unknown): { input?: RegisterInput; error?
       password,
       phone: normalisedPhone,
       role: requestedRole,
+      firstName: requestedRole === 'CUSTOMER' ? first.value : null,
+      lastName: requestedRole === 'CUSTOMER' ? last.value : null,
       displayName: requestedRole === 'PROFESSIONAL' ? display.value : null,
       businessName: requestedRole === 'BUSINESS_OWNER' ? business.value : null,
     },

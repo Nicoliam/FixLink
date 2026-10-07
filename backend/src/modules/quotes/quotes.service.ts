@@ -15,15 +15,20 @@
 import type { UserRepository } from '../users/user.repository';
 import type { JobsStore } from '../jobs/jobs.store';
 import type { JobDto } from '../jobs/jobs.types';
+import type { MarketplaceStore } from '../marketplace/marketplace.store';
+import type { ProviderRef } from '../marketplace/marketplace.types';
 import type { NotificationService } from '../notifications/notifications.service';
+import { anyAreaMatchesLocation } from '../../utils/service-area-match';
 import type { QuotesStore } from './quotes.store';
 import {
   JobNotAcceptableError,
   JobNotQuoteableError,
   JobNotSchedulableError,
   JobNotStartableError,
+  MAX_QUOTES_PER_OPEN_JOB,
   QuoteAlreadyAcceptedError,
   QuoteConflictError,
+  QuoteLimitReachedError,
   QuoteNotEligibleError,
 } from './quotes.store';
 import type { JobWithQuotes, ProviderRequestDto, QuoteDto } from './quotes.types';
@@ -89,6 +94,13 @@ export class QuotesService {
      * failures never roll back the quote/schedule/start outcome.
      */
     private readonly notify?: NotificationService,
+    /**
+     * Step 14 — the caller's own category buckets and service areas, for
+     * open-request matching. Optional so pre-14 constructions keep compiling;
+     * without it the board is simply empty, which is the honest answer for a
+     * provider whose matching profile cannot be read.
+     */
+    private readonly marketplace?: MarketplaceStore,
   ) {}
 
   /**
@@ -106,10 +118,20 @@ export class QuotesService {
     }
   }
 
+  /**
+   * Provider recipients for a job event.
+   *
+   * Step 14: an OPEN job has no provider, and the store writes the winner
+   * onto the job at acceptance — so every call site here runs on a refreshed
+   * job whose `provider` is already set. The null branch is a guard for a
+   * caller that forgot to refresh: an open request has nobody to notify.
+   */
   private async providerUserIds(job: JobDto, excludeUserId?: string): Promise<string[]> {
+    const addressee = job.provider;
+    if (!addressee) return [];
     try {
-      const numeric = job.provider.id.split('-')[1] ?? '';
-      const userIds = await this.quotes.findUserIdsForProvider(job.provider.providerType, numeric);
+      const numeric = addressee.id.split('-')[1] ?? '';
+      const userIds = await this.quotes.findUserIdsForProvider(addressee.providerType, numeric);
       return excludeUserId ? userIds.filter((id) => id !== excludeUserId) : userIds;
     } catch {
       return [];
@@ -155,10 +177,82 @@ export class QuotesService {
   }
 
   private isAddressedTo(job: JobDto, identity: ProviderIdentity): boolean {
-    const numeric = job.provider.id.split('-')[1] ?? '';
-    return job.provider.providerType === 'professional'
+    const addressee = job.provider;
+    if (!addressee) return false;
+    const numeric = addressee.id.split('-')[1] ?? '';
+    return addressee.providerType === 'professional'
       ? identity.professionalIds.includes(numeric)
       : identity.businessIds.includes(numeric);
+  }
+
+  /** Every provider reference this identity may act as. */
+  private providerRefs(identity: ProviderIdentity): ProviderRef[] {
+    return [
+      ...identity.professionalIds.map((numericId) => ({ providerType: 'professional' as const, numericId })),
+      ...identity.businessIds.map((numericId) => ({ providerType: 'business' as const, numericId })),
+    ];
+  }
+
+  /** Has this identity got a live quote on this job? Quoting is the access grant. */
+  private async hasQuote(jobId: string, identity: ProviderIdentity): Promise<boolean> {
+    const refs = this.providerRefs(identity);
+    if (refs.length === 0) return false;
+    try {
+      const results = await Promise.all(
+        refs.map((ref) => this.quotes.hasQuoteFromProvider(jobId, ref.providerType, ref.numericId)),
+      );
+      return results.some(Boolean);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Step 14 — the open-request rule.
+   *
+   * A provider may see and quote an open request only when they match it on
+   * BOTH conditions:
+   *
+   *   category — one of their offerings or catalogue links sits in the job's
+   *              platform category bucket, and
+   *   area     — one of their service areas matches the request location.
+   *
+   * Both are read from the provider's own stored profile. Nothing in this
+   * decision comes from the request, so a client cannot widen its own match
+   * set: there is no accepted `category`, `area` or `radius` parameter
+   * anywhere on these endpoints.
+   *
+   * An identity with several provider profiles (a professional who also owns
+   * a business) matches if ANY of them matches. Refusing because one
+   * profile fails would make the rule depend on which profile happened to be
+   * checked first.
+   */
+  private async canQuoteOpenRequest(job: JobDto, identity: ProviderIdentity): Promise<boolean> {
+    if (!this.marketplace) return false;
+    const refs = this.providerRefs(identity);
+    if (refs.length === 0) return false;
+    try {
+      const profiles = await Promise.all(refs.map((ref) => this.marketplace?.getProviderMatchProfile(ref)));
+      return profiles.some(
+        (profile) =>
+          profile !== undefined &&
+          job.service.categoryId !== '' &&
+          profile.categoryIds.includes(job.service.categoryId) &&
+          anyAreaMatchesLocation(profile.serviceAreas, job.location),
+      );
+    } catch {
+      // A matcher that cannot be read must fail closed. Showing a request to
+      // everyone is the one outcome that cannot be undone.
+      return false;
+    }
+  }
+
+  /** Addressed to this identity, or an open request they may see. */
+  private async canViewRequest(job: JobDto, identity: ProviderIdentity): Promise<boolean> {
+    if (this.isAddressedTo(job, identity)) return true;
+    if (job.provider !== null) return false;
+    if (await this.hasQuote(job.id, identity)) return true;
+    return this.canQuoteOpenRequest(job, identity);
   }
 
   async listProviderRequests(
@@ -174,7 +268,7 @@ export class QuotesService {
       return fail(
         422,
         'VALIDATION_ERROR',
-        'Invalid pagination or status. Use page 1–1000, pageSize 1–50, status REQUESTED, QUOTED, ACCEPTED, SCHEDULED or IN_PROGRESS.',
+        'Invalid pagination or status. Use page 1-1000, pageSize 1-50, status REQUESTED, QUOTED, ACCEPTED, SCHEDULED or IN_PROGRESS.',
       );
     }
     const result = await this.quotes.listProviderRequests({
@@ -194,12 +288,101 @@ export class QuotesService {
       return fail(400, 'VALIDATION_ERROR', 'Invalid request id.');
     }
     const job = await this.jobs.getJobById(requestId.trim());
-    // Addressed-to is part of existence: another provider's request reads
-    // as 404 so request ids cannot be probed across providers.
-    if (!job || job.source !== 'MARKETPLACE' || !this.isAddressedTo(job, resolved.identity)) {
+    // Addressed-to (or an open request they may see / have quoted) is part of
+    // existence: another provider's request reads as 404 so request ids cannot
+    // be probed across providers.
+    if (!job || job.source !== 'MARKETPLACE' || !(await this.canViewRequest(job, resolved.identity))) {
       return fail(404, 'NOT_FOUND', 'Request not found.');
     }
-    return { status: 200, data: await this.toProviderRequest(job) };
+    return { status: 200, data: await this.toProviderRequest(job, resolved.identity) };
+  }
+
+  /**
+   * Step 14 — open requests this provider may quote, newest first.
+   *
+   * Three filters are applied before a job is shown:
+   *
+   *   1. category AND area, from the provider's own profile (fail-closed)
+   *   2. not already quoted by this provider — those are in the inbox
+   *   3. fewer than MAX_QUOTES_PER_OPEN_JOB active quotes, because a full
+   *      request can only answer with a 409
+   *
+   * A provider with no published service areas, or no offerings in any
+   * category, gets `200` with an empty list. That is an answer, not an error:
+   * the frontend turns it into "publish your areas to see matching work".
+   */
+  async listOpenRequests(
+    authUserId: string,
+    query: Record<string, unknown>,
+  ): Promise<ServiceResult<{ items: ProviderRequestDto[]; total: number; page: number; pageSize: number }>> {
+    const resolved = await this.resolveIdentity(authUserId);
+    if ('forbidden' in resolved) return fail(403, 'FORBIDDEN_ROLE', resolved.forbidden);
+    const page = readPage(query['page'], 1, 1000);
+    const pageSize = readPage(query['pageSize'] ?? query['page_size'], 20, 50);
+    if (page === null || pageSize === null) {
+      return fail(422, 'VALIDATION_ERROR', 'Invalid pagination. Use page 1-1000 and pageSize 1-50.');
+    }
+    if (!this.marketplace) {
+      return { status: 200, data: { items: [], total: 0, page, pageSize } };
+    }
+    const refs = this.providerRefs(resolved.identity);
+    if (refs.length === 0) {
+      return { status: 200, data: { items: [], total: 0, page, pageSize } };
+    }
+
+    // Category ids first: an empty set matches nothing, and that short-circuit
+    // avoids the job scan entirely for a provider who offers nothing.
+    const profiles = await Promise.all(refs.map((ref) => this.marketplace?.getProviderMatchProfile(ref) ?? null));
+    const categoryIds = [...new Set(profiles.flatMap((profile) => profile?.categoryIds ?? []))];
+    const areas = profiles.flatMap((profile) => profile?.serviceAreas ?? []);
+    if (categoryIds.length === 0 || areas.length === 0) {
+      return { status: 200, data: { items: [], total: 0, page, pageSize } };
+    }
+
+    // Jobs this provider already quoted go to the inbox, not the board.
+    const quoted = new Set<string>();
+    for (const ref of refs) {
+      const owned = await this.quotes.listJobIdsQuotedBy(ref.providerType, ref.numericId);
+      for (const jobId of owned) quoted.add(jobId);
+    }
+
+    const candidates = await this.jobs.listOpenJobs({
+      categoryIds,
+      quotedJobIds: [...quoted],
+      maxQuotes: MAX_QUOTES_PER_OPEN_JOB,
+      statuses: ['REQUESTED', 'QUOTED'],
+    });
+    const matching = candidates.filter((job) => anyAreaMatchesLocation(areas, job.location));
+    const start = (page - 1) * pageSize;
+    const window = matching.slice(start, start + pageSize);
+    const items: ProviderRequestDto[] = [];
+    for (const job of window) {
+      items.push(await this.toProviderRequest(job, resolved.identity));
+    }
+    return { status: 200, data: { items, total: matching.length, page, pageSize } };
+  }
+
+  /**
+   * Step 14 — one open request this provider may quote.
+   *
+   * Matching IS the access grant, so a non-matching open request reads as 404
+   * rather than 403: otherwise a professional could walk the id space and
+   * learn which requests exist in their trade and where.
+   */
+  async getOpenRequest(authUserId: string, requestId: string): Promise<ServiceResult<ProviderRequestDto>> {
+    const resolved = await this.resolveIdentity(authUserId);
+    if ('forbidden' in resolved) return fail(403, 'FORBIDDEN_ROLE', resolved.forbidden);
+    if (!/^[1-9][0-9]*$/.test(requestId.trim())) {
+      return fail(400, 'VALIDATION_ERROR', 'Invalid request id.');
+    }
+    const job = await this.jobs.getJobById(requestId.trim());
+    if (!job || job.source !== 'MARKETPLACE' || job.provider !== null) {
+      return fail(404, 'NOT_FOUND', 'Request not found.');
+    }
+    if (!(await this.canViewRequest(job, resolved.identity))) {
+      return fail(404, 'NOT_FOUND', 'Request not found.');
+    }
+    return { status: 200, data: await this.toProviderRequest(job, resolved.identity) };
   }
 
   async createQuote(authUserId: string, jobId: string, body: unknown): Promise<ServiceResult<QuoteDto>> {
@@ -214,16 +397,27 @@ export class QuotesService {
       return fail(failure.status, failure.code, failure.message);
     }
     const job = await this.jobs.getJobById(jobId.trim());
-    if (!job || job.source !== 'MARKETPLACE' || !this.isAddressedTo(job, resolved.identity)) {
+    if (!job || job.source !== 'MARKETPLACE' || !(await this.canViewRequest(job, resolved.identity))) {
       return fail(404, 'NOT_FOUND', 'Job not found.');
     }
-    const numeric = job.provider.id.split('-')[1] as string;
+
+    // Step 14: an OPEN request is quoted by the provider themselves; an
+    // ADDRESSED one only by the provider it names. Getting this wrong would
+    // either let anyone claim a named provider's job, or make an open request
+    // impossible to quote at all.
+    const author =
+      job.provider !== null
+        ? { providerType: job.provider.providerType, numericId: job.provider.id.split('-')[1] ?? '', name: job.provider.name }
+        : await this.authorOf(resolved.identity);
+    if (!author || !/^[1-9][0-9]*$/.test(author.numericId)) {
+      return fail(404, 'NOT_FOUND', 'Job not found.');
+    }
     try {
       const quote = await this.quotes.createQuote({
         job,
-        providerType: job.provider.providerType,
-        providerNumericId: numeric,
-        providerName: job.provider.name,
+        providerType: author.providerType,
+        providerNumericId: author.numericId,
+        providerName: author.name,
         input,
         createdBy: authUserId,
       });
@@ -231,7 +425,7 @@ export class QuotesService {
       await this.emit(customer ? [customer] : [], {
         type: 'QUOTE_RECEIVED',
         title: 'New quote received',
-        message: `${job.provider.name} quoted ${quote.currency} ${quote.total} for ${job.service.name} (${job.reference}).`,
+        message: `${author.name} quoted ${quote.currency} ${quote.total} for ${job.service.name} (${job.reference}).`,
         jobId: job.id,
       });
       return { status: 201, data: quote };
@@ -239,11 +433,40 @@ export class QuotesService {
       if (err instanceof QuoteConflictError) {
         return fail(409, 'CONFLICT', err.message);
       }
+      if (err instanceof QuoteLimitReachedError) {
+        // 409: the request is open, but the customer's three quotes are in.
+        return fail(409, 'CONFLICT', err.message);
+      }
       if (err instanceof JobNotQuoteableError) {
         return fail(422, 'VALIDATION_ERROR', err.message);
       }
       throw err;
     }
+  }
+
+  /**
+   * Which of this identity's profiles is quoting an open request.
+   *
+   * `canViewRequest` already proved they match on category and area, so this
+   * only has to pick which profile to attribute the quote to and supply its
+   * public display name (the customer's notification names the professional).
+   * A single-profile identity is the common case; with several, the
+   * professional profile wins, matching the precedence `resolveIdentity` uses.
+   */
+  private async authorOf(
+    identity: ProviderIdentity,
+  ): Promise<{ providerType: ProviderRef['providerType']; numericId: string; name: string } | null> {
+    const ref: ProviderRef | null = identity.professionalIds.length > 0
+      ? { providerType: 'professional', numericId: identity.professionalIds[0] as string }
+      : identity.businessIds.length > 0
+        ? { providerType: 'business', numericId: identity.businessIds[0] as string }
+        : null;
+    if (!ref || !this.marketplace) return null;
+    const profile = await this.marketplace.getProviderById(`${ref.providerType}-${ref.numericId}`);
+    // An inactive or deleted profile cannot be quoted for. Falling back to the
+    // ref would put a name on the quote that the customer could never verify.
+    if (!profile) return null;
+    return { providerType: ref.providerType, numericId: ref.numericId, name: profile.name };
   }
 
   async listJobQuotes(authUserId: string, jobId: string): Promise<ServiceResult<{ items: QuoteDto[]; total: number }>> {
@@ -487,11 +710,25 @@ export class QuotesService {
     return { job: null, status: 403, code: 'FORBIDDEN_ROLE', message: 'Your account cannot view quotes.' };
   }
 
-  private async toProviderRequest(job: JobDto): Promise<ProviderRequestDto> {
-    const [displayName, quotes] = await Promise.all([
+  /**
+   * The provider-facing projection of a request.
+   *
+   * Step 14: `quotes` holds ONLY the viewing provider's own quote. On an
+   * addressed request that is the whole set anyway (only the addressed
+   * provider may quote), so nothing changes; on an open request it is the
+   * difference between "you and two competitors are all quoting R1 200" and
+   * "here is your quote". Competing quotes stay invisible to each other and
+   * only the customer compares them. The customer-facing projection
+   * (`getCustomerJobWithQuotes`) is deliberately unfiltered.
+   */
+  private async toProviderRequest(job: JobDto, identity: ProviderIdentity): Promise<ProviderRequestDto> {
+    const [displayName, allQuotes] = await Promise.all([
       this.quotes.findCustomerDisplayName(job.customerId),
       this.quotes.listQuotesByJobId(job.id),
     ]);
+    const refs = this.providerRefs(identity).map((ref) => `${ref.providerType}-${ref.numericId}`);
+    const mine = new Set(refs);
+    const quotes = allQuotes.filter((quote) => mine.has(quote.provider.id));
     return {
       id: job.id,
       reference: job.reference,

@@ -55,6 +55,28 @@ export function makeQuotesController(service: QuotesService) {
       }
     },
 
+    /** Step 14 — open requests matching this provider's categories and areas. */
+    async listOpenRequests(req: Request, res: Response): Promise<void> {
+      try {
+        const user = authUser(req);
+        const result = await service.listOpenRequests(user.id, req.query as Record<string, unknown>);
+        send(res, result, 'Open requests retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve open requests. Please try again.', 500);
+      }
+    },
+
+    /** Step 14 — one open request this provider may quote. */
+    async getOpenRequest(req: Request, res: Response): Promise<void> {
+      try {
+        const user = authUser(req);
+        const result = await service.getOpenRequest(user.id, req.params['id'] ?? '');
+        send(res, result, 'Open request retrieved.');
+      } catch {
+        fail(res, 'INTERNAL_ERROR', 'Could not retrieve the open request. Please try again.', 500);
+      }
+    },
+
     async create(req: Request, res: Response): Promise<void> {
       try {
         const user = authUser(req);

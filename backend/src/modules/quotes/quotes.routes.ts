@@ -5,6 +5,8 @@
  *
  * GET  /api/v1/provider/requests                  provider inbox (actionable statuses)
  * GET  /api/v1/provider/requests/:id              one addressed request with quotes
+ * GET  /api/v1/provider/open-requests             Step 14: open requests this provider may quote
+ * GET  /api/v1/provider/open-requests/:id         Step 14: one matching open request
  * POST /api/v1/jobs/:jobId/quotes                 submit a quote (REQUESTED → QUOTED)
  * GET  /api/v1/jobs/:jobId/quotes                 quotes for an authorized job
  * GET  /api/v1/quotes/:id                         one authorized quote
@@ -19,6 +21,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../../middleware/auth';
+import type { MarketplaceStore } from '../marketplace/marketplace.store';
 import type { NotificationService } from '../notifications/notifications.service';
 import type { UserRepository } from '../users/user.repository';
 import type { JobsStore } from '../jobs/jobs.store';
@@ -31,9 +34,11 @@ export function makeQuotesRoutes(
   jobs: JobsStore,
   quotes: QuotesStore,
   notify?: NotificationService,
+  /** Step 14 — the caller's own categories and areas, for open-request matching. */
+  marketplace?: MarketplaceStore,
 ): Router {
   const router = Router();
-  const service = new QuotesService(jobs, quotes, users, notify);
+  const service = new QuotesService(jobs, quotes, users, notify, marketplace);
   const controller = makeQuotesController(service);
 
   // Per-app limiter (created in the factory, not at module level) so each
@@ -50,6 +55,10 @@ export function makeQuotesRoutes(
 
   router.get('/provider/requests', controller.listRequests);
   router.get('/provider/requests/:id', controller.getRequest);
+  // Step 14. Registered before `/provider/requests/:id` so "open-requests" can
+  // never be parsed as a request id.
+  router.get('/provider/open-requests', controller.listOpenRequests);
+  router.get('/provider/open-requests/:id', controller.getOpenRequest);
   router.post('/jobs/:jobId/quotes', controller.create);
   router.post('/jobs/:jobId/quotes/:quoteId/accept', controller.accept);
   router.post('/jobs/:jobId/schedule', controller.schedule);

@@ -252,7 +252,7 @@ async function uploadVoice(
   return req;
 }
 
-describe('Stage 7D — technician start', () => {
+describe('Stage 7D - technician start', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -344,7 +344,7 @@ describe('Stage 7D — technician start', () => {
   });
 });
 
-describe('Stage 7D — BEFORE/DURING/AFTER photos', () => {
+describe('Stage 7D - BEFORE/DURING/AFTER photos', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -432,7 +432,7 @@ describe('Stage 7D — BEFORE/DURING/AFTER photos', () => {
   });
 });
 
-describe('Stage 7D — text updates', () => {
+describe('Stage 7D - text updates', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -480,7 +480,7 @@ describe('Stage 7D — text updates', () => {
   });
 });
 
-describe('Stage 7D — voice notes', () => {
+describe('Stage 7D - voice notes', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -632,7 +632,7 @@ describe('Stage 7D — voice notes', () => {
   });
 });
 
-describe('Stage 7D — completion and timeline', () => {
+describe('Stage 7D - completion and timeline', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {
@@ -725,7 +725,7 @@ describe('Stage 7D — completion and timeline', () => {
   });
 });
 
-describe('Stage 7D — business visibility', () => {
+describe('Stage 7D - business visibility', () => {
   let ctx: TestContext;
   let setup: Awaited<ReturnType<typeof setupBusinesses>>;
   beforeEach(async () => {

@@ -1,6 +1,7 @@
 import { env } from '../../config/env';
 import type { ProfileProvision, SafeUser, UserRepository } from '../users/user.repository';
 import { hashPassword, verifyPassword } from '../../utils/password';
+import { provisionCustomerNames } from '../../utils/customer-names';
 import { generateRefreshToken, hashRefreshToken, signAccessToken } from '../../utils/tokens';
 import {
   validateLogin,
@@ -9,6 +10,7 @@ import {
   type RegisterInput,
 } from './auth.validation';
 import type { RefreshStore } from './refresh.store';
+import type { OpsAlertSender } from '../../services/ops-alert';
 
 export const GENERIC_AUTH_ERROR = 'Invalid email or password.';
 
@@ -73,6 +75,12 @@ export class AuthService {
   constructor(
     private readonly users: UserRepository,
     private readonly refreshStore: RefreshStore,
+    /**
+     * Operations alert for a new signup. Optional so existing constructions
+     * keep compiling; delivery is best-effort and never affects the response,
+     * because a mail relay being down must not stop someone registering.
+     */
+    private readonly opsAlert?: OpsAlertSender,
   ) {}
 
   /**
@@ -114,6 +122,9 @@ export class AuthService {
       const roles = await this.users.getRoles(created.id);
       await this.users.touchLogin(created.id);
       const tokens = await this.issueSession(created.id, created.email, roles);
+      // Alert only once the account is committed, and never let it change the
+      // outcome: `send` resolves false rather than rejecting.
+      await this.alertRegistration(created.id, created.email, created.phone, roles, input);
       return { status: 201, data: { user: this.users.toSafeUser(created, roles), ...tokens } };
     } catch (err) {
 
@@ -145,10 +156,60 @@ export class AuthService {
   }
 
   /**
-   * The role profile to create alongside the account. A CUSTOMER has none
-   * here — `customer_profiles` is provisioned on their first job request.
+   * The role profile to create alongside the account, in the same transaction.
+   *
+   * A CUSTOMER provisions `customer_profiles` here too. That row is the
+   * ownership anchor for every customer-scoped feature (saved professionals,
+   * quotes, job detail, job history), so creating it lazily on the first job
+   * request left a brand-new customer with 404s until they posted a job.
    */
+  /**
+   * Tell the operations inbox that an account was created.
+   *
+   * Carries contact details on purpose — this is the internal inbox, and
+   * knowing who signed up is the entire purpose. It deliberately does NOT
+   * carry the password: `input` is read field by field, so the plaintext
+   * password in `RegisterInput.password` is never referenced.
+   */
+  private async alertRegistration(
+    userId: string,
+    email: string,
+    phone: string | null,
+    roles: string[],
+    input: RegisterInput,
+  ): Promise<void> {
+    if (!this.opsAlert) return;
+    const name =
+      input.displayName ??
+      input.businessName ??
+      [input.firstName, input.lastName].filter((part) => part && part.trim() !== '').join(' ').trim();
+    await this.opsAlert.send({
+      kind: 'REGISTRATION',
+      details: [
+        { label: 'Email', value: email },
+        { label: 'Phone', value: phone ?? 'Not provided' },
+        { label: 'Role', value: roles.join(', ') || 'none' },
+        { label: 'Name', value: name !== '' ? name : 'Not provided' },
+        { label: 'Account ID', value: `#${userId}` },
+      ],
+    });
+  }
+
   private profileFor(input: RegisterInput): ProfileProvision | null {
+    if (input.role === 'CUSTOMER') {
+      // The registration form asks for both names. They stay OPTIONAL on the
+      // wire so an existing client cannot be broken by this change; when they
+      // are absent the name is derived from the email instead, which is what
+      // the lazy job-request path always did.
+      const derived = provisionCustomerNames(input.email);
+      return {
+        kind: 'CUSTOMER',
+        firstName: input.firstName ?? derived.firstName,
+        lastName: input.lastName ?? derived.lastName,
+        email: input.email,
+        phone: input.phone,
+      };
+    }
     if (input.role === 'PROFESSIONAL' && input.displayName !== null) {
       return { kind: 'PROFESSIONAL', displayName: input.displayName };
     }

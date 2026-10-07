@@ -14,12 +14,28 @@ export type WorkPhase = 'BEFORE' | 'DURING' | 'AFTER';
 
 export const WORK_PHASES: readonly WorkPhase[] = ['BEFORE', 'DURING', 'AFTER'];
 
+/**
+ * Which population an image belongs to (migration 017).
+ *
+ * REQUEST photos are the customer's own evidence of the problem, attached while
+ * the job is still REQUESTED/QUOTED. WORK photos are the professional's or
+ * technician's Before/During/After execution record. They share one table so
+ * there is one storage namespace and one read-authorization path, but they are
+ * never conflated: `phase` alone cannot tell them apart, and merging them
+ * would let a customer write into the professional's work record.
+ */
+export type JobImageContext = 'REQUEST' | 'WORK';
+
+export const JOB_IMAGE_CONTEXTS: readonly JobImageContext[] = ['REQUEST', 'WORK'];
+
 /** File metadata for a job photo (no binary content, no raw paths). */
 export interface JobImageDto {
   id: string;
   jobId: string;
   uploadedBy: string;
   phase: WorkPhase;
+  /** REQUEST for customer evidence of the problem, WORK for execution record. */
+  context: JobImageContext;
   originalFilename: string | null;
   mimeType: string;
   size: number;
@@ -52,6 +68,8 @@ export interface TimelineEventDto {
   previousStatus?: JobDto['status'] | null;
   reason?: string | null;
   phase?: WorkPhase;
+  /** Present on image events so a client can label request vs work photos. */
+  context?: JobImageContext;
   note?: string;
   imageId?: string;
   mimeType?: string;

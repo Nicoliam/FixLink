@@ -409,7 +409,7 @@ export function validateInternalJobListQuery(query: Record<string, unknown>): Va
   const pageSize =
     rawPageSize === undefined || rawPageSize === null || String(rawPageSize).trim() === '' ? 20 : Number(String(rawPageSize).trim());
   if (!Number.isInteger(page) || page < 1 || page > 1000 || !Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50) {
-    return invalid('Invalid pagination. Use page 1–1000 and pageSize 1–50.');
+    return invalid('Invalid pagination. Use page 1-1000 and pageSize 1-50.');
   }
 
   let status: InternalJobStatus | null = null;

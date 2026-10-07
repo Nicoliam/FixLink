@@ -7,6 +7,12 @@
  * run in one transaction so they cannot become inconsistent; the status
  * update is guarded by `AND status = 'REQUESTED'` so a concurrent quote
  * cannot double-transition the job.
+ *
+ * Step 14 adds open requests: a MARKETPLACE job whose `professional_id` and
+ * `business_id` are both NULL, quotable by up to MAX_QUOTES_PER_OPEN_JOB
+ * matching providers instead of only the addressed one. The job row is held
+ * with `FOR UPDATE` for the whole of `createQuote`, which is what makes the
+ * quote cap race-safe: two simultaneous fourth quotes cannot both count three.
  */
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import type { JobDto, JobStatus } from '../jobs/jobs.types';
@@ -15,8 +21,10 @@ import {
   JobNotQuoteableError,
   JobNotSchedulableError,
   JobNotStartableError,
+  MAX_QUOTES_PER_OPEN_JOB,
   QuoteAlreadyAcceptedError,
   QuoteConflictError,
+  QuoteLimitReachedError,
   QuoteNotEligibleError,
   type AcceptQuotePersistInput,
   type AcceptQuoteResult,
@@ -81,6 +89,8 @@ interface JobRow extends RowDataPacket {
   service_id: number | null;
   service_name: string | null;
   service_slug: string | null;
+  service_category_id: number | null;
+  service_category_name: string | null;
   description: string;
   address_line1: string | null;
   city: string | null;
@@ -123,12 +133,14 @@ const JOB_DETAIL_SELECT = `
          pp.\`display_name\` AS \`professional_name\`,
          bp.\`business_name\` AS \`business_name\`,
           j.\`service_id\`, s.\`name\` AS \`service_name\`, s.\`slug\` AS \`service_slug\`,
+          s.\`category_id\` AS \`service_category_id\`, c.\`name\` AS \`service_category_name\`,
           j.\`description\`, j.\`address_line1\`, j.\`city\`, j.\`province\`,
           j.\`scheduled_at\`, j.\`completed_at\`, j.\`confirmed_at\`, j.\`closed_at\`, j.\`created_at\`
     FROM \`jobs\` j
     LEFT JOIN \`professional_profiles\` pp ON pp.\`id\` = j.\`professional_id\`
     LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = j.\`business_id\`
-    LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\``;
+    LEFT JOIN \`services\` s ON s.\`id\` = j.\`service_id\`
+    LEFT JOIN \`service_categories\` c ON c.\`id\` = s.\`category_id\``;
 
 const QUOTE_DETAIL_SELECT = `
   SELECT q.\`id\`, q.\`job_id\`, q.\`professional_id\`, q.\`business_id\`,
@@ -141,7 +153,10 @@ const QUOTE_DETAIL_SELECT = `
     LEFT JOIN \`business_profiles\` bp ON bp.\`id\` = q.\`business_id\``;
 
 function mapJobRow(row: JobRow): Omit<ProviderRequestDto, 'customer' | 'quotes'> {
+  // Step 14: both provider columns NULL is an OPEN REQUEST. Reporting
+  // `business-null` here would hand every open request a phantom business.
   const isProfessional = row.professional_id !== null;
+  const isBusiness = row.business_id !== null;
   const providerId = isProfessional ? `professional-${row.professional_id}` : `business-${row.business_id}`;
   const scheduledAt = toIso(row.scheduled_at);
   return {
@@ -149,15 +164,20 @@ function mapJobRow(row: JobRow): Omit<ProviderRequestDto, 'customer' | 'quotes'>
     reference: row.reference,
     source: row.source,
     status: row.status,
-    provider: {
-      id: providerId,
-      providerType: isProfessional ? 'professional' : 'business',
-      name: isProfessional ? (row.professional_name ?? providerId) : (row.business_name ?? providerId),
-    },
+    provider:
+      isProfessional || isBusiness
+        ? {
+            id: providerId,
+            providerType: isProfessional ? 'professional' : 'business',
+            name: isProfessional ? (row.professional_name ?? providerId) : (row.business_name ?? providerId),
+          }
+        : null,
     service: {
       id: row.service_id === null ? '' : toStringId(row.service_id),
       name: row.service_name ?? '',
       slug: row.service_slug ?? '',
+      categoryId: row.service_category_id === null ? '' : toStringId(row.service_category_id),
+      categoryName: row.service_category_name ?? '',
     },
     description: row.description,
     location: row.address_line1 ?? '',
@@ -266,6 +286,26 @@ export class MysqlQuotesStore implements QuotesStore {
       params.push(...filter.businessIds);
     }
     if (ownership.length === 0) return { items: [], total: 0 };
+    // Step 14: an OPEN request has no provider column to match on. Quoting is
+    // the access grant, so a job this provider has a live quote on joins the
+    // addressed set. It is a correlated EXISTS rather than a join so a job
+    // with several of this provider's historical quotes still appears once.
+    const quotedByMe: string[] = [];
+    for (const numericId of filter.professionalIds) {
+      quotedByMe.push(
+        `EXISTS (SELECT 1 FROM \`quotes\` q WHERE q.\`job_id\` = j.\`id\`
+           AND q.\`professional_id\` = ? AND q.\`status\` IN ('DRAFT','SUBMITTED'))`,
+      );
+      params.push(numericId);
+    }
+    for (const numericId of filter.businessIds) {
+      quotedByMe.push(
+        `EXISTS (SELECT 1 FROM \`quotes\` q WHERE q.\`job_id\` = j.\`id\`
+           AND q.\`business_id\` = ? AND q.\`status\` IN ('DRAFT','SUBMITTED'))`,
+      );
+      params.push(numericId);
+    }
+    ownership.push(`(j.\`professional_id\` IS NULL AND j.\`business_id\` IS NULL AND (${quotedByMe.join(' OR ')}))`);
     clauses.push(`(${ownership.join(' OR ')})`);
     clauses.push(`j.\`status\` IN (${statuses.map(() => '?').join(', ')})`);
     params.push(...statuses);
@@ -305,6 +345,36 @@ export class MysqlQuotesStore implements QuotesStore {
     return displayNameOf(row.first_name, row.last_name);
   }
 
+  async hasQuoteFromProvider(
+    jobId: string,
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<boolean> {
+    if (!/^[1-9][0-9]*$/.test(jobId) || !/^[1-9][0-9]*$/.test(providerNumericId)) return false;
+    const column = providerType === 'professional' ? 'professional_id' : 'business_id';
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT 1 AS \`hit\` FROM \`quotes\`
+        WHERE \`job_id\` = ? AND \`${column}\` = ? AND \`status\` IN ('DRAFT','SUBMITTED')
+        LIMIT 1`,
+      [jobId, providerNumericId],
+    );
+    return rows.length > 0;
+  }
+
+  async listJobIdsQuotedBy(
+    providerType: 'professional' | 'business',
+    providerNumericId: string,
+  ): Promise<string[]> {
+    if (!/^[1-9][0-9]*$/.test(providerNumericId)) return [];
+    const column = providerType === 'professional' ? 'professional_id' : 'business_id';
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT DISTINCT \`job_id\` FROM \`quotes\`
+        WHERE \`${column}\` = ? AND \`status\` IN ('DRAFT','SUBMITTED')`,
+      [providerNumericId],
+    );
+    return rows.map((row) => toStringId(row['job_id'] as number));
+  }
+
   async createQuote(input: CreateQuotePersistInput): Promise<QuoteDto> {
     const expectedProfessionalId = input.providerType === 'professional' ? input.providerNumericId : null;
     const expectedBusinessId = input.providerType === 'business' ? input.providerNumericId : null;
@@ -312,15 +382,21 @@ export class MysqlQuotesStore implements QuotesStore {
     try {
       await conn.beginTransaction();
       const [jobRows] = await conn.query<JobRow[]>(
-        'SELECT `id`, `source`, `status`, `professional_id`, `business_id` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        'SELECT `id`, `source`, `status`, `professional_id`, `business_id` FROM `jobs` WHERE `id` = ? AND `deleted_at` IS NULL FOR UPDATE',
         [input.job.id],
       );
       const job = (jobRows as JobRow[])[0] as JobRow | undefined;
+      // Step 14: both provider columns NULL is an OPEN request — quotable by
+      // any matching provider. The service proved the match (category AND
+      // area) before calling; here only the eligibility rules are re-checked,
+      // under the same row lock the quote count is taken with.
+      const isOpenRequest =
+        job !== undefined && job.professional_id === null && job.business_id === null;
       const addressedHere =
         job !== undefined &&
         ((expectedProfessionalId !== null && String(job.professional_id ?? '') === expectedProfessionalId) ||
           (expectedBusinessId !== null && String(job.business_id ?? '') === expectedBusinessId));
-      if (!job || job.source !== 'MARKETPLACE' || !addressedHere) {
+      if (!job || job.source !== 'MARKETPLACE' || (!isOpenRequest && !addressedHere)) {
         throw new JobNotQuoteableError('This job is not addressed to your provider profile.');
       }
       // Duplicate check before the status check: a second submission from
@@ -335,7 +411,28 @@ export class MysqlQuotesStore implements QuotesStore {
         [input.job.id, expectedProfessionalId, expectedBusinessId],
       );
       if ((existing as RowDataPacket[]).length > 0) throw new QuoteConflictError();
-      if (job.status !== 'REQUESTED') {
+
+      if (isOpenRequest) {
+        // The cap is counted HERE, while the job row is locked by FOR UPDATE
+        // above. A count in the service would be a read-then-write and two
+        // concurrent fourth quotes could both pass it.
+        const [countRows] = await conn.query<RowDataPacket[]>(
+          `SELECT COUNT(*) AS \`n\` FROM \`quotes\`
+            WHERE \`job_id\` = ? AND \`status\` IN ('DRAFT','SUBMITTED')`,
+          [input.job.id],
+        );
+        const active = Number((countRows[0] as RowDataPacket | undefined)?.['n'] ?? 0);
+        if (active >= MAX_QUOTES_PER_OPEN_JOB) {
+          throw new QuoteLimitReachedError(
+            `This request already has ${MAX_QUOTES_PER_OPEN_JOB} quotes, so the customer is no longer accepting more.`,
+          );
+        }
+        // QUOTED is quoteable too: on an open request the 2nd and 3rd quotes
+        // arrive after the 1st has already moved it there.
+        if (job.status !== 'REQUESTED' && job.status !== 'QUOTED') {
+          throw new JobNotQuoteableError('This job can no longer be quoted.');
+        }
+      } else if (job.status !== 'REQUESTED') {
         throw new JobNotQuoteableError('This job can no longer be quoted.');
       }
 
@@ -362,15 +459,21 @@ export class MysqlQuotesStore implements QuotesStore {
           [quoteId, item.description, item.quantity, item.unitPrice, index],
         );
       }
-      const [updated] = await conn.query<ResultSetHeader>(
-        'UPDATE `jobs` SET `status` = \'QUOTED\' WHERE `id` = ? AND `status` = \'REQUESTED\'',
-        [input.job.id],
-      );
-      if (updated.affectedRows !== 1) throw new JobNotQuoteableError();
-      await conn.query(
-        'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
-        [input.job.id, 'REQUESTED', 'QUOTED', input.createdBy, 'Provider submitted quote'],
-      );
+      // Step 14: only the FIRST quote on an open request moves REQUESTED ->
+      // QUOTED. Later quotes leave the already-QUOTED job alone, so no further
+      // `job_status_history` entry is written — the job did not change state,
+      // and history records state changes (AGENTS.md section 37).
+      if (job.status === 'REQUESTED') {
+        const [updated] = await conn.query<ResultSetHeader>(
+          'UPDATE `jobs` SET `status` = \'QUOTED\' WHERE `id` = ? AND `status` = \'REQUESTED\'',
+          [input.job.id],
+        );
+        if (updated.affectedRows !== 1) throw new JobNotQuoteableError();
+        await conn.query(
+          'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
+          [input.job.id, 'REQUESTED', 'QUOTED', input.createdBy, 'Provider submitted quote'],
+        );
+      }
       await conn.commit();
       const created = await this.getQuoteById(String(quoteId));
       if (!created) throw new Error('Quote creation failed: row not found after insert.');
@@ -388,7 +491,7 @@ export class MysqlQuotesStore implements QuotesStore {
     try {
       await conn.beginTransaction();
       const [jobRows] = await conn.query<JobRow[]>(
-        'SELECT `id`, `source`, `status` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        'SELECT `id`, `source`, `status`, `professional_id`, `business_id` FROM `jobs` WHERE `id` = ? AND `deleted_at` IS NULL FOR UPDATE',
         [input.jobId],
       );
       const job = (jobRows as JobRow[])[0] as JobRow | undefined;
@@ -399,7 +502,7 @@ export class MysqlQuotesStore implements QuotesStore {
         throw new JobNotAcceptableError('Quote not found.');
       }
       const [quoteRows] = await conn.query<QuoteRow[]>(
-        'SELECT `id`, `job_id`, `status`, `total`, `currency` FROM `quotes` WHERE `id` = ? FOR UPDATE',
+        'SELECT `id`, `job_id`, `status`, `total`, `currency`, `professional_id`, `business_id` FROM `quotes` WHERE `id` = ? FOR UPDATE',
         [input.quoteId],
       );
       const target = (quoteRows as QuoteRow[])[0] as QuoteRow | undefined;
@@ -423,11 +526,41 @@ export class MysqlQuotesStore implements QuotesStore {
         [input.jobId, input.quoteId],
       );
       void retired;
+      // Step 14: accepting a quote on an OPEN request writes the winner onto
+      // the job — `professional_id`/`business_id` from the accepted quote. This
+      // is the moment the customer chooses a professional, so the job becomes
+      // an addressed request and every downstream module (schedule, start,
+      // execution, assignment) keeps working with no open-request branch.
+      const wasOpenRequest = job.professional_id === null && job.business_id === null;
+      if (wasOpenRequest) {
+        if (target.professional_id === null && target.business_id === null) {
+          throw new JobNotAcceptableError('Quote has no provider to assign.');
+        }
+      }
       const [jobUpdated] = await conn.query<ResultSetHeader>(
-        "UPDATE `jobs` SET `status` = 'ACCEPTED', `agreed_amount` = ?, `currency` = ? WHERE `id` = ? AND `status` = 'QUOTED'",
-        [toNumber(target.total), target.currency, input.jobId],
+        wasOpenRequest
+          ? "UPDATE `jobs` SET `status` = 'ACCEPTED', `agreed_amount` = ?, `currency` = ?, `professional_id` = ?, `business_id` = ? WHERE `id` = ? AND `status` = 'QUOTED'"
+          : "UPDATE `jobs` SET `status` = 'ACCEPTED', `agreed_amount` = ?, `currency` = ? WHERE `id` = ? AND `status` = 'QUOTED'",
+        wasOpenRequest
+          ? [toNumber(target.total), target.currency, target.professional_id, target.business_id, input.jobId]
+          : [toNumber(target.total), target.currency, input.jobId],
       );
       if (jobUpdated.affectedRows !== 1) throw new JobNotAcceptableError();
+      if (wasOpenRequest) {
+        // An open request has no `job_assignments` row at creation, so the
+        // winning provider's assignment is written here, inside the same
+        // transaction as the acceptance that caused it.
+        await conn.query(
+          'INSERT INTO `job_assignments` (`job_id`, `assignment_type`, `professional_id`, `business_id`, `assigned_by`) VALUES (?, ?, ?, ?, ?)',
+          [
+            input.jobId,
+            target.professional_id !== null ? 'PROFESSIONAL' : 'BUSINESS',
+            target.professional_id,
+            target.business_id,
+            input.acceptedBy,
+          ],
+        );
+      }
       await conn.query(
         'INSERT INTO `job_status_history` (`job_id`, `previous_status`, `new_status`, `changed_by`, `reason`) VALUES (?, ?, ?, ?, ?)',
         [input.jobId, 'QUOTED', 'ACCEPTED', input.acceptedBy, 'Customer accepted provider quote'],
@@ -471,7 +604,7 @@ export class MysqlQuotesStore implements QuotesStore {
     try {
       await conn.beginTransaction();
       const [jobRows] = await conn.query<JobRow[]>(
-        'SELECT `id`, `source`, `status` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        'SELECT `id`, `source`, `status`, `professional_id`, `business_id` FROM `jobs` WHERE `id` = ? AND `deleted_at` IS NULL FOR UPDATE',
         [input.jobId],
       );
       const job = (jobRows as JobRow[])[0] as JobRow | undefined;
@@ -519,7 +652,7 @@ export class MysqlQuotesStore implements QuotesStore {
     try {
       await conn.beginTransaction();
       const [jobRows] = await conn.query<JobRow[]>(
-        'SELECT `id`, `source`, `status` FROM `jobs` WHERE `id` = ? FOR UPDATE',
+        'SELECT `id`, `source`, `status`, `professional_id`, `business_id` FROM `jobs` WHERE `id` = ? AND `deleted_at` IS NULL FOR UPDATE',
         [input.jobId],
       );
       const job = (jobRows as JobRow[])[0] as JobRow | undefined;

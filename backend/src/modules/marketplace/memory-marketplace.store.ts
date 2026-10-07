@@ -6,18 +6,36 @@
  * The MySQL implementation enforces the same visibility rules; the database
  * schema itself is covered by database/tests/schema.test.js.
  */
-import type { MarketplaceStore } from './marketplace.store';
+import { MAX_OPEN_REQUEST_MATCHES, type MarketplaceStore } from './marketplace.store';
 import type {
   CertificateDto,
+  OpenRequestMatch,
   Paginated,
   PortfolioProjectDto,
+  ProviderAreaTag,
   ProviderCardDto,
+  ProviderMatchProfile,
+  ProviderOfferingTag,
   ProviderProfileDto,
+  ProviderRef,
   ProviderSearchFilters,
   ReviewDto,
   ServiceCategoryDto,
   ServiceDto,
 } from './marketplace.types';
+import { anyAreaMatchesLocation } from '../../utils/service-area-match';
+
+interface OfferingFixture {
+  id: string;
+  name: string;
+  description: string | null;
+  categoryName: string;
+  categorySlug: string;
+  /** null = provider has not stated a price yet (see migration 019). */
+  priceAmount: number | null;
+  currency: string;
+  isActive: boolean;
+}
 
 interface ProfessionalRow {
   id: string;
@@ -29,6 +47,7 @@ interface ProfessionalRow {
   ratingAvg: number;
   ratingCount: number;
   serviceIds: string[];
+  offerings: OfferingFixture[];
   areas: { areaName: string; city: string | null; province: string | null }[];
   portfolio: PortfolioProjectDto[];
   certificates: CertificateDto[];
@@ -46,6 +65,7 @@ interface BusinessRow {
   ratingAvg: number;
   ratingCount: number;
   serviceIds: string[];
+  offerings: OfferingFixture[];
   areas: { areaName: string; city: string | null; province: string | null }[];
   portfolio: PortfolioProjectDto[];
   certificates: CertificateDto[];
@@ -89,7 +109,7 @@ function serviceTag(id: string): { id: string; name: string; slug: string } {
 const PROFESSIONALS: ProfessionalRow[] = [
   {
     id: '1',
-    displayName: 'Sipho Ndlovu — ProPlumb',
+    displayName: 'Sipho Ndlovu - ProPlumb',
     bio: 'PIRB-registered plumber doing leaks, geysers and drains across Joburg North.',
     experienceYears: 9,
     photo: 'profiles/professional-1.jpg',
@@ -97,6 +117,15 @@ const PROFESSIONALS: ProfessionalRow[] = [
     ratingAvg: 4.8,
     ratingCount: 64,
     serviceIds: ['1', '2', '3'],
+    offerings: [
+      { id: '101', name: 'Emergency Burst Pipe Repair', description: 'Same-day call-out for burst pipes.', categoryName: 'Plumbing', categorySlug: 'plumbing', priceAmount: 850, currency: 'ZAR', isActive: true },
+      // Higher than the first, so "from" must be 850 and not this.
+      { id: '102', name: 'Geyser Installation', description: null, categoryName: 'Plumbing', categorySlug: 'plumbing', priceAmount: 2400, currency: 'ZAR', isActive: true },
+      // No price stated yet (migration 019): must be ignored, never read as R0.
+      { id: '103', name: 'Drain Blockage Clearance', description: null, categoryName: 'Plumbing', categorySlug: 'plumbing', priceAmount: null, currency: 'ZAR', isActive: true },
+      // Retired offering: must never surface as a price.
+      { id: '104', name: 'Retired Service', description: null, categoryName: 'Plumbing', categorySlug: 'plumbing', priceAmount: 150, currency: 'ZAR', isActive: false },
+    ],
     areas: [
       { areaName: 'Randburg & surrounds', city: 'Johannesburg', province: 'Gauteng' },
       { areaName: 'Sandton', city: 'Johannesburg', province: 'Gauteng' },
@@ -136,6 +165,7 @@ const PROFESSIONALS: ProfessionalRow[] = [
     ratingAvg: 4.7,
     ratingCount: 41,
     serviceIds: ['4', '5'],
+    offerings: [{ id: '102', name: 'DB Board Upgrades', description: null, categoryName: 'Electrical', categorySlug: 'electrical', priceAmount: 1200, currency: 'ZAR', isActive: true }],
     areas: [{ areaName: 'Centurion', city: 'Centurion', province: 'Gauteng' }],
     portfolio: [],
     certificates: [],
@@ -159,6 +189,7 @@ const PROFESSIONALS: ProfessionalRow[] = [
     ratingAvg: 0,
     ratingCount: 0,
     serviceIds: ['6', '7'],
+    offerings: [{ id: '103', name: 'Interior Repainting', description: 'Two coats, premium paint supplied.', categoryName: 'Painting', categorySlug: 'painting', priceAmount: 2400, currency: 'ZAR', isActive: true }],
     areas: [{ areaName: 'Durban North', city: 'Durban', province: 'KwaZulu-Natal' }],
     portfolio: [],
     certificates: [],
@@ -178,6 +209,7 @@ const BUSINESSES: BusinessRow[] = [
     ratingAvg: 4.6,
     ratingCount: 48,
     serviceIds: ['1', '2', '3'],
+    offerings: [{ id: '201', name: 'Commercial Drainage', description: 'Blocked drains cleared on site.', categoryName: 'Plumbing', categorySlug: 'plumbing', priceAmount: 1500, currency: 'ZAR', isActive: true }],
     areas: [
       { areaName: 'Johannesburg North', city: 'Johannesburg', province: 'Gauteng' },
       { areaName: 'Fourways', city: 'Johannesburg', province: 'Gauteng' },
@@ -208,12 +240,28 @@ const BUSINESSES: BusinessRow[] = [
     ratingAvg: 0,
     ratingCount: 0,
     serviceIds: ['4', '5'],
+    offerings: [],
     areas: [{ areaName: 'Southern Suburbs', city: 'Cape Town', province: 'Western Cape' }],
     portfolio: [],
     certificates: [],
     reviews: [],
   },
 ];
+
+/**
+ * The "call out from R…" figure: the lowest price the provider has actually
+ * stated on a live offering. Mirrors lowestStatedPrice in the MySQL store so
+ * the two backends behave identically. Nulls when nothing is stated — never 0.
+ */
+function lowestStatedPrice(offerings: ProviderOfferingTag[]): {
+  fromPrice: number | null;
+  fromPriceCurrency: string | null;
+} {
+  const priced = offerings.filter((o) => o.priceAmount !== null);
+  if (priced.length === 0) return { fromPrice: null, fromPriceCurrency: null };
+  const lowest = priced.reduce((min, o) => (o.priceAmount! < min.priceAmount! ? o : min));
+  return { fromPrice: lowest.priceAmount, fromPriceCurrency: lowest.currency };
+}
 
 function professionalCard(row: ProfessionalRow): ProviderCardDto {
   return {
@@ -232,7 +280,12 @@ function professionalCard(row: ProfessionalRow): ProviderCardDto {
     serviceAreas: row.areas,
     portfolioCount: row.portfolio.length,
     approvedCertificateCount: row.certificates.length,
+    ...lowestStatedPrice(liveOfferings(row)),
   };
+}
+
+function liveOfferings(row: { offerings: OfferingFixture[] }): ProviderOfferingTag[] {
+  return row.offerings.filter((offering) => offering.isActive);
 }
 
 function businessCard(row: BusinessRow): ProviderCardDto {
@@ -252,6 +305,7 @@ function businessCard(row: BusinessRow): ProviderCardDto {
     serviceAreas: row.areas,
     portfolioCount: row.portfolio.length,
     approvedCertificateCount: row.certificates.length,
+    ...lowestStatedPrice(liveOfferings(row)),
   };
 }
 
@@ -315,7 +369,168 @@ function matchesQuery(card: ProviderCardDto, query: string | null): boolean {
     .every((word) => haystack.includes(word));
 }
 
+function mergeById<T extends { id: string }>(fixtures: T[], overrides: T[]): T[] {
+  const byId = new Map<string, T>(fixtures.map((row) => [row.id, row]));
+  for (const row of overrides) byId.set(row.id, row);
+  return [...byId.values()];
+}
+
 export class MemoryMarketplaceStore implements MarketplaceStore {
+  /**
+   * Step 14 — extra providers created by tests, appended after the static
+   * fixtures. Real registration creates a `professional_profiles` row but no
+   * services or areas, so a registered professional matches nothing until a
+   * test says what they offer and where. That is exactly the production
+   * behaviour and the thing the matching tests need to set up.
+   */
+  private readonly extraProfessionals: ProfessionalRow[] = [];
+  private readonly extraBusinesses: BusinessRow[] = [];
+
+  /** Test setup: give a provider published coverage (Step 14). */
+  seedServiceAreas(provider: ProviderRef, areas: ProviderAreaTag[]): void {
+    const rows = provider.providerType === 'professional' ? this.allProfessionals() : this.allBusinesses();
+    const row = rows.find((entry) => entry.id === provider.numericId.trim());
+    if (!row) return;
+    // Assign a fresh array: never mutate an object a static fixture still owns.
+    row.areas = areas.map((area) => ({ ...area }));
+  }
+
+  /** Test setup: register a professional's matching profile (Step 14). */
+  addTestProfessional(profile: {
+    id: string;
+    displayName: string;
+    serviceIds?: string[];
+    offeringCategoryIds?: string[];
+    areas?: { areaName: string; city?: string | null; province?: string | null }[];
+  }): void {
+    this.extraProfessionals.push({
+      id: profile.id,
+      displayName: profile.displayName,
+      bio: null,
+      experienceYears: null,
+      photo: null,
+      verificationStatus: 'UNVERIFIED',
+      ratingAvg: 0,
+      ratingCount: 0,
+      serviceIds: profile.serviceIds ?? [],
+      offerings: (profile.offeringCategoryIds ?? []).map((categoryId, index) => ({
+        id: `test-${profile.id}-${index + 1}`,
+        name: `Test offering ${index + 1}`,
+        description: null,
+        categoryName: CATEGORIES.find((c) => c.id === categoryId)?.name ?? 'Test',
+        categorySlug: CATEGORIES.find((c) => c.id === categoryId)?.slug ?? 'test',
+        priceAmount: null,
+        currency: 'ZAR',
+        isActive: true,
+      })),
+      areas: (profile.areas ?? []).map((area) => ({
+        areaName: area.areaName,
+        city: area.city ?? null,
+        province: area.province ?? null,
+      })),
+      portfolio: [],
+      certificates: [],
+      reviews: [],
+    });
+  }
+
+  /** Test setup: register a business's matching profile (Step 14). */
+  addTestBusiness(business: {
+    id: string;
+    businessName: string;
+    serviceIds?: string[];
+    areas?: { areaName: string; city?: string | null; province?: string | null }[];
+  }): void {
+    this.extraBusinesses.push({
+      id: business.id,
+      businessName: business.businessName,
+      description: null,
+      logo: null,
+      city: business.areas?.[0]?.city ?? null,
+      province: business.areas?.[0]?.province ?? null,
+      verificationStatus: 'UNVERIFIED',
+      ratingAvg: 0,
+      ratingCount: 0,
+      serviceIds: business.serviceIds ?? [],
+      offerings: [],
+      areas: (business.areas ?? []).map((area) => ({
+        areaName: area.areaName,
+        city: area.city ?? null,
+        province: area.province ?? null,
+      })),
+      portfolio: [],
+      certificates: [],
+      reviews: [],
+    });
+  }
+
+  /**
+   * Static fixtures plus anything a test registered, with test rows WINNING on
+   * a colliding id.
+   *
+   * The collision is real: business '1' is a fixture, and a test that wants to
+   * set business 1's service areas would otherwise mutate (or be shadowed by)
+   * the fixture depending on which list a lookup searched. Merging here means
+   * every `find` in this class sees exactly one row per id.
+   */
+  private allProfessionals(): ProfessionalRow[] {
+    return mergeById(PROFESSIONALS, this.extraProfessionals);
+  }
+
+  private allBusinesses(): BusinessRow[] {
+    return mergeById(BUSINESSES, this.extraBusinesses);
+  }
+
+  /** The platform category buckets a fixture offers in, catalogue + offerings. */
+  private categoriesFor(row: ProfessionalRow | BusinessRow): string[] {
+    const ids = new Set<string>();
+    for (const serviceId of row.serviceIds) {
+      const service = SERVICES.find((s) => s.id === serviceId);
+      if (service) ids.add(service.categoryId);
+    }
+    for (const offering of row.offerings) {
+      const category = CATEGORIES.find((c) => c.slug === offering.categorySlug);
+      if (category) ids.add(category.id);
+    }
+    return [...ids];
+  }
+
+  async findOpenRequestMatches(
+    categoryId: string,
+    location: string,
+    limit: number,
+  ): Promise<OpenRequestMatch[]> {
+    const cap = Math.max(0, Math.min(limit, MAX_OPEN_REQUEST_MATCHES));
+    const collect = (rows: (ProfessionalRow | BusinessRow)[], providerType: 'professional' | 'business') =>
+      rows
+        .filter((row) => this.categoriesFor(row).includes(categoryId))
+        .filter((row) => anyAreaMatchesLocation(row.areas, location))
+        .map((row) => ({
+          providerType,
+          numericId: row.id,
+          name: 'displayName' in row ? row.displayName : row.businessName,
+          serviceAreas: row.areas,
+        }));
+    const matches = [
+      ...collect(this.allProfessionals(), 'professional'),
+      ...collect(this.allBusinesses(), 'business'),
+    ];
+    // Mirrors the MySQL ordering: newest profile first, then the fan-out cap.
+    matches.sort((a, b) => Number(b.numericId) - Number(a.numericId));
+    return matches.slice(0, cap);
+  }
+
+  async getProviderMatchProfile(provider: ProviderRef): Promise<ProviderMatchProfile> {
+    const rows = provider.providerType === 'professional' ? this.allProfessionals() : this.allBusinesses();
+    const row = rows.find((entry) => entry.id === provider.numericId.trim());
+    if (!row) return { categoryIds: [], serviceAreas: [] };
+    return { categoryIds: this.categoriesFor(row), serviceAreas: row.areas };
+  }
+
+  async replaceServiceAreas(provider: ProviderRef, areas: ProviderAreaTag[]): Promise<void> {
+    this.seedServiceAreas(provider, areas);
+  }
+
   async listCategories(activeOnly: boolean): Promise<ServiceCategoryDto[]> {
     void activeOnly;
     return CATEGORIES;
@@ -336,8 +551,8 @@ export class MemoryMarketplaceStore implements MarketplaceStore {
 
   async searchProviders(filters: ProviderSearchFilters): Promise<Paginated<ProviderCardDto>> {
     let cards: ProviderCardDto[] = [
-      ...PROFESSIONALS.map(professionalCard),
-      ...BUSINESSES.map(businessCard),
+      ...this.allProfessionals().map(professionalCard),
+      ...this.allBusinesses().map(businessCard),
     ];
 
     if (filters.providerType) {
@@ -349,8 +564,8 @@ export class MemoryMarketplaceStore implements MarketplaceStore {
     cards = cards.filter((card) => {
       const row =
         card.providerType === 'professional'
-          ? PROFESSIONALS.find((p) => `professional-${p.id}` === card.id)
-          : BUSINESSES.find((b) => `business-${b.id}` === card.id);
+          ? this.allProfessionals().find((p) => `professional-${p.id}` === card.id)
+          : this.allBusinesses().find((b) => `business-${b.id}` === card.id);
       const serviceIds = row?.serviceIds ?? [];
       const areas = row?.areas ?? [];
       const businessCity = card.providerType === 'business' ? card.city : null;
@@ -368,34 +583,42 @@ export class MemoryMarketplaceStore implements MarketplaceStore {
   }
 
   async getProviderById(providerId: string): Promise<ProviderProfileDto | null> {
-    const professional = PROFESSIONALS.find((p) => `professional-${p.id}` === providerId);
+    const professional = this.allProfessionals().find((p) => `professional-${p.id}` === providerId);
     if (professional) {
-      return { ...professionalCard(professional), bio: professional.bio };
+      return {
+        ...professionalCard(professional),
+        bio: professional.bio,
+        offerings: liveOfferings(professional),
+      };
     }
-    const business = BUSINESSES.find((b) => `business-${b.id}` === providerId);
+    const business = this.allBusinesses().find((b) => `business-${b.id}` === providerId);
     if (business) {
-      return { ...businessCard(business), bio: business.description };
+      return {
+        ...businessCard(business),
+        bio: business.description,
+        offerings: liveOfferings(business),
+      };
     }
     return null;
   }
 
   async getProviderPortfolio(providerId: string): Promise<PortfolioProjectDto[]> {
-    const professional = PROFESSIONALS.find((p) => `professional-${p.id}` === providerId);
+    const professional = this.allProfessionals().find((p) => `professional-${p.id}` === providerId);
     if (professional) return professional.portfolio;
-    const business = BUSINESSES.find((b) => `business-${b.id}` === providerId);
+    const business = this.allBusinesses().find((b) => `business-${b.id}` === providerId);
     return business?.portfolio ?? [];
   }
 
   async getProviderCertificates(providerId: string): Promise<CertificateDto[]> {
-    const professional = PROFESSIONALS.find((p) => `professional-${p.id}` === providerId);
+    const professional = this.allProfessionals().find((p) => `professional-${p.id}` === providerId);
     if (professional) return professional.certificates;
-    const business = BUSINESSES.find((b) => `business-${b.id}` === providerId);
+    const business = this.allBusinesses().find((b) => `business-${b.id}` === providerId);
     return business?.certificates ?? [];
   }
 
   async getProviderReviews(providerId: string, page: number, pageSize: number): Promise<Paginated<ReviewDto>> {
-    const professional = PROFESSIONALS.find((p) => `professional-${p.id}` === providerId);
-    const business = professional ? null : BUSINESSES.find((b) => `business-${b.id}` === providerId);
+    const professional = this.allProfessionals().find((p) => `professional-${p.id}` === providerId);
+    const business = professional ? null : this.allBusinesses().find((b) => `business-${b.id}` === providerId);
     const all = professional?.reviews ?? business?.reviews ?? [];
     const start = (page - 1) * pageSize;
     return { items: all.slice(start, start + pageSize), total: all.length, page, pageSize };

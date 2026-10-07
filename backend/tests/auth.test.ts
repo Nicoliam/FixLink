@@ -81,7 +81,7 @@ describe('POST /api/v1/auth/register', () => {
     assert.equal(stored.status, 'ACTIVE');
   });
 
-  it('logs the new account straight in — registration returns a working session', async () => {
+  it('logs the new account straight in - registration returns a working session', async () => {
     const res = await request(app).post('/api/v1/auth/register').send({
       email: 'autologin@example.co.za',
       password: 'Str0ngPassw0rd!',
@@ -144,11 +144,91 @@ describe('POST /api/v1/auth/register', () => {
     assert.equal(businessSlug('Mokoena Plumbing', 'owner@example.co.za'), businessSlug('mokoena  plumbing', 'OWNER@example.co.za'));
   });
 
-  it('does not create a profile for a CUSTOMER (provisioned on first job request)', async () => {
-    await request(app)
-      .post('/api/v1/auth/register')
-      .send({ email: 'plain.customer@example.co.za', password: 'Str0ngPassw0rd!' });
-    assert.equal(await users.debugProfileFor('plain.customer@example.co.za'), null);
+  it('creates a customer profile in the same transaction as the account', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'naledi.dlamini@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'CUSTOMER',
+      firstName: 'Naledi',
+      lastName: 'Dlamini',
+      phone: '0821234567',
+    });
+    assert.equal(res.status, 201);
+    // customer_profiles is the ownership anchor for saved professionals,
+    // quotes and job detail, so it must exist from the moment of signup
+    // rather than on the first job request.
+    const profile = await users.debugProfileFor('naledi.dlamini@example.co.za');
+    assert.ok(profile, 'expected a CUSTOMER profile');
+    assert.equal(profile?.kind, 'CUSTOMER');
+    assert.deepEqual(profile, {
+      kind: 'CUSTOMER',
+      firstName: 'Naledi',
+      lastName: 'Dlamini',
+      email: 'naledi.dlamini@example.co.za',
+      phone: '0821234567',
+    });
+  });
+
+  it('derives a customer name from the email when none is supplied', async () => {
+    // Names are optional on the wire so an older client keeps working; the
+    // profile row still has to exist, and its names are NOT NULL.
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'sipho.ndlovu@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'CUSTOMER',
+    });
+    assert.equal(res.status, 201);
+    const profile = await users.debugProfileFor('sipho.ndlovu@example.co.za');
+    assert.equal(profile?.kind, 'CUSTOMER');
+    assert.deepEqual(profile, {
+      kind: 'CUSTOMER',
+      firstName: 'Sipho',
+      lastName: 'Ndlovu',
+      email: 'sipho.ndlovu@example.co.za',
+      phone: null,
+    });
+  });
+
+  it('still creates the profile when the email offers no usable name', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'fixlynk@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'CUSTOMER',
+    });
+    assert.equal(res.status, 201);
+    const profile = await users.debugProfileFor('fixlynk@example.co.za');
+    assert.equal(profile?.kind, 'CUSTOMER');
+  });
+
+  it('rejects a half-given customer name rather than silently dropping one half (422)', async () => {
+    for (const body of [
+      { email: 'only.first@example.co.za', password: 'Str0ngPassw0rd!', role: 'CUSTOMER', firstName: 'Naledi' },
+      { email: 'only.last@example.co.za', password: 'Str0ngPassw0rd!', role: 'CUSTOMER', lastName: 'Dlamini' },
+      {
+        email: 'blank.first@example.co.za',
+        password: 'Str0ngPassw0rd!',
+        role: 'CUSTOMER',
+        firstName: '   ',
+        lastName: 'Dlamini',
+      },
+    ]) {
+      const res = await request(app).post('/api/v1/auth/register').send(body);
+      assert.equal(res.status, 422, `expected 422 for ${JSON.stringify(body)}`);
+      assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+    }
+    assert.equal(await users.findByEmail('only.first@example.co.za'), null);
+  });
+
+  it('rejects a customer name longer than the column allows (422)', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'long.customer.name@example.co.za',
+      password: 'Str0ngPassw0rd!',
+      role: 'CUSTOMER',
+      firstName: 'N'.repeat(129),
+      lastName: 'Dlamini',
+    });
+    assert.equal(res.status, 422);
+    assert.equal(await users.findByEmail('long.customer.name@example.co.za'), null);
   });
 
   it('requires the display name a PROFESSIONAL profile is created with (422)', async () => {
@@ -173,16 +253,21 @@ describe('POST /api/v1/auth/register', () => {
     assert.equal(await users.findByEmail('nameless.owner@example.co.za'), null);
   });
 
-  it('ignores a provider name sent for a role that has no profile (CUSTOMER)', async () => {
+  it('ignores provider names sent for the CUSTOMER role', async () => {
     const res = await request(app).post('/api/v1/auth/register').send({
       email: 'customer.with.name@example.co.za',
       password: 'Str0ngPassw0rd!',
       role: 'CUSTOMER',
+      firstName: 'Naledi',
+      lastName: 'Dlamini',
       displayName: 'Should Not Provision',
       businessName: 'Should Not Provision Either',
     });
     assert.equal(res.status, 201);
-    assert.equal(await users.debugProfileFor('customer.with.name@example.co.za'), null);
+    const profile = await users.debugProfileFor('customer.with.name@example.co.za');
+    // The provider-only names are ignored, so a CUSTOMER profile is still the
+    // only thing provisioned.
+    assert.equal(profile?.kind, 'CUSTOMER');
   });
 
   it('rejects a provider name longer than the profile column allows (422)', async () => {
@@ -255,7 +340,7 @@ describe('POST /api/v1/auth/register', () => {
     assert.equal(await users.findByEmail('admin@example.co.za'), null);
   });
 
-  it('stores a bcrypt hash — never the plaintext password', async () => {
+  it('stores a bcrypt hash - never the plaintext password', async () => {
     const password = 'Sup3rSecretPw!';
     await request(app).post('/api/v1/auth/register').send({ email: 'hashcheck@example.co.za', password });
     const stored = await users.findByEmail('hashcheck@example.co.za');
@@ -267,7 +352,7 @@ describe('POST /api/v1/auth/register', () => {
   });
 });
 
-describe('POST /api/v1/auth/register — unique constraint classification', () => {
+describe('POST /api/v1/auth/register - unique constraint classification', () => {
   /**
    * `users` has two unique keys. The MySQL repository surfaces a duplicate as
    * ER_DUP_ENTRY plus the key name, so the endpoint can report the constraint

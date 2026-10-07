@@ -48,7 +48,25 @@ function buildApp(): TestContext {
 const PASSWORD = 'Str0ngPassw0rd!';
 
 /** A future SAST slot: 5 October 2026, 10:00 SAST (UTC+2). */
-const FUTURE_SLOT = '2026-10-05T10:00:00+02:00';
+
+/** ISO instant `days` from now, for fixtures that must be in the future. */
+function futureSlot(days: number): string {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** `YYYY-MM-DD` for the same instant, for `preferredDate` fields. */
+function futureDate(days: number): string {
+  return futureSlot(days).slice(0, 10);
+}
+/**
+ * A scheduled slot a few days from NOW, as an ISO instant.
+ *
+ * Derived from the clock rather than hard-coded. An absolute date labelled
+ * "future" is a time bomb: the schedule endpoint refuses a past slot, so the
+ * whole file starts failing the moment the wall clock passes it. These files
+ * did exactly that on 2026-10-05.
+ */
+const FUTURE_SLOT = futureSlot(3);
 const FUTURE_SLOT_INSTANT = new Date(FUTURE_SLOT).toISOString();
 
 /**
@@ -77,7 +95,7 @@ function validJob(overrides: Record<string, unknown> = {}): Record<string, unkno
     serviceId: '1',
     description: 'Kitchen mixer tap leaking at the base and the cupboard floor is damp.',
     location: 'Fourways, Johannesburg',
-    preferredDate: '2026-10-05',
+    preferredDate: futureDate(3),
     ...overrides,
   };
 }
@@ -520,7 +538,7 @@ describe('POST /api/v1/jobs/:jobId/start (provider start)', () => {
   });
 });
 
-describe('Stage 6E — customer visibility, quote integrity and envelopes', () => {
+describe('Stage 6E - customer visibility, quote integrity and envelopes', () => {
   let ctx: TestContext;
   let customerToken: string;
   let proToken: string;

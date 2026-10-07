@@ -91,7 +91,15 @@ export class MysqlUserRepository implements UserRepository {
         [userId, input.role],
       );
       const profile = input.profile;
-      if (profile?.kind === 'PROFESSIONAL') {
+      if (profile?.kind === 'CUSTOMER') {
+        // `customer_profiles` requires first_name + last_name (NOT NULL, no
+        // default). uq_customer_profiles_user keeps this to one row per user,
+        // and the whole insert rolls back with the account if it conflicts.
+        await connection.query(
+          'INSERT INTO `customer_profiles` (`user_id`, `first_name`, `last_name`, `email`, `phone`) VALUES (?, ?, ?, ?, ?)',
+          [userId, profile.firstName, profile.lastName, profile.email, profile.phone],
+        );
+      } else if (profile?.kind === 'PROFESSIONAL') {
         await connection.query(
           'INSERT INTO `professional_profiles` (`user_id`, `display_name`, `verification_status`) VALUES (?, ?, \'UNVERIFIED\')',
           [userId, profile.displayName],

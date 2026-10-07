@@ -95,7 +95,7 @@ describe('POST /api/v1/jobs (customer job request)', () => {
     assert.ok(job.customerId);
     assert.equal(job.provider.id, 'professional-1');
     assert.equal(job.provider.providerType, 'professional');
-    assert.equal(job.provider.name, 'Sipho Ndlovu — ProPlumb');
+    assert.equal(job.provider.name, 'Sipho Ndlovu - ProPlumb');
     assert.equal(job.service.id, '1');
     assert.equal(job.service.slug, 'leak-repair');
     assert.equal(job.description, validJob().description);
@@ -211,7 +211,10 @@ describe('POST /api/v1/jobs (customer job request)', () => {
       { payload: validJob({ description: undefined, serviceId: '1' }), status: 422 },
       { payload: validJob({ location: '' }), status: 422 },
       { payload: validJob({ serviceId: '' }), status: 400 },
-      { payload: validJob({ providerId: '' }), status: 400 },
+      // Step 14: a MALFORMED provider id is still a 400. A blank one is not
+      // malformed — it is how an untouched optional form field arrives, and it
+      // now means "post this as an open request". Covered in open-requests.
+      { payload: validJob({ providerId: 'technician-1' }), status: 400 },
       { payload: validJob({ preferredDate: '05-10-2026' }), status: 422 },
       { payload: validJob({ preferredDate: '2026-02-30' }), status: 422 },
       { payload: validJob({ preferredTime: '25:00' }), status: 422 },

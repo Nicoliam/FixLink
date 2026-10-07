@@ -83,7 +83,7 @@ export function validateCreateQuote(body: unknown): ValidatedCreateQuote {
       if (description.length < 1 || description.length > QUOTE_ITEM_DESCRIPTION_MAX) {
         return invalid(
           422,
-          `Quote item ${index + 1} needs a description of 1–${QUOTE_ITEM_DESCRIPTION_MAX} characters.`,
+          `Quote item ${index + 1} needs a description of 1-${QUOTE_ITEM_DESCRIPTION_MAX} characters.`,
         );
       }
       const quantity = toFiniteNumber(raw['quantity'] ?? 1);

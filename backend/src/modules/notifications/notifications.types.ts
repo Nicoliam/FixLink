@@ -30,6 +30,19 @@
 
 export type NotificationType =
   | 'JOB_REQUEST'
+  /**
+   * Step 14 — an OPEN request (posted without a chosen professional) matches
+   * this provider's categories and service areas. Distinct from JOB_REQUEST,
+   * which means "this request was addressed to you": the recipient has not
+   * been chosen and is one of several who may quote.
+   */
+  | 'JOB_REQUEST_OPEN'
+  /**
+   * Step 15 - the customer cancelled or deleted a request this provider was
+   * relying on. Distinct from a generic update because the meaning is
+   * unambiguous: the work is not happening.
+   */
+  | 'JOB_CANCELLED'
   | 'QUOTE_RECEIVED'
   | 'QUOTE_ACCEPTED'
   | 'JOB_SCHEDULED'
@@ -51,6 +64,8 @@ export type NotificationReferenceType = 'JOB' | 'INTERNAL_JOB' | 'PARTS_REQUEST'
 
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'JOB_REQUEST',
+  'JOB_REQUEST_OPEN',
+  'JOB_CANCELLED',
   'QUOTE_RECEIVED',
   'QUOTE_ACCEPTED',
   'JOB_SCHEDULED',

@@ -1446,7 +1446,7 @@ export class MemoryBusinessStore implements BusinessStore {
         jobId,
         previousStatus: 'IN_PROGRESS',
         status: 'AWAITING_PARTS',
-        reason: 'Parts request approved — awaiting parts',
+        reason: 'Parts request approved - awaiting parts',
         createdAt: now,
       });
       nextJob = moved;
@@ -1500,7 +1500,7 @@ export class MemoryBusinessStore implements BusinessStore {
         jobId,
         previousStatus: 'AWAITING_PARTS',
         status: 'IN_PROGRESS',
-        reason: 'Parts available — job ready to continue',
+        reason: 'Parts available - job ready to continue',
         createdAt: now,
       });
       nextJob = resumed;
@@ -1571,7 +1571,7 @@ export class MemoryBusinessStore implements BusinessStore {
       jobId,
       previousStatus: 'AWAITING_PARTS',
       status: 'IN_PROGRESS',
-      reason: 'Technician resumed job — parts available',
+      reason: 'Technician resumed job - parts available',
       createdAt: now,
     });
     const dto = this.toJobDto(resumed);
