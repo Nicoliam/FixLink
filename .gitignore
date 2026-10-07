@@ -51,3 +51,11 @@ uploads/
 # Test artifacts
 playwright-report/
 test-results/
+
+# Local AI agent tooling (not part of the product)
+.opencode/
+
+# Local dev scratch scripts and their output
+backend/probe3307.mjs
+backend/preview-alerts.ts
+backend/alert-preview/
