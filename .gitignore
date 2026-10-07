@@ -59,3 +59,4 @@ test-results/
 backend/probe3307.mjs
 backend/preview-alerts.ts
 backend/alert-preview/
+deploy/
