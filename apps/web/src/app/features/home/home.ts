@@ -50,6 +50,8 @@ export class HomeComponent {
     { name: 'Home Maintenance', description: 'Gutters, waterproofing, roofs', icon: 'roofing', iconClass: 'secondary-container' },
     { name: 'Gardening', description: 'Landscaping, cleanups, trees', icon: 'yard', iconClass: 'primary-fixed' },
     { name: 'Appliance Repairs', description: 'Fridges, washers, ovens', icon: 'kitchen', iconClass: 'secondary-container' },
+    { name: 'Solar', description: 'Panels, inverters, batteries', icon: 'solar_power', iconClass: 'primary-fixed' },
+    { name: 'Cleaning', description: 'Domestic, deep & move cleans', icon: 'cleaning_services', iconClass: 'secondary-container' },
   ]);
 
   protected readonly steps = signal<StepItem[]>([

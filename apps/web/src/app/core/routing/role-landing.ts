@@ -9,12 +9,12 @@ import type { UserRole } from '../models/auth.model';
  * its surface the moment the session exists.
  */
 const ROLE_LANDING: Readonly<Record<UserRole, string>> = {
-  ADMIN: '/admin',
-  BUSINESS_OWNER: '/business',
-  BUSINESS_MANAGER: '/business',
-  TECHNICIAN: '/technician/jobs',
-  PROFESSIONAL: '/requests',
-  CUSTOMER: '/my-jobs',
+  ADMIN: '/account',
+  BUSINESS_OWNER: '/account',
+  BUSINESS_MANAGER: '/account',
+  TECHNICIAN: '/account',
+  PROFESSIONAL: '/account',
+  CUSTOMER: '/account',
 };
 
 /**

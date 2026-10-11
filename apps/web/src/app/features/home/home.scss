@@ -140,33 +140,6 @@
   }
 }
 
-.fl-suburb-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 9999px;
-  background: var(--st-surface-container-high);
-  border: 1px solid rgba(191, 199, 210, 0.4);
-  margin-bottom: 1.25rem;
-}
-
-.fl-suburb-tag-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 9999px;
-  background: var(--st-secondary);
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.fl-suburb-tag-text {
-  font-size: 12px;
-  line-height: 16px;
-  letter-spacing: 0.02em;
-  font-weight: 700;
-  color: var(--st-on-surface-variant);
-}
-
 .fl-hero-title {
   font-size: 32px;
   line-height: 40px;

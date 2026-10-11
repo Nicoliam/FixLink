@@ -99,6 +99,18 @@ export class App {
     });
   }
 
+  /**
+   * Reset the viewport whenever a header link is used. Router scroll
+   * restoration covers navigation, but clicking the link of the route you are
+   * already on does not navigate, so the page would keep its offset.
+   */
+  protected scrollToTop(event: MouseEvent): void {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!(event.target as Element | null)?.closest('a[href]')) return;
+    globalThis.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
+
   /** Toggle the compact panel; opening refreshes the recent items. */
   protected togglePanel(): void {
     const next = !this.panelOpen();

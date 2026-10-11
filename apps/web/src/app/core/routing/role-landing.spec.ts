@@ -1,23 +1,23 @@
 import { DEFAULT_LANDING, roleLandingRoute } from './role-landing';
 
 describe('roleLandingRoute', () => {
-  it('sends each role to the surface it works in', () => {
-    expect(roleLandingRoute(['CUSTOMER'])).toBe('/my-jobs');
-    expect(roleLandingRoute(['PROFESSIONAL'])).toBe('/requests');
-    expect(roleLandingRoute(['BUSINESS_OWNER'])).toBe('/business');
-    expect(roleLandingRoute(['BUSINESS_MANAGER'])).toBe('/business');
-    expect(roleLandingRoute(['TECHNICIAN'])).toBe('/technician/jobs');
-    expect(roleLandingRoute(['ADMIN'])).toBe('/admin');
+  it('sends every role to the account page', () => {
+    expect(roleLandingRoute(['CUSTOMER'])).toBe('/account');
+    expect(roleLandingRoute(['PROFESSIONAL'])).toBe('/account');
+    expect(roleLandingRoute(['BUSINESS_OWNER'])).toBe('/account');
+    expect(roleLandingRoute(['BUSINESS_MANAGER'])).toBe('/account');
+    expect(roleLandingRoute(['TECHNICIAN'])).toBe('/account');
+    expect(roleLandingRoute(['ADMIN'])).toBe('/account');
   });
 
-  it('gives provider roles precedence over CUSTOMER for a dual-role account', () => {
-    expect(roleLandingRoute(['CUSTOMER', 'PROFESSIONAL'])).toBe('/requests');
-    expect(roleLandingRoute(['CUSTOMER', 'BUSINESS_OWNER'])).toBe('/business');
+  it('gives the same account landing for a dual-role account', () => {
+    expect(roleLandingRoute(['CUSTOMER', 'PROFESSIONAL'])).toBe('/account');
+    expect(roleLandingRoute(['CUSTOMER', 'BUSINESS_OWNER'])).toBe('/account');
   });
 
-  it('prefers platform and business administration over operational roles', () => {
-    expect(roleLandingRoute(['CUSTOMER', 'PROFESSIONAL', 'ADMIN'])).toBe('/admin');
-    expect(roleLandingRoute(['TECHNICIAN', 'BUSINESS_MANAGER'])).toBe('/business');
+  it('lands platform and business administration on the account page too', () => {
+    expect(roleLandingRoute(['CUSTOMER', 'PROFESSIONAL', 'ADMIN'])).toBe('/account');
+    expect(roleLandingRoute(['TECHNICIAN', 'BUSINESS_MANAGER'])).toBe('/account');
   });
 
   it('falls back to the account page when no role is recognised', () => {
