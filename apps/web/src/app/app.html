@@ -3,9 +3,9 @@
     <ng-template #brandMark>
       <img
         class="fl-stitch-brand-logo"
-        ngSrc="brand/fixlynk-logo.svg"
-        width="120"
-        height="60"
+        ngSrc="brand/fixlynk-home-repair-logo.png"
+        width="200"
+        height="100"
         priority
         alt="Fixlynk"
       />
@@ -91,6 +91,20 @@
         <ng-container [ngTemplateOutlet]="brandMark" />
       </a>
     }
+    <button
+      type="button"
+      class="fl-mobile-menu-toggle"
+      (click)="toggleMobileMenu()"
+      [attr.aria-expanded]="mobileMenuOpen()"
+      aria-controls="fl-mobile-menu-content"
+      [attr.aria-label]="mobileMenuOpen() ? 'Close navigation menu' : 'Open navigation menu'"
+    >
+      <span class="material-symbols-outlined" aria-hidden="true">
+        {{ mobileMenuOpen() ? 'close' : 'menu' }}
+      </span>
+    </button>
+
+    <div id="fl-mobile-menu-content" class="fl-header-menu-content" [class.fl-header-menu-open]="mobileMenuOpen()">
     @if (isProvider()) {
       <nav class="fl-stitch-nav fl-stitch-nav-provider" aria-label="Primary">
         <a class="fl-stitch-nav-link" routerLink="/requests" routerLinkActive="active">Requests</a>
@@ -125,6 +139,7 @@
         }
       </div>
     }
+    </div>
   </div>
 </header>
 
@@ -139,7 +154,7 @@
         <div class="fl-stitch-footer-brand-row">
           <img
             class="fl-stitch-footer-brand-logo"
-            ngSrc="brand/fixlynk-logo.svg"
+            ngSrc="brand/fixlynk-home-repair-logo.png"
             width="96"
             height="48"
             alt="Fixlynk"

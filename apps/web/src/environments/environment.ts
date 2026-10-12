@@ -9,5 +9,5 @@
 export const environment = {
   production: true,
   // Same-origin in production (served behind the same host / reverse proxy).
-  apiBaseUrl: '/api/v1',
+  apiBaseUrl: 'https://api.fixlynk.co.za/api/v1',
 };

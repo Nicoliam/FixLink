@@ -83,6 +83,15 @@ export class App {
   protected readonly panelError = signal('');
   protected readonly panelItems = signal<NotificationItem[]>([]);
   protected readonly isLoggingOut = signal(false);
+  protected readonly mobileMenuOpen = signal(false);
+
+  protected toggleMobileMenu(): void {
+    this.mobileMenuOpen.update((open) => !open);
+  }
+
+  protected closeMobileMenu(): void {
+    this.mobileMenuOpen.set(false);
+  }
 
   protected readonly typeLabel = notificationTypeLabel;
   protected readonly formatTime = formatNotificationTime;
@@ -108,6 +117,7 @@ export class App {
     if (event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     if (!(event.target as Element | null)?.closest('a[href]')) return;
+    this.closeMobileMenu();
     globalThis.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }
 
