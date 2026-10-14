@@ -60,10 +60,23 @@
 
       <div class="fl-field">
         <label class="fl-label" for="fl-service">Service <span aria-hidden="true">*</span></label>
+        @if (servicesStatus() === 'loading') {
+          <p class="fl-optional" id="fl-service-status">Loading services…</p>
+        }
+        @if (servicesStatus() === 'error') {
+          <p class="fl-alert fl-alert-error" role="alert">{{ servicesError() }}</p>
+          <p class="fl-optional" id="fl-service-status">
+            <button type="button" class="fl-btn fl-btn-secondary fl-btn-sm" (click)="retryServices()">Retry</button>
+          </p>
+        }
+        @if (servicesStatus() === 'empty') {
+          <p class="fl-optional" id="fl-service-status">No services available. Please try again later.</p>
+        }
         <select
           class="fl-input"
           id="fl-service"
           formControlName="serviceId"
+          [disabled]="servicesStatus() !== 'ready'"
           [attr.aria-invalid]="fieldInvalid('serviceId')"
           [attr.aria-describedby]="fieldInvalid('serviceId') ? 'fl-service-error' : null"
         >

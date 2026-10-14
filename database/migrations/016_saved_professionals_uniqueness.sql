@@ -50,6 +50,16 @@
 -- at the column as well means a programming error cannot persist a row that
 -- is saved to nobody or to both a professional and a business at once.
 --
+-- MariaDB 10.6 (production target) rejects any reference to a generated
+-- column inside a CHECK clause (error 1901: "Function or expression '...'
+-- cannot be used in the CHECK clause"), while MySQL 8 accepts it. The CHECK
+-- is therefore written against the nullable base columns using the same
+-- COALESCE(..., 0) mapping the generated keys use. The two forms are
+-- equivalent: every real id is an AUTO_INCREMENT value >= 1, so
+-- COALESCE(col, 0) > 0 is true exactly when col IS NOT NULL, and
+-- COALESCE(col, 0) = 0 is true exactly when col IS NULL. The exactly-one-
+-- owner rule is preserved unchanged.
+--
 -- The owner is customer_profiles.id, not users.id, which is what migration 008
 -- chose and what the customer journey means: a bookmark belongs to the
 -- customer's profile. The backend resolves that profile from the session, so
@@ -82,8 +92,8 @@ ALTER TABLE `saved_professionals`
   ADD COLUMN `business_key` BIGINT UNSIGNED GENERATED ALWAYS AS (COALESCE(`saved_business_id`, 0)) VIRTUAL,
   ADD UNIQUE KEY `uq_saved_professionals_unique` (`customer_id`,`professional_key`,`business_key`),
   ADD CONSTRAINT `chk_saved_professionals_owner` CHECK (
-    (`professional_key` > 0 AND `business_key` = 0)
-    OR (`business_key` > 0 AND `professional_key` = 0)
+    (COALESCE(`saved_professional_id`, 0) > 0 AND COALESCE(`saved_business_id`, 0) = 0)
+    OR (COALESCE(`saved_business_id`, 0) > 0 AND COALESCE(`saved_professional_id`, 0) = 0)
   );
 
 -- +migrate Down

@@ -483,11 +483,11 @@ describe('RequestJobComponent', () => {
 
   // --- Deep links ----------------------------------------------------------
 
-  it('pre-selects a provider from the query param and jumps to step 02', async () => {
+  it('pre-selects a provider from the query param while staying on step 01', async () => {
     await setup({ queryParams: { provider: 'professional-1' } });
     expect(api.getProvider).toHaveBeenCalledWith('professional-1');
-    expect(step()).toBe(2);
-    expect(text()).toContain('Sipho Ndlovu - ProPlumb');
+    expect(step()).toBe(1);
+    expect((component as unknown as { selected: () => { id?: string; name?: string } | null }).selected()?.id).toBe('professional-1');
   });
 
   it('falls back to searching when the linked provider cannot be loaded', async () => {
@@ -498,8 +498,7 @@ describe('RequestJobComponent', () => {
     const late = TestBed.createComponent(RequestJobComponent);
     late.detectChanges();
     // The customer is not stranded on an empty step.
-    expect((late.componentInstance as unknown as { step: () => number }).step()).toBe(2);
-    expect((late.nativeElement.textContent as string)).toContain('Sipho Ndlovu - ProPlumb');
+    expect((late.componentInstance as unknown as { step: () => number }).step()).toBe(1);
   });
 
   // --- Search states -------------------------------------------------------

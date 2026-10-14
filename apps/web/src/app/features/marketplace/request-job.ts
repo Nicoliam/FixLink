@@ -117,6 +117,8 @@ export class RequestJobComponent implements OnInit {
 
   protected readonly step = signal<StepNumber>(1);
   protected readonly services = signal<ServiceListing[]>([]);
+  protected readonly servicesStatus = signal<'loading' | 'ready' | 'empty' | 'error'>('loading');
+  protected readonly servicesError = signal('');
   protected readonly createdJob = signal<Job | null>(null);
 
   // --- Step 01: the details -------------------------------------------------
@@ -190,10 +192,17 @@ export class RequestJobComponent implements OnInit {
     this.marketplace
       .listServices()
       .pipe(
-        catchError(() => of([])),
+        catchError((error: unknown) => {
+          this.servicesError.set(getApiErrorMessage(error, 'Could not load services. Please try again.'));
+          this.servicesStatus.set('error');
+          return of([]);
+        }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((items) => this.services.set(items));
+      .subscribe((items) => {
+        this.services.set(items);
+        this.servicesStatus.set(items.length === 0 ? 'empty' : 'ready');
+      });
 
     if (this.canSave()) this.loadSavedProviders();
 
@@ -205,6 +214,25 @@ export class RequestJobComponent implements OnInit {
       return;
     }
     this.searchProviders();
+  }
+
+  protected retryServices(): void {
+    this.servicesStatus.set('loading');
+    this.servicesError.set('');
+    this.marketplace
+      .listServices()
+      .pipe(
+        catchError((error: unknown) => {
+          this.servicesError.set(getApiErrorMessage(error, 'Could not load services. Please try again.'));
+          this.servicesStatus.set('error');
+          return of([]);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((items) => {
+        this.services.set(items);
+        this.servicesStatus.set(items.length === 0 ? 'empty' : 'ready');
+      });
   }
 
   /** Step 01 -> 02. Blocks on invalid details rather than advancing silently. */
@@ -470,7 +498,7 @@ export class RequestJobComponent implements OnInit {
       });
   }
 
-  /** Resolve a `?provider=` id into a selectable card, then jump to step 02. */
+  /** Resolve a `?provider=` id into a selectable card, keeping the wizard on Step 1. */
   private preselect(providerId: string): void {
     this.marketplace
       .getProvider(providerId)
@@ -478,13 +506,11 @@ export class RequestJobComponent implements OnInit {
       .subscribe({
         next: (profile: ProviderProfile) => {
           this.selected.set(profile);
-          this.step.set(2);
         },
         error: () => {
-          // An unknown or deactivated provider must not strand the customer
-          // on an empty step: fall back to searching.
-          this.step.set(2);
-          this.searchProviders();
+          // An unknown or deactivated provider must not preserve a phantom
+          // selection: stay on Step 1 and let the customer choose manually.
+          this.selected.set(null);
         },
       });
   }
