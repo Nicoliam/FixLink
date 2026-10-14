@@ -193,7 +193,7 @@ describe('HomeComponent marketplace foundation', () => {
     // A provider who has not set a price must never be shown as "from R0".
     expect(text).not.toContain('Call out from');
     expect(text).not.toMatch(/R\s?0\b/);
-    expect(text).toContain('Professional');
+    expect(text).toContain('Fee not set');
   });
 
   it('renders only backend-confirmed trust signals on a featured card', async () => {

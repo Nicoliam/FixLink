@@ -2039,10 +2039,14 @@ body {
 }
 
 .fl-card-title {
-  margin: 0 0 0.75rem;
-  font-size: 20px;
-  line-height: 28px;
-  font-weight: 600;
+  margin: 0 0 1rem;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--fl-border, #e2e8f0);
 }
 
 .fl-card-text {

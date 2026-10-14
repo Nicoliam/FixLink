@@ -57,7 +57,7 @@
       </div>
       <div class="fl-hero-media">
         <div class="fl-hero-image-wrapper">
-          <img class="fl-hero-image" src="/images/homepage/fixlynk-during.jpg" alt="A professional South African plumber fixing a leaking pipe under a sink">
+          <img class="fl-hero-image" src="/images/homepage/fixlynk-during.png" alt="A professional South African plumber fixing a leaking pipe under a sink">
         </div>
       </div>
     </div>
@@ -265,11 +265,11 @@
               <div class="fl-professional-card-footer">
                 @if (fromPrice(pro); as price) {
                   <div>
-                    <span class="fl-professional-price-label">Call out from</span>
+                    <span class="fl-professional-price-label">Call-out fee:</span>
                     <span class="fl-professional-price">{{ price }}</span>
                   </div>
                 } @else {
-                  <span class="fl-professional-type">{{ pro.providerType === 'business' ? 'Service business' : 'Professional' }}</span>
+                  <span class="fl-professional-type">Fee not set</span>
                 }
                 <div class="fl-professional-actions">
                   <a class="fl-btn-view-profile" [routerLink]="['/marketplace/providers', pro.id]">View Profile</a>

@@ -240,7 +240,7 @@ const BUSINESSES: BusinessRow[] = [
     ratingAvg: 0,
     ratingCount: 0,
     serviceIds: ['4', '5'],
-    offerings: [],
+    offerings: [{ id: '202', name: 'House Call Inspection', description: null, categoryName: 'Electrical', categorySlug: 'electrical', priceAmount: 350, currency: 'ZAR', isActive: true }],
     areas: [{ areaName: 'Southern Suburbs', city: 'Cape Town', province: 'Western Cape' }],
     portfolio: [],
     certificates: [],
