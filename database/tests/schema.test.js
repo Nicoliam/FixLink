@@ -381,14 +381,14 @@ describe('saved professionals', () => {
     await db.query('START TRANSACTION');
     try {
       await db.query(
-        'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (1, 1)'
+        'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (2, 1)'
       );
       // The duplicate must be refused. MySQL treats NULLs as DISTINCT in a
       // unique index, so without the COALESCE-generated unique key this insert
       // would succeed because saved_business_id is NULL on both rows.
       await assert.rejects(
         db.query(
-          'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (1, 1)'
+          'INSERT INTO `saved_professionals` (`customer_id`,`saved_professional_id`) VALUES (2, 1)'
         ),
         /duplicate/i
       );
@@ -401,11 +401,11 @@ describe('saved professionals', () => {
     await db.query('START TRANSACTION');
     try {
       await db.query(
-        'INSERT INTO `saved_professionals` (`customer_id`,`saved_business_id`) VALUES (1, 1)'
+        'INSERT INTO `saved_professionals` (`customer_id`,`saved_business_id`) VALUES (2, 1)'
       );
       await assert.rejects(
         db.query(
-          'INSERT INTO `saved_professionals` (`customer_id`,`saved_business_id`) VALUES (1, 1)'
+          'INSERT INTO `saved_professionals` (`customer_id`,`saved_business_id`) VALUES (2, 1)'
         ),
         /duplicate/i
       );
@@ -555,7 +555,7 @@ describe('provider service offerings', () => {
     const price = rows.find((r) => r.COLUMN_NAME === 'price_amount');
     const currency = rows.find((r) => r.COLUMN_NAME === 'currency');
 // DECIMAL(10,2) with a CHECK constraint, matching chk_jobs_agreed_amount.
-      assert.equal(price.IS_NULLABLE, 'NO', 'price_amount must be required');
+      assert.equal(price.IS_NULLABLE, 'YES', 'price_amount is optional (migration 019)');
       assert.equal(Number(price.NUMERIC_SCALE), 2, 'price must hold cents, not rounded Rand');
       assert.equal(price.COLUMN_DEFAULT, null, 'price must not be silently defaulted');
     assert.equal(currency.COLUMN_DEFAULT, 'ZAR');
