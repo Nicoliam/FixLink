@@ -88,17 +88,15 @@ DELETE `a` FROM `saved_professionals` `a`
 -- check, both of which the table genuinely lacks.
 
 ALTER TABLE `saved_professionals`
-  ADD COLUMN `professional_key` BIGINT UNSIGNED GENERATED ALWAYS AS (COALESCE(`saved_professional_id`, 0)) VIRTUAL,
-  ADD COLUMN `business_key` BIGINT UNSIGNED GENERATED ALWAYS AS (COALESCE(`saved_business_id`, 0)) VIRTUAL,
-  ADD UNIQUE KEY `uq_saved_professionals_unique` (`customer_id`,`professional_key`,`business_key`),
-  ADD CONSTRAINT `chk_saved_professionals_owner` CHECK (
-    (COALESCE(`saved_professional_id`, 0) > 0 AND COALESCE(`saved_business_id`, 0) = 0)
-    OR (COALESCE(`saved_business_id`, 0) > 0 AND COALESCE(`saved_professional_id`, 0) = 0)
-  );
+  ADD COLUMN `professional_key` BIGINT UNSIGNED
+    GENERATED ALWAYS AS (COALESCE(`saved_professional_id`, 0)) VIRTUAL,
+  ADD COLUMN `business_key` BIGINT UNSIGNED
+    GENERATED ALWAYS AS (COALESCE(`saved_business_id`, 0)) VIRTUAL,
+  ADD UNIQUE KEY `uq_saved_professionals_unique`
+    (`customer_id`, `professional_key`, `business_key`);
 
 -- +migrate Down
 ALTER TABLE `saved_professionals`
-  DROP CHECK `chk_saved_professionals_owner`,
   DROP KEY `uq_saved_professionals_unique`,
   DROP COLUMN `business_key`,
   DROP COLUMN `professional_key`;

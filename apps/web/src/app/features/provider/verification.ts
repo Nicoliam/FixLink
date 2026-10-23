@@ -3,7 +3,6 @@ import { finalize } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { VerificationService } from '../../core/services/verification.service';
-import { AuthService } from '../../core/services/auth.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
 import type { VerificationDocumentType, VerificationStatus } from '../../core/models/verification.model';
 
@@ -17,7 +16,6 @@ import { DOCUMENT_STATUS_KEY } from '../../core/models/verification.model';
 export class VerificationComponent {
   private readonly api = inject(VerificationService);
   private readonly router = inject(Router);
-  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly status = signal<'loading' | 'loaded' | 'error'>('loading');
@@ -38,8 +36,20 @@ export class VerificationComponent {
 
   protected readonly uploading = signal(false);
   protected readonly resendCooldown = signal(0);
+  protected readonly huruDate = signal('');
 
-  protected readonly documentTypes = signal<VerificationDocumentType[]>(['HURU_REPORT', 'ID_COPY', 'PROOF_OF_RESIDENCE', 'QUALIFICATION', 'PROFILE_PICTURE', 'SELFIE']);
+  protected onHuruDateChange(event: Event): void {
+    this.huruDate.set((event.target as HTMLInputElement).value);
+  }
+
+  protected readonly documentTypes = signal<VerificationDocumentType[]>([
+    'HURU_REPORT',
+    'ID_COPY',
+    'PROOF_OF_RESIDENCE',
+    'QUALIFICATION',
+    'PROFILE_PICTURE',
+    'SELFIE',
+  ]);
 
   protected readonly TYPE_LABELS: Record<VerificationDocumentType, string> = {
     HURU_REPORT: 'Huru report',
@@ -75,6 +85,15 @@ export class VerificationComponent {
 
   protected loadStatus(): void {
     this.status.set('loading');
+    this.fetchStatus();
+  }
+
+  /** Reload the status without blanking the page (used after uploads and confirmations). */
+  private refreshStatus(): void {
+    this.fetchStatus();
+  }
+
+  private fetchStatus(): void {
     this.api
       .getStatus()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -121,7 +140,7 @@ export class VerificationComponent {
       )
       .subscribe({
         next: () => {
-          this.loadStatus();
+          this.refreshStatus();
           this.errorMessage.set('Your phone number has been verified.');
           this.errorCode.set('PHONE_VERIFIED_SUCCESS');
         },
@@ -162,7 +181,7 @@ export class VerificationComponent {
       )
       .subscribe({
         next: () => {
-          this.loadStatus();
+          this.refreshStatus();
           this.errorMessage.set('Your email address has been verified.');
           this.errorCode.set('EMAIL_VERIFIED_SUCCESS');
         },
@@ -185,7 +204,7 @@ export class VerificationComponent {
   protected get progressPercentage(): number {
     const v = this.verification();
     const items = this.REQUIRED_ITEMS.map((key) => v[this.documentStatusKey[key]]?.status);
-    const completed = items.filter((status) => status === 'uploaded').length;
+    const completed = items.filter((s) => s === 'uploaded' || s === 'approved').length;
     return Math.round((completed / this.REQUIRED_ITEMS.length) * 100);
   }
 
@@ -195,28 +214,23 @@ export class VerificationComponent {
       .map((key) => v[this.documentStatusKey[key]])
       .filter((item) => item?.status === 'missing');
     if (missingItems.length > 0) {
-      return `Missing ${missingItems.length} document${
-        missingItems.length > 1 ? 's' : ''
-      }`;
+      return `Missing ${missingItems.length} document${missingItems.length > 1 ? 's' : ''}`;
     }
     return null;
   }
 
-  protected onFileChange(
-    event: Event,
-    field: VerificationDocumentType,
-  ): void {
-    const file = (event.target as HTMLInputElement).files?.[0];
+  protected onFileChange(event: Event, field: VerificationDocumentType): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
 
     let documentDate: string | undefined;
     if (field === 'HURU_REPORT') {
-      const dateInput = event.target as HTMLInputElement;
-      const selectedDate = dateInput?.valueAsNumber
-        ? new Date(dateInput?.valueAsNumber ?? 0)
-        : new Date(dateInput?.valueAsNumber ?? 0);
-      if (selectedDate && selectedDate <= this.today && selectedDate >= new Date(this.minDate)) {
-        documentDate = selectedDate.toISOString().split('T')[0];
+      documentDate = this.huruDate();
+      if (!documentDate) {
+        this.errorMessage.set('Please choose the Huru report date first.');
+        input.value = '';
+        return;
       }
     }
 
@@ -225,20 +239,25 @@ export class VerificationComponent {
       .uploadDocument(field, file, documentDate)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.uploading.set(false)),
+        finalize(() => {
+          this.uploading.set(false);
+          input.value = '';
+        }),
       )
       .subscribe({
         next: () => {
-          this.loadStatus();
-          this.errorMessage.set(`${field} has been uploaded successfully.`);
+          this.refreshStatus();
+          this.errorMessage.set(`${this.TYPE_LABELS[field]} uploaded successfully.`);
         },
         error: (err: unknown) => {
-          this.errorMessage.set(getApiErrorMessage(err, 'Could not upload document. Please check the file format and size.'));
+          this.errorMessage.set(
+            getApiErrorMessage(err, 'Could not upload document. Please check the file format and size.'),
+          );
         },
       });
   }
 
-  protected retryUpload(field: VerificationDocumentType): void {
-    this.loadStatus();
+  protected retryUpload(_field: VerificationDocumentType): void {
+    this.refreshStatus();
   }
 }
