@@ -121,59 +121,6 @@
       </div>
 
       <div class="fl-card">
-        <h2 class="fl-card-title">Upload documents</h2>
-        <p class="fl-card-text">
-          Submit the required documents for verification. Each document type must be
-          uploaded separately.
-        </p>
-
-        @for (type of documentTypes(); track type) {
-          <div class="fl-field">
-            <label class="fl-field-label">{{ TYPE_LABELS[type] }}</label>
-            @if (type === 'HURU_REPORT') {
-              <div class="fl-field-group">
-                <input
-                  type="file"
-                  class="fl-input fl-input-file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  (change)="onFileChange($event, type)"
-                />
-                @if (verification()[documentStatusKey[type]]?.status !== 'missing') {
-                  <span class="fl-text-caption">
-                    {{ verification()[documentStatusKey[type]]?.status }}
-                    @if (verification()[documentStatusKey[type]]?.document_date) {
-                      ({{ verification()[documentStatusKey[type]].document_date }})
-                    }
-                  </span>
-                }
-                @if (verification()[documentStatusKey[type]]?.status === 'missing') {
-                  <input
-                    type="date"
-                    class="fl-input fl-input-small"
-                    [min]="minDate"
-                    [max]="todayString"
-                    (change)="onFileChange($event, type)"
-                  />
-                }
-              </div>
-            } @else {
-              <input
-                type="file"
-                class="fl-input fl-input-file"
-                accept="image/*,.pdf,.doc,.docx"
-                (change)="onFileChange($event, type)"
-              />
-              @if (verification()[documentStatusKey[type]]?.status !== 'missing') {
-                <span class="fl-text-caption">
-                  {{ verification()[documentStatusKey[type]]?.status }}
-                </span>
-              }
-            }
-          </div>
-        }
-      </div>
-
-      <div class="fl-card">
         <h2 class="fl-card-title">Resend phone code</h2>
         <p class="fl-card-text">
           @if (resendCooldown() > 0) {
