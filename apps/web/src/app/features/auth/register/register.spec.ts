@@ -685,7 +685,8 @@ describe('RegisterComponent (registration steps)', () => {
       await settle();
       fixture.detectChanges();
 
-      expect(navigateSpy).toHaveBeenCalledWith('/requests');
+      // Professional lands on /verification via roleLandingRoute, not /requests directly
+      expect(navigateSpy).toHaveBeenCalledWith('/verification');
     });
 
     it('sends nothing when the provider ticked nothing', async () => {
@@ -697,7 +698,8 @@ describe('RegisterComponent (registration steps)', () => {
       fixture.detectChanges();
 
       httpMock.expectNone(`${API}/provider/offerings`);
-      expect(navigateSpy).toHaveBeenCalledWith('/requests');
+      // Professional lands on /verification via roleLandingRoute
+      expect(navigateSpy).toHaveBeenCalledWith('/verification');
     });
 
     it('offers "Skip for now" while nothing is ticked', () => {
@@ -766,7 +768,7 @@ describe('RegisterComponent (registration steps)', () => {
       await settle();
       fixture.detectChanges();
 
-      expect(navigateSpy).toHaveBeenCalledWith('/requests');
+      expect(navigateSpy).toHaveBeenCalledWith('/verification');
       expect(el('register-services-error')).toBeNull();
     });
 

@@ -17,6 +17,7 @@ import { roleLandingRoute } from '../../../core/routing/role-landing';
 import {
   SELF_REGISTER_ROLE_OPTIONS,
   type AuthUser,
+  type RegisterRequest,
   type SelfRegisterRole,
   type UserRole,
 } from '../../../core/models/auth.model';
@@ -162,6 +163,8 @@ export class RegisterComponent {
   readonly lastName = this.detailsForm.controls.lastName;
   readonly displayName = this.detailsForm.controls.displayName;
   readonly businessName = this.detailsForm.controls.businessName;
+
+  
 
   /**
    * Angular form-control values are not signals, so these must be plain
@@ -347,17 +350,22 @@ export class RegisterComponent {
 
     const { email, phone, password, firstName, lastName, displayName, businessName } =
       this.detailsForm.getRawValue();
+
+    // Build registration payload. Document uploads are handled separately
+    // after account creation via the /verification page. Do NOT include them
+    // here to avoid 422 validation errors.
+    const registrationBody: RegisterRequest = {
+      email,
+      password,
+      role,
+      firstName: this.isCustomer && firstName ? firstName : '',
+      lastName: this.isCustomer && lastName ? lastName : '',
+      displayName: this.isProfessional ? (displayName ?? '') : '',
+      businessName: this.isBusinessOwner ? (businessName ?? '') : '',
+    };
+
     this.auth
-      .register({
-        email,
-        phone: phone || undefined,
-        password,
-        role,
-        firstName: this.isCustomer && firstName ? firstName : undefined,
-        lastName: this.isCustomer && lastName ? lastName : undefined,
-        displayName: this.isProfessional ? displayName : undefined,
-        businessName: this.isBusinessOwner ? businessName : undefined,
-      })
+      .register(registrationBody as RegisterRequest)
       .subscribe({
         next: (user) => {
           this.accountCreated.set(user);
@@ -366,10 +374,9 @@ export class RegisterComponent {
           // retried without discarding the account they just created.
           if (this.isProviderRole) {
             void this.saveSelectedServices(user.roles);
-            return;
           }
           this.isSubmitting.set(false);
-          void this.router.navigateByUrl(roleLandingRoute(user.roles));
+          void this.router.navigateByUrl('/verification');
         },
         error: (error: unknown) => {
           this.isSubmitting.set(false);
@@ -435,7 +442,6 @@ export class RegisterComponent {
     );
     if (selected.length === 0 || this.servicesSavingUnavailable) {
       this.isSubmitting.set(false);
-      void this.router.navigateByUrl(roleLandingRoute(roles));
       return;
     }
 
@@ -474,7 +480,6 @@ export class RegisterComponent {
       );
       return;
     }
-    void this.router.navigateByUrl(roleLandingRoute(roles));
   }
 
   /** True when the picker cannot be used, so saving is skipped not attempted. */

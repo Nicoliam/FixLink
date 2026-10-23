@@ -1,0 +1,190 @@
+<div class="fl-page">
+  <nav aria-label="Breadcrumb">
+    @if (!isVerificationPage()) {
+      <a class="fl-link" routerLink="/my-services">← Back to my services</a>
+    }
+  </nav>
+
+  <p class="fl-eyebrow">Verification</p>
+  <h1 class="fl-page-title">Provider verification</h1>
+  <p class="fl-page-subtitle">
+    Submit the documents required to verify your identity and qualifications.
+  </p>
+
+  @if (status() === 'loading') {
+    <div class="fl-state" role="status">
+      <p>Loading your verification status…</p>
+    </div>
+  } @else if (status() === 'error') {
+    <div class="fl-state fl-state-error" role="alert">
+      <h2 class="fl-state-title">{{ errorCode() === 'LOAD_ERROR' ? 'Error' : 'Something went wrong' }}</h2>
+      <p class="fl-state-text">{{ errorMessage() }}</p>
+    </div>
+  } @else {
+    <div class="fl-provider-verification">
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Verification status</h2>
+        <p class="fl-card-text">
+          <strong>Overall status:</strong>
+          @if (verification().status === 'unverified') {
+            Not yet verified
+          } @else if (verification().status === 'pending') {
+            Pending review
+          } @else if (verification().status === 'verified') {
+            Verified
+          } @else {
+            Rejected
+          }
+        </p>
+        <p class="fl-card-text">
+          <strong>Phone verified:</strong>
+          @if (verification().phone_verified) {
+            <span class="fl-badge fl-badge-success">Yes</span>
+          } @else {
+            <span class="fl-badge fl-badge-error">No</span>
+          }
+        </p>
+        <p class="fl-card-text">
+          <strong>Email verified:</strong>
+          @if (verification().email_verified) {
+            <span class="fl-badge fl-badge-success">Yes</span>
+          } @else {
+            <span class="fl-badge fl-badge-error">No</span>
+          }
+        </p>
+        <p class="fl-card-text">
+          <strong>Pending since:</strong>
+          @if (verification().pending_since) {
+            {{ verification().pending_since }}
+          } @else {
+            N/A
+          }
+        </p>
+      </div>
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Progress</h2>
+        <p class="fl-card-text">
+          <strong>{{ progressPercentage }}% complete</strong>
+        </p>
+        <progress [value]="progressPercentage" max="100"></progress>
+        @if (pendingReason) {
+          <p class="fl-card-text fl-card-text-error">{{ pendingReason }}</p>
+        }
+      </div>
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Documents</h2>
+        @for (type of documentTypes(); track type) {
+          <div class="fl-field">
+            <label class="fl-field-label">{{ TYPE_LABELS[type] }}</label>
+            <span class="fl-field-status"
+              [class.fl-field-status-missing]="verification()[documentStatusKey[type]]?.status === 'missing'"
+              [class.fl-field-status-uploaded]="verification()[documentStatusKey[type]]?.status === 'uploaded'"
+              [class.fl-field-status-approved]="verification()[documentStatusKey[type]]?.status === 'approved'"
+              [class.fl-field-status-rejected]="verification()[documentStatusKey[type]]?.status === 'rejected'"
+            >
+              {{ STATUS_LABELS[verification()[documentStatusKey[type]]?.status ?? 'missing'] || (verification()[documentStatusKey[type]]?.status ?? 'missing') }}
+            </span>
+          </div>
+        }
+      </div>
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Phone verification</h2>
+        <p class="fl-card-text">
+          @if (verification().phone_verified) {
+            Your phone number is verified.
+          } @else {
+            <button class="fl-btn fl-btn-primary" (click)="resendPhoneCode()"
+              [disabled]="resendCooldown() > 0">
+              {{ resendCooldown() > 0 ? `Resending in ${resendCooldown()}s` : 'Resend verification code' }}
+            </button>
+            <p class="fl-text-caption">Or <a (click)="sendEmailLink()">verify with email</a></p>
+          }
+        </p>
+      </div>
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Email verification</h2>
+        <p class="fl-card-text">
+          @if (verification().email_verified) {
+            Your email address is verified.
+          } @else {
+            <button class="fl-btn fl-btn-primary" (click)="sendEmailLink()">
+              Send verification link
+            </button>
+            <p class="fl-text-caption">Check your email (including spam folder)</p>
+          }
+        </p>
+      </div>
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Upload documents</h2>
+        <p class="fl-card-text">
+          Submit the required documents for verification. Each document type must be
+          uploaded separately.
+        </p>
+
+        @for (type of documentTypes(); track type) {
+          <div class="fl-field">
+            <label class="fl-field-label">{{ TYPE_LABELS[type] }}</label>
+            @if (type === 'HURU_REPORT') {
+              <div class="fl-field-group">
+                <input
+                  type="file"
+                  class="fl-input fl-input-file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  (change)="onFileChange($event, type)"
+                />
+                @if (verification()[documentStatusKey[type]]?.status !== 'missing') {
+                  <span class="fl-text-caption">
+                    {{ verification()[documentStatusKey[type]]?.status }}
+                    @if (verification()[documentStatusKey[type]]?.document_date) {
+                      ({{ verification()[documentStatusKey[type]].document_date }})
+                    }
+                  </span>
+                }
+                @if (verification()[documentStatusKey[type]]?.status === 'missing') {
+                  <input
+                    type="date"
+                    class="fl-input fl-input-small"
+                    [min]="minDate"
+                    [max]="todayString"
+                    (change)="onFileChange($event, type)"
+                  />
+                }
+              </div>
+            } @else {
+              <input
+                type="file"
+                class="fl-input fl-input-file"
+                accept="image/*,.pdf,.doc,.docx"
+                (change)="onFileChange($event, type)"
+              />
+              @if (verification()[documentStatusKey[type]]?.status !== 'missing') {
+                <span class="fl-text-caption">
+                  {{ verification()[documentStatusKey[type]]?.status }}
+                </span>
+              }
+            }
+          </div>
+        }
+      </div>
+
+      <div class="fl-card">
+        <h2 class="fl-card-title">Resend phone code</h2>
+        <p class="fl-card-text">
+          @if (resendCooldown() > 0) {
+            Cooldown active. Try again in {{ resendCooldown() }} seconds.
+          } @else {
+            <button class="fl-btn fl-btn-primary" (click)="resendPhoneCode()">
+              Resend verification code
+            </button>
+          }
+        </p>
+      </div>
+    </div>
+  }
+</div>
