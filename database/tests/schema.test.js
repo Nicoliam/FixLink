@@ -433,7 +433,10 @@ describe('saved professionals', () => {
     }
   });
 
-  it('saves a professional or a business, never both or neither', async () => {
+  // The DB CHECK (chk_saved_professionals_owner) was dropped from migration 016
+  // because MySQL cannot combine it with the FK referential actions. "Exactly one
+  // owner" is enforced by the application (see mysql-saved-providers.store.ts).
+  it.skip('saves a professional or a business, never both or neither', async () => {
     await db.query('START TRANSACTION');
     try {
       // chk_saved_professionals_owner rejects a half-owned row, so a bookmark
