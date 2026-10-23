@@ -122,6 +122,14 @@
         </div>
       }
 
+      @if (isProfessional) {
+        <p class="fl-form-note">
+          After creating your account you'll need to complete verification before you can access the Job Board.
+          You'll need: a Huru report (not older than 3 months), a certified ID copy, proof of residence,
+          qualifications or certificates, a profile picture, a selfie, and a verified cell number and email.
+        </p>
+      }
+
       @if (isBusinessOwner) {
         <div class="fl-field">
           <label class="fl-label" for="register-business-name">Business name</label>

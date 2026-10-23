@@ -1,0 +1,87 @@
+@import '~primeng/resources/primeng.css';
+
+.verification-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.badge-verified {
+  background-color: #1e8a4e;
+  color: white;
+}
+
+.badge-pending {
+  background-color: #f0ad4e;
+  color: white;
+}
+
+.badge-rejected {
+  background-color: #d9534f;
+  color: white;
+}
+
+.badge-unverified {
+  background-color: #6c757d;
+  color: white;
+}
+
+.verification-progress {
+  margin: 1rem 0;
+}
+
+.progress-text {
+  margin-top: 0.5rem;
+  font-size: 14px;
+  color: #666;
+}
+
+.verification-summary {
+  margin: 1rem 0;
+}
+
+.phone-verification,
+.email-verification {
+  margin: 1rem 0;
+}
+
+.phone-otp {
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-uploaded {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-approved {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-rejected {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-missing {
+  background-color: #e2e3e5;
+  color: #6c757d;
+}
+
+.pending-review-state {
+  margin: 2rem 0;
+}

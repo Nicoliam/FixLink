@@ -95,6 +95,11 @@ export const routes: Routes = [
     canActivate: [providerGuard],
   },
   {
+    path: 'verification',
+    loadComponent: () => import('./features/provider/verification').then((m) => m.VerificationComponent),
+    canActivate: [providerGuard],
+  },
+  {
     path: 'my-areas',
     loadComponent: () => import('./features/provider/my-areas').then((m) => m.MyAreasComponent),
     canActivate: [providerGuard],

@@ -169,6 +169,14 @@ export class MysqlUserRepository implements UserRepository {
     await this.pool.query('UPDATE `users` SET `status` = ? WHERE `id` = ?', [status, userId]);
   }
 
+  async markPhoneVerified(userId: string): Promise<void> {
+    await this.pool.query('UPDATE `users` SET `phone_verified_at` = NOW(), `status` = \'ACTIVE\' WHERE `id` = ?', [userId]);
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.pool.query('UPDATE `users` SET `email_verified_at` = NOW() WHERE `id` = ?', [userId]);
+  }
+
   toSafeUser(user: UserRecord, roles: string[]): ReturnType<UserRepository['toSafeUser']> {
     return toSafeUser(user, roles);
   }

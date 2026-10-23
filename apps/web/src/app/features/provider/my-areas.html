@@ -15,10 +15,15 @@
     <div class="fl-state" role="status">
       <p>Loading your service areas…</p>
     </div>
-  } @else if (status() === 'error') {
+} @else if (status() === 'error') {
     <div class="fl-state fl-state-error" role="alert">
-      <h2 class="fl-state-title">Something went wrong</h2>
+      <h2 class="fl-state-title">Error</h2>
       <p class="fl-state-text">{{ errorMessage() }}</p>
+      @if (errorCode() === 'NOT_FOUND') {
+        <p class="fl-field-error" role="alert">
+          No provider profile found for your account. <a class="fl-link" routerLink="/verification">Complete your provider profile</a> first.
+        </p>
+      }
       <button type="button" class="fl-btn fl-btn-primary" (click)="reload()">Try again</button>
     </div>
   } @else {

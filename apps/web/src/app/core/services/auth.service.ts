@@ -50,7 +50,7 @@ export class AuthService {
    * redirects straight to the new account's landing route. No verification
    * step is required to reach it.
    */
-  register(payload: RegisterRequest): Observable<AuthUser> {
+register(payload: RegisterRequest): Observable<AuthUser> {
     const body: Record<string, string> = {
       email: payload.email.trim(),
       password: payload.password,
@@ -64,6 +64,11 @@ export class AuthService {
     if (payload.lastName?.trim()) body['lastName'] = payload.lastName.trim();
     if (payload.displayName?.trim()) body['displayName'] = payload.displayName.trim();
     if (payload.businessName?.trim()) body['businessName'] = payload.businessName.trim();
+    if (payload.hururuReport) body['hururuReport'] = payload.hururuReport;
+    if (payload.idCopyCertified) body['idCopyCertified'] = payload.idCopyCertified;
+    if (payload.proofOfResidence) body['proofOfResidence'] = payload.proofOfResidence;
+    if (payload.qualificationCertificate) body['qualificationCertificate'] = payload.qualificationCertificate;
+    if (payload.profilePhoto) body['profilePhoto'] = payload.profilePhoto;
     return this.http
       .post<ApiSuccess<RegisterResponseData>>(`${this.baseUrl}/auth/register`, body)
       .pipe(

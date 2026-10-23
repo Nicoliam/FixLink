@@ -76,6 +76,12 @@ export interface RegisterRequest {
   displayName?: string;
   /** BUSINESS_OWNER only — the name shown on the business profile. */
   businessName?: string;
+  /** Professional document upload references. */
+  hururuReport?: string;
+  idCopyCertified?: string;
+  proofOfResidence?: string;
+  qualificationCertificate?: string;
+  profilePhoto?: string;
 }
 
 export interface AuthTokens {

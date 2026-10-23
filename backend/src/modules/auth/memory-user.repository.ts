@@ -110,6 +110,20 @@ export class MemoryUserRepository implements UserRepository {
     }
   }
 
+  async markPhoneVerified(userId: string): Promise<void> {
+    const user = this.byId.get(userId);
+    if (user) {
+      this.byId.set(userId, { ...user, phone: user.phone, updatedAt: nowIso() });
+    }
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    const user = this.byId.get(userId);
+    if (user) {
+      this.byId.set(userId, { ...user, emailVerifiedAt: new Date().toISOString(), updatedAt: nowIso() });
+    }
+  }
+
   toSafeUser(user: UserRecord, roles: string[]): ReturnType<UserRepository['toSafeUser']> {
     return toSafeUser(user, roles);
   }

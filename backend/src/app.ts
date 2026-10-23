@@ -54,6 +54,7 @@ import { makeAdminRoutes } from './modules/admin/admin.routes';
 import { MemoryAdminStore } from './modules/admin/memory-admin.store';
 import { MysqlAdminStore } from './modules/admin/mysql-admin.store';
 import type { AdminStore } from './modules/admin/admin.store';
+import { makeVerificationRoutes } from './modules/verification/verification.routes';
 
 export interface AppDeps {
   users: UserRepository;
@@ -248,6 +249,8 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   if (quotes) {
     app.use('/api/v1', makeProviderAreasRoutes(deps.marketplace, quotes, deps.users));
   }
+  // Provider verification checklist and document management.
+  app.use('/api/v1', makeVerificationRoutes(storage, deps.users));
   app.use('/api/v1', makeAdminRoutes(deps.users, admin, storage));
 
   // Standard 404 envelope for unknown API routes.

@@ -123,11 +123,20 @@ export class MyServicesComponent implements OnInit {
           this.status.set(list.items.length === 0 ? 'empty' : 'ready');
         },
         error: (error: unknown) => {
-          this.errorMessage.set(
-            getApiErrorMessage(error, 'We could not load your services. Please try again.'),
-          );
-          this.errorCode.set(getApiErrorCode(error));
-          this.status.set('error');
+          const code = getApiErrorCode(error);
+          if (code === 'NOT_FOUND') {
+            this.errorMessage.set(
+              'No provider profile found for your account. Complete your provider profile first.',
+            );
+            this.errorCode.set(code);
+            this.status.set('error');
+          } else {
+            this.errorMessage.set(
+              getApiErrorMessage(error, 'We could not load your services. Please try again.'),
+            );
+            this.errorCode.set(code);
+            this.status.set('error');
+          }
         },
       });
   }

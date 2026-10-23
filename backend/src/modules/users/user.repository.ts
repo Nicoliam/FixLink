@@ -82,6 +82,8 @@ export interface UserRepository {
    */
   setStatus(userId: string, status: UserStatus): Promise<void>;
   toSafeUser(user: UserRecord, roles: string[]): SafeUser;
+  markPhoneVerified(userId: string): Promise<void>;
+  markEmailVerified(userId: string): Promise<void>;
 }
 
 export function toSafeUser(user: UserRecord, roles: string[]): SafeUser {

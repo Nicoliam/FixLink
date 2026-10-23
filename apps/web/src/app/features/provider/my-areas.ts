@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ProviderAreaService } from '../../core/services/provider-area.service';
-import { getApiErrorMessage } from '../../core/models/api.model';
+import { getApiErrorCode, getApiErrorMessage } from '../../core/models/api.model';
 import {
   AREA_CITY_MAX,
   AREA_NAME_MAX,
@@ -46,6 +46,7 @@ export class MyAreasComponent implements OnInit {
   protected readonly status = signal<AreasStatus>('loading');
   protected readonly errorMessage = signal('');
   protected readonly saveError = signal<string | null>(null);
+  protected readonly errorCode = signal<string | null>(null);
   protected readonly saved = signal(false);
   protected readonly saving = signal(false);
   protected readonly submitted = signal(false);
@@ -133,9 +134,17 @@ export class MyAreasComponent implements OnInit {
           this.status.set('ready');
         },
         error: (error: unknown) => {
-          this.errorMessage.set(
-            getApiErrorMessage(error, 'Could not load your service areas. Please try again.'),
-          );
+          const code = getApiErrorCode(error);
+          if (code === 'NOT_FOUND') {
+            this.errorMessage.set(
+              'No provider profile found for your account. Complete your provider profile first.',
+            );
+            this.errorCode.set(code);
+          } else {
+            this.errorMessage.set(
+              getApiErrorMessage(error, 'Could not load your service areas. Please try again.'),
+            );
+          }
           this.status.set('error');
         },
       });
