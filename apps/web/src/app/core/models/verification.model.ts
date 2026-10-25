@@ -9,14 +9,21 @@ export type VerificationDocumentType =
   | 'PROFILE_PICTURE'
   | 'SELFIE';
 
+/** One checklist row as returned by the status endpoint. */
+export interface VerificationItem {
+  status: VerificationItemStatus;
+  document_id: string | null;
+  file_name: string | null;
+}
+
 export interface VerificationStatus {
   status: VerificationOverallStatus;
-  huru_report: { status: VerificationItemStatus; document_date: string | null };
-  certified_id: { status: VerificationItemStatus };
-  proof_of_residence: { status: VerificationItemStatus };
-  qualifications: { status: VerificationItemStatus; count: number };
-  profile_picture: { status: VerificationItemStatus };
-  selfie: { status: VerificationItemStatus };
+  huru_report: VerificationItem & { document_date: string | null };
+  certified_id: VerificationItem;
+  proof_of_residence: VerificationItem;
+  qualifications: VerificationItem & { count: number };
+  profile_picture: VerificationItem;
+  selfie: VerificationItem;
   phone_verified: boolean;
   email_verified: boolean;
   pending_since: string | null;

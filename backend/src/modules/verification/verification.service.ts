@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { fail, ok } from '../../utils/response';
 import type { Response } from 'express';
-import { JOB_IMAGE_MAX_BYTES, detectImageType } from '../../services/file-storage';
+import { JOB_IMAGE_MAX_BYTES, detectImageType, sanitizeOriginalFilename } from '../../services/file-storage';
 import type { FileStorage } from '../../services/file-storage';
 import type { UserRepository } from '../users/user.repository';
+import type { VerificationDocument, VerificationDocumentStore, VerificationDocumentType } from './verification.store';
 
 const MAX_OTP_ATTEMPTS = 5;
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
@@ -85,10 +86,72 @@ class InMemoryOTPStore {
   }
 }
 
-export function makeVerificationService(storage: FileStorage, users: UserRepository) {
+export function makeVerificationService(storage: FileStorage, users: UserRepository, documents: VerificationDocumentStore) {
   const otpStore = new InMemoryOTPStore();
 
   return {
+    /** Remove the latest document of a type (approved documents cannot be removed). */
+    async deleteDocument(req: any, res: Response): Promise<void> {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          fail(res, 'UNAUTHORIZED', 'Authentication required.', 401);
+          return;
+        }
+        const type = String(req.params.type ?? '');
+        if (!ALLOWED_DOCUMENT_TYPES.includes(type)) {
+          fail(res, 'VALIDATION_ERROR', 'Invalid document type.', 400);
+          return;
+        }
+        const providerId = await documents.findProfessionalProfileByUserId(String(userId));
+        if (!providerId) {
+          fail(res, 'NOT_FOUND', 'No provider profile found for your account.', 404);
+          return;
+        }
+        const latest = (await documents.listByProvider(providerId)).find((d) => d.type === type);
+        if (!latest) {
+          fail(res, 'NOT_FOUND', 'There is no document of that type to remove.', 404);
+          return;
+        }
+        if (latest.status === 'approved') {
+          fail(res, 'CONFLICT', 'An approved document cannot be removed.', 409);
+          return;
+        }
+        await documents.delete(providerId, latest.id);
+        await storage.remove(latest.stored_name);
+        ok(res, { removed: true }, 'Document removed.');
+      } catch (err) {
+        fail(res, 'INTERNAL_ERROR', 'Could not remove the document. Please try again.', 500);
+      }
+    },
+
+    /** Stream a document back to its owner only. */
+    async viewDocument(req: any, res: Response): Promise<void> {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          fail(res, 'UNAUTHORIZED', 'Authentication required.', 401);
+          return;
+        }
+        const doc = await documents.findOwnedDocument(String(userId), String(req.params.id ?? ''));
+        if (!doc) {
+          fail(res, 'NOT_FOUND', 'Document not found.', 404);
+          return;
+        }
+        const bytes = await storage.read(doc.stored_name);
+        if (!bytes) {
+          fail(res, 'NOT_FOUND', 'The file is no longer available.', 404);
+          return;
+        }
+        res.setHeader('Content-Type', doc.mime);
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.send(bytes);
+      } catch (err) {
+        fail(res, 'INTERNAL_ERROR', 'Could not open the document. Please try again.', 500);
+      }
+    },
+
     /**
      * Upload a verification document.
      * Validates file type, size, magic bytes, and stores outside public folder.
@@ -125,30 +188,61 @@ export function makeVerificationService(storage: FileStorage, users: UserReposit
         }
 
         const ext: string = validation.extension === 'pdf' ? 'pdf' : validation.extension !== undefined ? validation.extension : 'pdf';
-        const randomHex = randomBytes(16).toString('hex');
-        const storedName = `verification/${userId}/${type}/${randomHex}.${ext}`;
-
-await storage.save(storedName, file.buffer, ext);
-
-        const document_date = req.body.document_date ?? new Date().toISOString().split('T')[0] as string;
-        if (!document_date) {
-          fail(res, 'VALIDATION_ERROR', 'Document date is required.', 400);
+        const providerId = await documents.findProfessionalProfileByUserId(String(userId));
+        if (!providerId) {
+          fail(res, 'NOT_FOUND', 'No provider profile found for your account.', 404);
           return;
         }
 
-        ok(res, {
-          id: storedName,
-          provider_id: userId,
-          type,
-          original_name: file.originalname,
-          stored_name: storedName,
-          mime: validation.mime,
-          size: file.size,
-          status: 'uploaded',
-          rejection_reason: null,
-          document_date: document_date,
-          created_at: new Date().toISOString(),
-        }, 'Document uploaded successfully.');
+        const todayIso = new Date().toISOString().split('T')[0] as string;
+        let documentDate = todayIso;
+        if (type === 'HURU_REPORT') {
+          const raw = typeof req.body.document_date === 'string' ? req.body.document_date.trim() : '';
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(Date.parse(raw))) {
+            fail(res, 'VALIDATION_ERROR', 'The Huru report date is required (YYYY-MM-DD).', 400);
+            return;
+          }
+          if (raw > todayIso) {
+            fail(res, 'VALIDATION_ERROR', 'The Huru report date cannot be in the future.', 400);
+            return;
+          }
+          const oldest = new Date();
+          oldest.setMonth(oldest.getMonth() - 3);
+          if (raw < (oldest.toISOString().split('T')[0] as string)) {
+            fail(res, 'VALIDATION_ERROR', 'The Huru report must not be older than 3 months.', 400);
+            return;
+          }
+          documentDate = raw;
+        }
+
+        const stored = await storage.saveAdminDocument('verification', String(userId), file.buffer, ext);
+        let record;
+        try {
+          record = await documents.create({
+            providerId,
+            type: type as VerificationDocumentType,
+            originalName: sanitizeOriginalFilename(file.originalname),
+            storedName: stored.storageKey,
+            mime: validation.mime ?? 'application/pdf',
+            size: file.size,
+            documentDate,
+          });
+        } catch (dbErr) {
+          await storage.remove(stored.storageKey);
+          throw dbErr;
+        }
+
+        if (type !== 'QUALIFICATION') {
+          const previous = (await documents.listByProvider(providerId)).filter(
+            (d) => d.type === type && d.id !== record.id && d.status !== 'approved',
+          );
+          for (const old of previous) {
+            await documents.delete(providerId, old.id);
+            await storage.remove(old.stored_name);
+          }
+        }
+
+        ok(res, record, 'Document uploaded successfully.');
       } catch (err) {
         fail(res, 'INTERNAL_ERROR', 'Could not upload document. Please try again.', 500);
       }
@@ -161,14 +255,25 @@ await storage.save(storedName, file.buffer, ext);
       try {
         const userId = req.user.id;
 
+        const providerId = await documents.findProfessionalProfileByUserId(String(userId));
+        const docs: VerificationDocument[] = providerId ? await documents.listByProvider(providerId) : [];
+        // listByProvider returns newest first, so find() yields the latest upload.
+        const item = (t: VerificationDocumentType) => {
+          const d = docs.find((x) => x.type === t);
+          return { status: d?.status ?? 'missing', document_id: d?.id ?? null, file_name: d?.original_name ?? null };
+        };
+
         const status = {
           status: 'unverified',
-          huru_report: { status: 'missing', document_date: null },
-          certified_id: { status: 'missing' },
-          proof_of_residence: { status: 'missing' },
-          qualifications: { status: 'missing', count: 0 },
-          profile_picture: { status: 'missing' },
-          selfie: { status: 'missing' },
+          huru_report: {
+            ...item('HURU_REPORT'),
+            document_date: docs.find((x) => x.type === 'HURU_REPORT')?.document_date ?? null,
+          },
+          certified_id: item('ID_COPY'),
+          proof_of_residence: item('PROOF_OF_RESIDENCE'),
+          qualifications: { ...item('QUALIFICATION'), count: docs.filter((x) => x.type === 'QUALIFICATION').length },
+          profile_picture: item('PROFILE_PICTURE'),
+          selfie: item('SELFIE'),
           phone_verified: false,
           email_verified: false,
           pending_since: null,
@@ -324,13 +429,13 @@ export function validateVerificationDocumentUpload(
   }
   const detected = detectImageType(file.buffer);
   if (!detected) {
-    const isPDF = file.buffer.length >= 4 && file.buffer[0] === 0x25 && file.buffer[1] === 0x25 && file.buffer[2] === 0x45 && file.buffer[3] === 0x0d;
+    const isPDF = file.buffer.length >= 4 && file.buffer[0] === 0x25 && file.buffer[1] === 0x50 && file.buffer[2] === 0x44 && file.buffer[3] === 0x46;
     if (!isPDF) return { valid: false, error: 'Only PDF, JPEG, PNG files are allowed.' };
   }
   let ext: string;
   if (detected === 'image/png') ext = 'png';
   else if (detected === 'image/jpeg') ext = 'jpg';
-  else if (file.buffer[0] === 0x25 && file.buffer[1] === 0x25 && file.buffer[2] === 0x45 && file.buffer[3] === 0x0d) ext = 'pdf';
+  else if (file.buffer[0] === 0x25 && file.buffer[1] === 0x50 && file.buffer[2] === 0x44 && file.buffer[3] === 0x46) ext = 'pdf';
   else ext = 'bin';
 
   return { valid: true, mime: detected || 'application/pdf', extension: ext };

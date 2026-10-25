@@ -48,6 +48,9 @@ import { makeSavedProvidersRoutes } from './modules/saved-providers/saved-provid
 import { MemorySavedProvidersStore } from './modules/saved-providers/memory-saved-providers.store';
 import { MysqlSavedProvidersStore } from './modules/saved-providers/mysql-saved-providers.store';
 import type { SavedProvidersStore } from './modules/saved-providers/saved-providers.store';
+import { MemoryVerificationDocumentStore } from './modules/verification/memory-verification.store';
+import { MysqlVerificationDocumentStore } from './modules/verification/mysql-verification.store';
+import type { VerificationDocumentStore } from './modules/verification/verification.store';
 import { fail } from './utils/response';
 import { errorHandler } from './middleware/error';
 import { makeAdminRoutes } from './modules/admin/admin.routes';
@@ -103,6 +106,8 @@ export interface AppDeps {
    * constructions keep compiling; defaults to a memory store.
    */
   savedProviders?: SavedProvidersStore;
+  /** Provider verification documents (migration 020). Defaults to a memory store. */
+  verificationDocuments?: VerificationDocumentStore;
 }
 
 export function resolveDeps(): AppDeps {
@@ -124,6 +129,7 @@ export function resolveDeps(): AppDeps {
       admin: new MemoryAdminStore(users),
       offerings: new MemoryOfferingsStore(),
       savedProviders: new MemorySavedProvidersStore(),
+      verificationDocuments: new MemoryVerificationDocumentStore(),
     };
   }
   const pool = getPool();
@@ -141,6 +147,7 @@ export function resolveDeps(): AppDeps {
     admin: new MysqlAdminStore(pool),
     offerings: new MysqlOfferingsStore(pool),
     savedProviders: new MysqlSavedProvidersStore(pool),
+    verificationDocuments: new MysqlVerificationDocumentStore(pool),
   };
 }
 
@@ -207,6 +214,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
   const admin = deps.admin ?? new MemoryAdminStore(deps.users);
   const offerings = deps.offerings ?? new MemoryOfferingsStore();
   const savedProviders = deps.savedProviders ?? new MemorySavedProvidersStore();
+  const verificationDocuments = deps.verificationDocuments ?? new MemoryVerificationDocumentStore();
 
   app.use('/api/v1/auth', makeAuthRoutes(deps.users, deps.refreshStore, opsAlert));
   app.use('/api/v1', makeMarketplaceRoutes(deps.marketplace));
@@ -250,7 +258,7 @@ export function createApp(deps: AppDeps = resolveDeps()): express.Express {
     app.use('/api/v1', makeProviderAreasRoutes(deps.marketplace, quotes, deps.users));
   }
   // Provider verification checklist and document management.
-  app.use('/api/v1', makeVerificationRoutes(storage, deps.users));
+  app.use('/api/v1', makeVerificationRoutes(storage, deps.users, verificationDocuments));
   app.use('/api/v1', makeAdminRoutes(deps.users, admin, storage));
 
   // Standard 404 envelope for unknown API routes.

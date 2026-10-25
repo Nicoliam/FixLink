@@ -1,0 +1,31 @@
+/* Provider verification: Documents card */
+.fl-doc-list { list-style: none; margin: 0; padding: 0; }
+.fl-doc-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-top: 1px solid #e3e9f0; }
+.fl-doc-row:first-child { border-top: 0; }
+.fl-doc-info { display: flex; align-items: flex-start; gap: 14px; min-width: 0; flex: 1; }
+.fl-doc-icon { flex: none; width: 40px; height: 40px; border-radius: 10px; background: #e8f3fc; color: #1f78c8; display: grid; place-items: center; }
+.fl-doc-icon svg { width: 20px; height: 20px; }
+.fl-doc-text { min-width: 0; }
+.fl-doc-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 1rem; font-weight: 600; color: #0f2557; }
+.fl-doc-sub { margin-top: 4px; font-size: 0.875rem; color: #5b6b7f; overflow-wrap: anywhere; }
+.fl-doc-date { display: block; margin-top: 10px; font-size: 0.8125rem; color: #5b6b7f; }
+.fl-doc-date input { display: block; margin-top: 4px; padding: 8px 10px; border: 1px solid #c9d6e3; border-radius: 8px; font: inherit; font-size: 0.9375rem; color: #0f2557; }
+.fl-doc-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+.fl-doc-badge-missing { background: #eef1f5; color: #5b6b7f; }
+.fl-doc-badge-uploaded { background: #e1f0fd; color: #1565a8; }
+.fl-doc-badge-approved { background: #e0f5e9; color: #1e7a46; }
+.fl-doc-badge-rejected { background: #fde8e6; color: #b3261e; }
+.fl-doc-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.fl-icon-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 10px; border: 1px solid #c9d6e3; background: #fff; color: #1f78c8; cursor: pointer; }
+.fl-icon-btn:hover { background: #e8f3fc; border-color: #3a84c4; }
+.fl-icon-btn svg { width: 19px; height: 19px; }
+.fl-icon-btn-danger { color: #c0392b; }
+.fl-icon-btn-danger:hover { background: #fdecea; border-color: #c0392b; }
+.fl-doc-btn { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.fl-doc-btn svg { width: 18px; height: 18px; }
+.fl-doc-working { font-size: 0.875rem; color: #5b6b7f; }
+.fl-doc-message { margin: 0 0 8px; padding: 10px 14px; border-radius: 10px; background: #e8f3fc; color: #0f2557; font-size: 0.9375rem; }
+@media (max-width: 560px) {
+  .fl-doc-row { flex-direction: column; align-items: stretch; }
+  .fl-doc-actions { justify-content: flex-start; }
+}

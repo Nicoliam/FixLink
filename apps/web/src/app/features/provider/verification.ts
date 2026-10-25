@@ -4,7 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { VerificationService } from '../../core/services/verification.service';
 import { getApiErrorMessage } from '../../core/models/api.model';
-import type { VerificationDocumentType, VerificationStatus } from '../../core/models/verification.model';
+import type { VerificationDocumentType, VerificationItem, VerificationStatus } from '../../core/models/verification.model';
 
 import { DOCUMENT_STATUS_KEY } from '../../core/models/verification.model';
 
@@ -12,6 +12,7 @@ import { DOCUMENT_STATUS_KEY } from '../../core/models/verification.model';
   selector: 'app-verification',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './verification.html',
+  styleUrl: './verification.css',
 })
 export class VerificationComponent {
   private readonly api = inject(VerificationService);
@@ -23,12 +24,12 @@ export class VerificationComponent {
   protected readonly errorCode = signal<string | null>(null);
   protected readonly verification = signal<VerificationStatus>({
     status: 'unverified',
-    huru_report: { status: 'missing', document_date: null },
-    certified_id: { status: 'missing' },
-    proof_of_residence: { status: 'missing' },
-    qualifications: { status: 'missing', count: 0 },
-    profile_picture: { status: 'missing' },
-    selfie: { status: 'missing' },
+    huru_report: { status: 'missing', document_id: null, file_name: null, document_date: null },
+    certified_id: { status: 'missing', document_id: null, file_name: null },
+    proof_of_residence: { status: 'missing', document_id: null, file_name: null },
+    qualifications: { status: 'missing', document_id: null, file_name: null, count: 0 },
+    profile_picture: { status: 'missing', document_id: null, file_name: null },
+    selfie: { status: 'missing', document_id: null, file_name: null },
     phone_verified: false,
     email_verified: false,
     pending_since: null,
@@ -235,12 +236,14 @@ export class VerificationComponent {
     }
 
     this.uploading.set(true);
+    this.activeType.set(field);
     this.api
       .uploadDocument(field, file, documentDate)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.uploading.set(false);
+          this.activeType.set(null);
           input.value = '';
         }),
       )
@@ -253,6 +256,57 @@ export class VerificationComponent {
           this.errorMessage.set(
             getApiErrorMessage(err, 'Could not upload document. Please check the file format and size.'),
           );
+        },
+      });
+  }
+
+  protected readonly activeType = signal<VerificationDocumentType | null>(null);
+
+  protected item(type: VerificationDocumentType): VerificationItem {
+    return this.verification()[this.documentStatusKey[type]];
+  }
+
+  protected viewDocument(type: VerificationDocumentType): void {
+    const id = this.item(type).document_id;
+    if (!id) return;
+    // Open the tab inside the click itself, or Safari blocks it as a pop-up.
+    const tab = window.open('', '_blank');
+    if (!tab) {
+      this.errorMessage.set('Your browser blocked the new tab. Please allow pop-ups for this site and try again.');
+      return;
+    }
+    this.api
+      .viewDocument(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob: Blob) => {
+          const url = URL.createObjectURL(blob);
+          tab.location.href = url;
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        },
+        error: (err: unknown) => {
+          tab.close();
+          this.errorMessage.set(getApiErrorMessage(err, 'Could not open the document. Please try again.'));
+        },
+      });
+  }
+
+  protected removeDocument(type: VerificationDocumentType): void {
+    if (!confirm(`Remove your ${this.TYPE_LABELS[type]}?`)) return;
+    this.activeType.set(type);
+    this.api
+      .deleteDocument(type)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.activeType.set(null)),
+      )
+      .subscribe({
+        next: () => {
+          this.errorMessage.set(`${this.TYPE_LABELS[type]} removed.`);
+          this.refreshStatus();
+        },
+        error: (err: unknown) => {
+          this.errorMessage.set(getApiErrorMessage(err, 'Could not remove the document. Please try again.'));
         },
       });
   }

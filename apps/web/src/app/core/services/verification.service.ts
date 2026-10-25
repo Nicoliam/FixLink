@@ -34,6 +34,13 @@ export class VerificationService {
       .pipe(map((res) => res.data));
   }
 
+  /** Fetch a document the signed-in provider owns, as a Blob, for the View action. */
+  viewDocument(documentId: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/verification/document/${encodeURIComponent(documentId)}/file`, {
+      responseType: 'blob',
+    });
+  }
+
   resendPhoneCode(): Observable<unknown> {
     return this.http.post<ApiSuccess<unknown>>(`${this.baseUrl}/verification/phone-code`, {}).pipe(map((res) => res.data));
   }
