@@ -14,6 +14,7 @@ interface AccountStats {
   completedJobs: number;
   inProgressJobs: number;
   totalSpent: number;
+  newJobs: number;
 }
 
 /**
@@ -127,6 +128,16 @@ export class AccountComponent {
         href,
       },
     ];
+    if (this.isProvider()) {
+      cards.push({
+        tone: 'teal',
+        icon: 'travel_explore',
+        label: 'New Jobs',
+        value: String(s.newJobs),
+        action: 'View available customer jobs and submit quotations',
+        href: ['/open-requests'],
+      });
+    }
     if (this.isCustomer()) {
       cards.push({
         tone: 'teal',
@@ -172,7 +183,7 @@ export class AccountComponent {
       } else if (this.isTechnician()) {
         await this.loadTechnicianData();
       } else {
-        this.stats.set({ totalJobs: 0, completedJobs: 0, inProgressJobs: 0, totalSpent: 0 });
+        this.stats.set({ totalJobs: 0, completedJobs: 0, inProgressJobs: 0, totalSpent: 0, newJobs: 0 });
       }
     } catch {
       this.error.set('Could not load your account data. Please try again.');
@@ -193,6 +204,7 @@ export class AccountComponent {
       completedJobs: completed.length,
       inProgressJobs: inProgress.length,
       totalSpent,
+      newJobs: 0,
     });
 
     this.completedJobs.set(
@@ -206,11 +218,20 @@ export class AccountComponent {
     const completed = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CONFIRMED' || j.status === 'CLOSED');
     const inProgress = jobs.filter((j) => ['REQUESTED', 'QUOTED', 'ACCEPTED', 'SCHEDULED', 'IN_PROGRESS', 'AWAITING_PARTS'].includes(j.status));
 
+    let newJobs = 0;
+    try {
+      const openRequests = await this.jobsApi.listOpenRequests(1, 1).toPromise();
+      newJobs = openRequests?.total ?? 0;
+    } catch {
+      // Keep the main dashboard available if the open-jobs count fails.
+    }
+
     this.stats.set({
       totalJobs: jobs.length,
       completedJobs: completed.length,
       inProgressJobs: inProgress.length,
       totalSpent: 0,
+      newJobs,
     });
 
     this.completedJobs.set(
@@ -237,6 +258,7 @@ export class AccountComponent {
       completedJobs: completed.length,
       inProgressJobs: inProgress.length,
       totalSpent: 0,
+      newJobs: 0,
     });
 
     this.completedJobs.set(
@@ -255,6 +277,7 @@ export class AccountComponent {
       completedJobs: completed.length,
       inProgressJobs: inProgress.length,
       totalSpent: 0,
+      newJobs: 0,
     });
 
     this.completedJobs.set(

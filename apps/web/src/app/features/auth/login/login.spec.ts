@@ -111,7 +111,7 @@ describe('LoginComponent', () => {
       data: { user: { ...mockUser, roles: ['PROFESSIONAL'] }, accessToken: 'a', refreshToken: 'r' },
     });
 
-    expect(navigateSpy).toHaveBeenCalledWith('/requests');
+    expect(navigateSpy).toHaveBeenCalledWith('/account');
   });
 
   it('falls back to /account when the session has no recognised role', async () => {

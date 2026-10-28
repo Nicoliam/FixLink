@@ -39,6 +39,10 @@ export class App {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
+  /** True on /admin pages, where the public header and footer are hidden. */
+  protected readonly isAdminRoute = signal(globalThis.location?.pathname?.startsWith('/admin') ?? false);
+  protected readonly isBusinessRoute = signal(globalThis.location?.pathname?.startsWith('/business') ?? false);
+
   /**
    * Customer session: replaces the marketing Login / Create account /
    * search CTA with My Jobs + Account navigation and the session actions.
@@ -97,6 +101,11 @@ export class App {
   protected readonly formatTime = formatNotificationTime;
 
   constructor() {
+    const routeSub = this.router.events.subscribe(() => {
+      this.isAdminRoute.set(this.router.url.startsWith('/admin'));
+      this.isBusinessRoute.set(this.router.url.startsWith('/business'));
+    });
+    this.destroyRef.onDestroy(() => routeSub.unsubscribe());
     effect(() => {
       if (this.auth.isAuthenticated()) {
         this.notifications.startPolling();

@@ -5,6 +5,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { Component } from '@angular/core';
 import { vi } from 'vitest';
 import { RegisterComponent } from './register';
+import { roleLandingRoute } from '../../../core/routing/role-landing';
 import { API_BASE_URL } from '../../../core/config/api-config';
 import type { AuthUser, SelfRegisterRole } from '../../../core/models/auth.model';
 
@@ -34,11 +35,15 @@ const validDetails = {
   businessName: 'Mokoena Plumbing',
 };
 
-/** Landing route each self-registerable role is sent to. */
+/**
+ * Landing route each self-registerable role is sent to by `roleLandingRoute`.
+ * Derived from the product code so it cannot drift. (A professional goes to
+ * /verification straight after registering; the provider tests assert that.)
+ */
 const LANDING: Record<SelfRegisterRole, string> = {
-  CUSTOMER: '/my-jobs',
-  PROFESSIONAL: '/requests',
-  BUSINESS_OWNER: '/business',
+  CUSTOMER: roleLandingRoute(['CUSTOMER']),
+  PROFESSIONAL: roleLandingRoute(['PROFESSIONAL']),
+  BUSINESS_OWNER: roleLandingRoute(['BUSINESS_OWNER']),
 };
 
 /** The public catalogue a provider picks from on the services step. */

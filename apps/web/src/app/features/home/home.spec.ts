@@ -157,7 +157,7 @@ describe('HomeComponent marketplace foundation', () => {
     });
     const text = (fixture.nativeElement as HTMLElement).querySelector('.fl-professional-card')?.textContent ?? '';
 
-    expect(text).toContain('Call out from');
+    expect(text).toContain('Call-out fee:');
     expect(text).toContain('R1,250');
   });
 

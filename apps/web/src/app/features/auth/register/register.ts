@@ -334,7 +334,7 @@ export class RegisterComponent {
     // Retry the services instead.
     const created = this.accountCreated();
     if (created !== null) {
-      void this.saveSelectedServices(created.roles);
+      void this.finishSetup(created.roles);
       return;
     }
 
@@ -356,6 +356,7 @@ export class RegisterComponent {
     // here to avoid 422 validation errors.
     const registrationBody: RegisterRequest = {
       email,
+      phone: phone.trim() || undefined,
       password,
       role,
       firstName: this.isCustomer && firstName ? firstName : '',
@@ -369,14 +370,8 @@ export class RegisterComponent {
       .subscribe({
         next: (user) => {
           this.accountCreated.set(user);
-          // A customer has no services, so they are done. A provider's ticked
-          // services are saved now, on this same step, so a failure can be
-          // retried without discarding the account they just created.
-          if (this.isProviderRole) {
-            void this.saveSelectedServices(user.roles);
-          }
           this.isSubmitting.set(false);
-          void this.router.navigateByUrl('/verification');
+          void this.finishSetup(user.roles);
         },
         error: (error: unknown) => {
           this.isSubmitting.set(false);
@@ -433,8 +428,8 @@ export class RegisterComponent {
    * where the button becomes "Finish setup" so the remaining services can be
    * retried.
    */
-  private async saveSelectedServices(roles: readonly UserRole[]): Promise<void> {
-    if (this.savingServices()) return;
+  private async saveSelectedServices(roles: readonly UserRole[]): Promise<boolean> {
+    if (this.savingServices()) return false;
     // Already-created offerings are excluded, so a retry after a partial save
     // finishes the remainder instead of failing on duplicates.
     const selected = this.allServices().filter(
@@ -442,7 +437,7 @@ export class RegisterComponent {
     );
     if (selected.length === 0 || this.servicesSavingUnavailable) {
       this.isSubmitting.set(false);
-      return;
+      return true;
     }
 
     this.savingServices.set(true);
@@ -478,8 +473,20 @@ export class RegisterComponent {
       this.servicesSaveError.set(
         `Saved ${this.savedServiceIds.size} of ${this.selectedCount()} services. You can add the rest from My Services.`,
       );
-      return;
+      return false;
     }
+    return true;
+  }
+
+  /**
+   * Save a provider's ticked services, then leave the form. Staying put on a
+   * failed save keeps the message and the "Finish setup" retry in view.
+   * Professionals go on to verification; every other role to its landing page.
+   */
+  private async finishSetup(roles: readonly UserRole[]): Promise<void> {
+    const allSaved = this.isProviderRole ? await this.saveSelectedServices(roles) : true;
+    if (!allSaved) return;
+    await this.router.navigateByUrl(this.isProfessional ? '/verification' : roleLandingRoute(roles));
   }
 
   /** True when the picker cannot be used, so saving is skipped not attempted. */

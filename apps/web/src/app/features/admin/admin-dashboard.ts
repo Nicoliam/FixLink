@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { getApiErrorMessage } from '../../core/models/api.model';
 import { AdminApiService } from '../../core/services/admin-api.service';
+import { AuthService } from '../../core/services/auth.service';
 import type { AdminDashboard } from '../../core/models/admin.model';
 
 @Component({
@@ -11,7 +12,17 @@ import type { AdminDashboard } from '../../core/models/admin.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="admin-page">
-      <header class="admin-page-header"><div><p class="admin-eyebrow">Operations overview</p><h1>Dashboard</h1><p>Monitor Fixlynk activity and the work that needs attention.</p></div><span class="admin-live"><i></i> Live data</span></header>
+      <header class="admin-page-header"><div><p class="admin-eyebrow">Operations overview</p><h1>Dashboard</h1><p>Monitor Fixlynk activity and the work that needs attention.</p></div><div class="admin-dashboard-actions">
+          <span class="admin-live"><i></i> Live data</span>
+          <button type="button" class="admin-header-logout"
+            (click)="logout()" [disabled]="isLoggingOut()"
+            [attr.aria-label]="isLoggingOut() ? 'Logging out' : 'Log out'"
+            title="Log out">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>
+            </svg>
+          </button>
+        </div></header>
       @if (loading()) { <div class="admin-state" role="status">Loading dashboard…</div> }
       @else if (error()) { <div class="admin-state admin-state-error" role="alert"><h2>Dashboard unavailable</h2><p>{{ error() }}</p><button class="admin-btn" type="button" (click)="load()">Try again</button></div> }
       @else if (dashboard(); as data) {
@@ -31,12 +42,25 @@ import type { AdminDashboard } from '../../core/models/admin.model';
 })
 export class AdminDashboardComponent implements OnInit {
   private readonly api = inject(AdminApiService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  protected readonly isLoggingOut = signal(false);
   protected readonly dashboard = signal<AdminDashboard | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
 
   ngOnInit(): void { this.load(); }
+
+  protected logout(): void {
+    if (this.isLoggingOut()) return;
+    this.isLoggingOut.set(true);
+    this.auth.logout().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => void this.router.navigate(['/']),
+      error: () => void this.router.navigate(['/']),
+      complete: () => this.isLoggingOut.set(false),
+    });
+  }
 
   protected load(): void {
     this.loading.set(true);

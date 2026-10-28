@@ -10,8 +10,8 @@ import type { UserRole } from '../models/auth.model';
  */
 const ROLE_LANDING: Readonly<Record<UserRole, string>> = {
   ADMIN: '/account',
-  BUSINESS_OWNER: '/account',
-  BUSINESS_MANAGER: '/account',
+  BUSINESS_OWNER: '/business',
+  BUSINESS_MANAGER: '/business',
   TECHNICIAN: '/account',
   PROFESSIONAL: '/account',
   CUSTOMER: '/account',

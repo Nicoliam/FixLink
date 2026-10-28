@@ -59,7 +59,11 @@ test-results/
 backend/probe3307.mjs
 backend/preview-alerts.ts
 backend/alert-preview/
-deploy/
+deploy/*
+!deploy/sql/
+deploy/sql/*
+!deploy/sql/*.sql
+!deploy/sql/README.md
 
 *.zip
 *.backup

@@ -130,7 +130,7 @@ describe('AccountComponent overview cards', () => {
   it('points a professional at their requests list', async () => {
     await setup({ roles: ['PROFESSIONAL'] });
     const hrefs = cards().map((c) => c.getAttribute('href'));
-    expect(new Set(hrefs)).toEqual(new Set(['/requests']));
+    expect(new Set(hrefs)).toEqual(new Set(['/requests', '/open-requests']));
   });
 
   it('gives each card a distinct tone, icon and label, so colour is never the only cue', async () => {
@@ -156,7 +156,7 @@ describe('AccountComponent overview cards', () => {
   it('hides "Total spent" from a professional, who earns rather than spends here', async () => {
     await setup({ roles: ['PROFESSIONAL'] });
     expect(text()).not.toContain('Total spent');
-    expect(cards().length).toBe(3);
+    expect(cards().length).toBe(4);
   });
 
   it('shows "Total spent" to a customer', async () => {

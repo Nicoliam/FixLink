@@ -106,50 +106,61 @@ export const routes: Routes = [
   },
   {
     path: 'business',
+    canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/business/business-dashboard').then((m) => m.BusinessDashboardComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/technicians',
-    loadComponent: () =>
-      import('./features/business/technician-list').then((m) => m.TechnicianListComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/technicians/:id',
-    loadComponent: () =>
-      import('./features/business/technician-detail').then((m) => m.TechnicianDetailComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/customers',
-    loadComponent: () =>
-      import('./features/business/business-customers').then((m) => m.BusinessCustomersComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/jobs',
-    loadComponent: () =>
-      import('./features/business/business-jobs-list').then((m) => m.BusinessJobsListComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/jobs/new',
-    loadComponent: () => import('./features/business/business-job-new').then((m) => m.BusinessJobNewComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/jobs/:id',
-    loadComponent: () =>
-      import('./features/business/business-job-detail').then((m) => m.BusinessJobDetailComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'business/profile',
-    loadComponent: () =>
-      import('./features/business/business-profile').then((m) => m.BusinessProfileComponent),
-    canActivate: [authGuard],
+      import('./features/business/business-shell').then((m) => m.BusinessShellComponent),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/business/business-dashboard').then((m) => m.BusinessDashboardComponent),
+      },
+      {
+        path: 'technicians',
+        loadComponent: () =>
+          import('./features/business/technician-list').then((m) => m.TechnicianListComponent),
+      },
+      {
+        path: 'technicians/:id',
+        loadComponent: () =>
+          import('./features/business/technician-detail').then((m) => m.TechnicianDetailComponent),
+      },
+      {
+        path: 'customers',
+        loadComponent: () =>
+          import('./features/business/business-customers').then((m) => m.BusinessCustomersComponent),
+      },
+      {
+        path: 'areas',
+        loadComponent: () =>
+          import('./features/provider/my-areas').then((m) => m.MyAreasComponent),
+      },
+      {
+        path: 'services',
+        loadComponent: () =>
+          import('./features/provider/my-services').then((m) => m.MyServicesComponent),
+      },
+      {
+        path: 'jobs',
+        loadComponent: () =>
+          import('./features/business/business-jobs-list').then((m) => m.BusinessJobsListComponent),
+      },
+      {
+        path: 'jobs/new',
+        loadComponent: () =>
+          import('./features/business/business-job-new').then((m) => m.BusinessJobNewComponent),
+      },
+      {
+        path: 'jobs/:id',
+        loadComponent: () =>
+          import('./features/business/business-job-detail').then((m) => m.BusinessJobDetailComponent),
+      },
+      {
+        path: 'profile',
+        loadComponent: () =>
+          import('./features/business/business-profile').then((m) => m.BusinessProfileComponent),
+      },
+    ],
   },
   {
     path: 'technician/jobs',

@@ -43,22 +43,16 @@
 -- columns are computed on read, which MySQL permits alongside a foreign key,
 -- and they can still be indexed, so the unique key behaves as intended.
 --
--- The same restriction applies to CHECK constraints: a base column cannot
--- appear in both a CHECK constraint and a foreign key carrying a referential
--- action. So the exactly-one-owner rule is written against the generated keys
--- too. Migration 008 documented this rule as backend-enforced; enforcing it
--- at the column as well means a programming error cannot persist a row that
--- is saved to nobody or to both a professional and a business at once.
+-- This migration enforces bookmark uniqueness only. It does not add a
+-- database CHECK constraint for the exactly-one-owner rule. That rule remains
+-- dependent on backend validation, so the application must ensure that exactly
+-- one of saved_professional_id or saved_business_id is set for every row.
 --
--- MariaDB 10.6 (production target) rejects any reference to a generated
--- column inside a CHECK clause (error 1901: "Function or expression '...'
--- cannot be used in the CHECK clause"), while MySQL 8 accepts it. The CHECK
--- is therefore written against the nullable base columns using the same
--- COALESCE(..., 0) mapping the generated keys use. The two forms are
--- equivalent: every real id is an AUTO_INCREMENT value >= 1, so
--- COALESCE(col, 0) > 0 is true exactly when col IS NOT NULL, and
--- COALESCE(col, 0) = 0 is true exactly when col IS NULL. The exactly-one-
--- owner rule is preserved unchanged.
+-- MariaDB 10.6 (production target) rejects references to generated columns
+-- inside CHECK clauses (error 1901). This migration therefore avoids adding a
+-- CHECK constraint and uses the VIRTUAL generated columns only for the unique
+-- index. The existing records were separately checked before deployment for
+-- invalid owner combinations.
 --
 -- The owner is customer_profiles.id, not users.id, which is what migration 008
 -- chose and what the customer journey means: a bookmark belongs to the
@@ -85,7 +79,7 @@ DELETE `a` FROM `saved_professionals` `a`
 -- the foreign key to whichever index it picks, which makes the duplicate
 -- undroppable ("Cannot drop index ... needed in a foreign key constraint").
 -- That breaks the Down migration, so this one adds only the unique key and the
--- check, both of which the table genuinely lacks.
+-- generated columns and unique key, which the table genuinely lacks.
 
 ALTER TABLE `saved_professionals`
   ADD COLUMN `professional_key` BIGINT UNSIGNED
